@@ -111,3 +111,35 @@ CREATE TABLE keyword_alias (
 
     CONSTRAINT fk_alias_keyword FOREIGN KEY (keyword_id) REFERENCES keyword(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- topic_subscription (토픽 구독)
+CREATE TABLE topic_subscription (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    member_id  BIGINT   NOT NULL,
+    topic_id   BIGINT   NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_topicsub (member_id, topic_id),
+    INDEX idx_topicsub_fanout (topic_id, member_id),
+
+    CONSTRAINT fk_topicsub_member FOREIGN KEY (member_id) REFERENCES member(id) ON DELETE CASCADE,
+    CONSTRAINT fk_topicsub_topic  FOREIGN KEY (topic_id)  REFERENCES topic(id)  ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- keyword_subscription (키워드 구독)
+CREATE TABLE keyword_subscription (
+    id         BIGINT   NOT NULL AUTO_INCREMENT,
+    member_id  BIGINT   NOT NULL,
+    keyword_id BIGINT   NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_kwsub (member_id, keyword_id),
+    INDEX idx_kwsub_fanout (keyword_id, member_id),
+
+    CONSTRAINT fk_kwsub_member  FOREIGN KEY (member_id)  REFERENCES member(id)  ON DELETE CASCADE,
+    CONSTRAINT fk_kwsub_keyword FOREIGN KEY (keyword_id) REFERENCES keyword(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
