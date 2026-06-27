@@ -65,6 +65,38 @@ CREATE TABLE topic_keyword (
     CONSTRAINT fk_tk_keyword FOREIGN KEY (keyword_id) REFERENCES keyword(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- article
+CREATE TABLE article (
+    id           BIGINT       NOT NULL AUTO_INCREMENT,
+    blog_id      BIGINT       NOT NULL,
+    title        VARCHAR(500) NOT NULL,
+    url          VARCHAR(512) NOT NULL,
+    published_at DATETIME     NOT NULL,
+    collected_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_article_url (url),
+    INDEX idx_article_blog_pub (blog_id, published_at),
+    INDEX idx_article_pub (published_at),
+
+    CONSTRAINT fk_article_blog FOREIGN KEY (blog_id) REFERENCES blog(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- article_keyword (매칭 결과)
+CREATE TABLE article_keyword (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    article_id  BIGINT      NOT NULL,
+    keyword_id  BIGINT      NOT NULL,
+    matched_via VARCHAR(20) NULL,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_article_keyword (article_id, keyword_id),
+    INDEX idx_ak_keyword (keyword_id),
+
+    CONSTRAINT fk_ak_article FOREIGN KEY (article_id) REFERENCES article(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ak_keyword FOREIGN KEY (keyword_id) REFERENCES keyword(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- keyword_alias
 CREATE TABLE keyword_alias (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
