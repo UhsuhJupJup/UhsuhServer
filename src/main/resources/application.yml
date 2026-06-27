@@ -1,3 +1,18 @@
 spring:
   application:
     name: backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/uhseojupjup?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: uhseojupjup
+    password: 0000
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+firebase:
+  service-account-path: ${UHSEOJUPJUP_FIREBASE_CREDENTIALS_PATH}
