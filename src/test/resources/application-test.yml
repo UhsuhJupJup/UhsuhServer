@@ -2,10 +2,6 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:db/schema.sql
 
 firebase:
   enabled: false

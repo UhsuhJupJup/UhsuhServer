@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
 import uhseojupjup.backend.common.auth.AuthUser;
 import uhseojupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhseojupjup.backend.common.exception.BusinessException;
@@ -26,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 class MemberIntegrationTest extends MySqlTestSupport {
 
     @Autowired
