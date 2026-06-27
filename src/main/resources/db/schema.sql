@@ -15,6 +15,20 @@ CREATE TABLE member (
     UNIQUE KEY uk_member_unsub (unsubscribe_token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- blog
+CREATE TABLE blog (
+    id         BIGINT       NOT NULL AUTO_INCREMENT,
+    name       VARCHAR(100) NOT NULL,
+    domain     VARCHAR(255) NOT NULL,
+    rss_url    VARCHAR(500) NOT NULL,
+    active     BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_blog_domain (domain)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- topic
 CREATE TABLE topic (
     id         BIGINT       NOT NULL AUTO_INCREMENT,
