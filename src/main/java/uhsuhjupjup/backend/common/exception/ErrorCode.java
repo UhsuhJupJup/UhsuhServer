@@ -23,7 +23,10 @@ public enum ErrorCode {
     TOPIC_NOT_FOUND(HttpStatus.NOT_FOUND, "토픽을 찾을 수 없습니다."),
     KEYWORD_NOT_FOUND(HttpStatus.NOT_FOUND, "키워드를 찾을 수 없습니다."),
     BLOG_NOT_FOUND(HttpStatus.NOT_FOUND, "블로그를 찾을 수 없습니다."),
-    ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 글을 찾을 수 없습니다.");
+    ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 글을 찾을 수 없습니다."),
+
+    CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "수신 동의가 필요합니다."),
+    INVALID_UNSUBSCRIBE_TOKEN(HttpStatus.NOT_FOUND, "유효하지 않은 수신거부 링크입니다.");
 
     private final HttpStatus status;
     private final String message;
