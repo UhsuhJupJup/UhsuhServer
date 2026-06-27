@@ -10,7 +10,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.TopicFixture;
-import uhsuhjupjup.backend.topic.application.TopicDetailResult;
+import uhsuhjupjup.backend.topic.application.dto.TopicDetailResult;
 import uhsuhjupjup.backend.topic.application.TopicService;
 import uhsuhjupjup.backend.topic.domain.Topic;
 

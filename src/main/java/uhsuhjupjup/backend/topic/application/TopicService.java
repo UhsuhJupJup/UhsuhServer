@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.topic.application.dto.TopicDetailResult;
 import uhsuhjupjup.backend.topic.domain.Topic;
 import uhsuhjupjup.backend.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;

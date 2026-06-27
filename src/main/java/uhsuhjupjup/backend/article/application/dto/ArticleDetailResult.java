@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.article.application;
+package uhsuhjupjup.backend.article.application.dto;
 
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;

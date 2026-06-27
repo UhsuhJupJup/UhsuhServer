@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.article.ui.dto;
 
-import uhsuhjupjup.backend.article.application.ArticleDetailResult;
+import uhsuhjupjup.backend.article.application.dto.ArticleDetailResult;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.blog.ui.dto.BlogResponse;
 

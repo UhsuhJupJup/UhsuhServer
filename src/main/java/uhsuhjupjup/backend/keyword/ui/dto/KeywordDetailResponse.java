@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.keyword.ui.dto;
 
-import uhsuhjupjup.backend.keyword.application.KeywordDetailResult;
+import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
 import uhsuhjupjup.backend.topic.ui.dto.TopicResponse;
 
 import java.util.List;
