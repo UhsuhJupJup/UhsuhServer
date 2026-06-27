@@ -8,10 +8,6 @@ import java.util.List;
 
 public interface TopicKeywordRepository extends JpaRepository<TopicKeyword, Long> {
 
-    List<TopicKeyword> findByTopicId(Long topicId);
-
-    List<TopicKeyword> findByKeywordId(Long keywordId);
-
     @Query("select tk from TopicKeyword tk join fetch tk.keyword where tk.topic.id = :topicId order by tk.keyword.name")
     List<TopicKeyword> findWithKeywordByTopicId(Long topicId);
 
