@@ -2,9 +2,11 @@ package uhseojupjup.backend.topic.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uhseojupjup.backend.topic.application.TopicService;
+import uhseojupjup.backend.topic.ui.dto.TopicDetailResponse;
 import uhseojupjup.backend.topic.ui.dto.TopicResponse;
 
 import java.util.List;
@@ -21,5 +23,10 @@ public class TopicController {
         return topicService.findAll().stream()
                 .map(TopicResponse::from)
                 .toList();
+    }
+
+    @GetMapping("/{id}")
+    public TopicDetailResponse detail(@PathVariable Long id) {
+        return TopicDetailResponse.from(topicService.getDetail(id));
     }
 }
