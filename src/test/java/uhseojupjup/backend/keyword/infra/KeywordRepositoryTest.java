@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import uhseojupjup.backend.config.JpaAuditingConfig;
 import uhseojupjup.backend.keyword.domain.Keyword;
+import uhseojupjup.backend.keyword.domain.KeywordAlias;
 import uhseojupjup.backend.support.MySqlTestSupport;
 
 import java.util.List;
@@ -27,6 +28,9 @@ class KeywordRepositoryTest extends MySqlTestSupport {
     @Autowired
     private KeywordRepository keywordRepository;
 
+    @Autowired
+    private KeywordAliasRepository keywordAliasRepository;
+
     @Test
     void findAllByOrderByNameAsc_ordersByName() {
         keywordRepository.saveAll(List.of(Keyword.create("Redis"), Keyword.create("Kafka")));
@@ -37,12 +41,23 @@ class KeywordRepositoryTest extends MySqlTestSupport {
     }
 
     @Test
-    void findByNameContainingIgnoreCase_matchesCaseInsensitively() {
-        keywordRepository.saveAll(List.of(Keyword.create("Kafka"), Keyword.create("Redis")));
+    void searchByNameOrAlias_matchesByName() {
+        keywordRepository.saveAll(List.of(Keyword.create("MySQL"), Keyword.create("Redis")));
 
-        assertThat(keywordRepository.findByNameContainingIgnoreCaseOrderByNameAsc("ka"))
+        assertThat(keywordRepository.searchByNameOrAlias("sql"))
                 .extracting(Keyword::getName)
-                .containsExactly("Kafka");
+                .containsExactly("MySQL");
+    }
+
+    @Test
+    void searchByNameOrAlias_matchesByAlias() {
+        Keyword mysql = keywordRepository.save(Keyword.create("MySQL"));
+        keywordRepository.save(Keyword.create("Redis"));
+        keywordAliasRepository.save(KeywordAlias.create(mysql.getId(), "마이에스큐엘"));
+
+        assertThat(keywordRepository.searchByNameOrAlias("마이"))
+                .extracting(Keyword::getName)
+                .containsExactly("MySQL");
     }
 
     @Test

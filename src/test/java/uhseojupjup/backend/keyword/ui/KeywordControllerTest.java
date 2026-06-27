@@ -7,8 +7,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uhseojupjup.backend.keyword.application.KeywordDetailResult;
 import uhseojupjup.backend.keyword.application.KeywordService;
+import uhseojupjup.backend.keyword.domain.Keyword;
 import uhseojupjup.backend.support.KeywordFixture;
+import uhseojupjup.backend.support.TopicFixture;
 
 import java.util.List;
 
@@ -32,7 +35,7 @@ class KeywordControllerTest {
 
     @Test
     void list_returnsKeywords() throws Exception {
-        given(keywordService.search(null)).willReturn(List.of(KeywordFixture.keyword(3L, "MySQL")));
+        given(keywordService.search(null, null)).willReturn(List.of(KeywordFixture.keyword(3L, "MySQL")));
 
         mockMvc.perform(get("/api/keywords"))
                 .andExpect(status().isOk())
@@ -42,10 +45,32 @@ class KeywordControllerTest {
 
     @Test
     void list_withQuery_passesQueryToService() throws Exception {
-        given(keywordService.search("ka")).willReturn(List.of(KeywordFixture.keyword(2L, "Kafka")));
+        given(keywordService.search("ka", null)).willReturn(List.of(KeywordFixture.keyword(2L, "Kafka")));
 
         mockMvc.perform(get("/api/keywords").param("q", "ka"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Kafka"));
+    }
+
+    @Test
+    void list_withTopicId_passesTopicIdToService() throws Exception {
+        given(keywordService.search(null, 1L)).willReturn(List.of(KeywordFixture.keyword(3L, "MySQL")));
+
+        mockMvc.perform(get("/api/keywords").param("topicId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("MySQL"));
+    }
+
+    @Test
+    void detail_returnsKeywordWithTopics() throws Exception {
+        Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
+        given(keywordService.getDetail(3L))
+                .willReturn(new KeywordDetailResult(keyword, List.of(TopicFixture.topic(1L, "Database"))));
+
+        mockMvc.perform(get("/api/keywords/3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.topics[0].name").value("Database"));
     }
 }

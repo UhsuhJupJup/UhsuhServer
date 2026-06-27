@@ -10,8 +10,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import uhseojupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhseojupjup.backend.keyword.domain.Keyword;
+import uhseojupjup.backend.keyword.domain.KeywordAlias;
+import uhseojupjup.backend.keyword.infra.KeywordAliasRepository;
 import uhseojupjup.backend.keyword.infra.KeywordRepository;
 import uhseojupjup.backend.support.MySqlTestSupport;
+import uhseojupjup.backend.topic.domain.Topic;
+import uhseojupjup.backend.topic.domain.TopicKeyword;
+import uhseojupjup.backend.topic.infra.TopicKeywordRepository;
+import uhseojupjup.backend.topic.infra.TopicRepository;
 
 import java.util.List;
 
@@ -30,13 +36,33 @@ class KeywordIntegrationTest extends MySqlTestSupport {
     @Autowired
     private KeywordRepository keywordRepository;
 
+    @Autowired
+    private KeywordAliasRepository keywordAliasRepository;
+
+    @Autowired
+    private TopicRepository topicRepository;
+
+    @Autowired
+    private TopicKeywordRepository topicKeywordRepository;
+
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
 
+    private Keyword mysql;
+    private Topic database;
+
     @BeforeEach
     void setUp() {
+        topicKeywordRepository.deleteAll();
+        keywordAliasRepository.deleteAll();
         keywordRepository.deleteAll();
-        keywordRepository.saveAll(List.of(Keyword.create("Redis"), Keyword.create("Kafka"), Keyword.create("MySQL")));
+        topicRepository.deleteAll();
+
+        keywordRepository.saveAll(List.of(Keyword.create("Redis"), Keyword.create("Kafka")));
+        mysql = keywordRepository.save(Keyword.create("MySQL"));
+        keywordAliasRepository.save(KeywordAlias.create(mysql.getId(), "마이에스큐엘"));
+        database = topicRepository.save(Topic.create("Database"));
+        topicKeywordRepository.save(TopicKeyword.of(database, mysql));
     }
 
     @Test
@@ -50,10 +76,34 @@ class KeywordIntegrationTest extends MySqlTestSupport {
     }
 
     @Test
-    void list_withQuery_returnsFiltered() throws Exception {
-        mockMvc.perform(get("/api/keywords").param("q", "ka"))
+    void list_withQuery_searchesByAlias() throws Exception {
+        mockMvc.perform(get("/api/keywords").param("q", "마이"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].name").value("Kafka"));
+                .andExpect(jsonPath("$[0].name").value("MySQL"));
+    }
+
+    @Test
+    void list_withTopicId_returnsTopicKeywords() throws Exception {
+        mockMvc.perform(get("/api/keywords").param("topicId", database.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("MySQL"));
+    }
+
+    @Test
+    void detail_returnsKeywordWithTopics() throws Exception {
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.topics.length()").value(1))
+                .andExpect(jsonPath("$.topics[0].name").value("Database"));
+    }
+
+    @Test
+    void detail_whenNotFound_returns404() throws Exception {
+        mockMvc.perform(get("/api/keywords/999999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
     }
 }
