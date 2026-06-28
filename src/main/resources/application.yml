@@ -12,7 +12,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        show_sql: true
     open-in-view: false
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 10s
 
 firebase:
   service-account-path: ${UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH}
