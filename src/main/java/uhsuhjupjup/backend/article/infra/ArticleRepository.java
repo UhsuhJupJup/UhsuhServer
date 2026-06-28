@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.article.domain.Article;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,4 +26,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
             order by a.publishedAt desc, a.id desc
             """)
     List<Article> search(Long blogId, Long keywordId, Long topicId, String q, Pageable pageable);
+
+    @Query("select a.url from Article a where a.url in :urls")
+    List<String> findExistingUrls(Collection<String> urls);
 }
