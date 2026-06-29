@@ -143,3 +143,19 @@ CREATE TABLE keyword_subscription (
     CONSTRAINT fk_kwsub_member  FOREIGN KEY (member_id)  REFERENCES member(id)  ON DELETE CASCADE,
     CONSTRAINT fk_kwsub_keyword FOREIGN KEY (keyword_id) REFERENCES keyword(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- notification
+CREATE TABLE notification (
+    id               BIGINT       NOT NULL AUTO_INCREMENT,
+    member_id        BIGINT       NOT NULL,
+    article_id       BIGINT       NOT NULL,
+    sent_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    matched_keywords VARCHAR(255) NULL,
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_noti (member_id, article_id),
+    INDEX idx_noti_member_sent (member_id, sent_at),
+
+    CONSTRAINT fk_noti_member  FOREIGN KEY (member_id)  REFERENCES member(id)  ON DELETE CASCADE,
+    CONSTRAINT fk_noti_article FOREIGN KEY (article_id) REFERENCES article(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
