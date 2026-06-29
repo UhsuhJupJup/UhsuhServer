@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.article.domain.Article;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -29,4 +30,6 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
 
     @Query("select a.url from Article a where a.url in :urls")
     List<String> findExistingUrls(Collection<String> urls);
+
+    List<Article> findByCollectedAtGreaterThanEqual(LocalDateTime threshold);
 }

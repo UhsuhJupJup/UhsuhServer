@@ -14,4 +14,7 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
 
     @Query("select ak from ArticleKeyword ak join fetch ak.keyword where ak.article.id in :articleIds order by ak.keyword.name")
     List<ArticleKeyword> findWithKeywordByArticleIdIn(Collection<Long> articleIds);
+
+    @Query("select ak.keyword.id from ArticleKeyword ak where ak.article.id = :articleId")
+    List<Long> findKeywordIdsByArticleId(Long articleId);
 }
