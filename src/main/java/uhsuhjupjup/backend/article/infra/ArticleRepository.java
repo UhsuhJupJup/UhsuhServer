@@ -32,4 +32,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     List<String> findExistingUrls(Collection<String> urls);
 
     List<Article> findByCollectedAtGreaterThanEqual(LocalDateTime threshold);
+
+    @Query("select a from Article a join fetch a.blog where a.id in :ids")
+    List<Article> findWithBlogByIdIn(Collection<Long> ids);
 }

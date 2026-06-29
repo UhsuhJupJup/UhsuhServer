@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8"/>
+</head>
+<body style="margin:0;background:#f5f7f5;">
+<div style="max-width:640px;margin:0 auto;padding:24px 16px;font-family:'Apple SD Gothic Neo',Pretendard,sans-serif;color:#15201a;">
+    <div style="border:1px solid #e4e9e5;border-radius:16px;overflow:hidden;background:#ffffff;">
+        <div style="padding:18px 22px;border-bottom:1px solid #e4e9e5;background:#f7f9f7;">
+            <div style="font-size:12px;color:#5c6b62;">
+                <span style="font-weight:700;color:#15201a;">🧹 어서줍줍</span>
+                · 받는 사람 <span th:text="${subEmail}">user@example.com</span>
+                · <span th:text="${digestDate}">2026.06.29</span>
+            </div>
+            <p style="font-size:18px;font-weight:800;margin:10px 0 0;color:#15201a;">
+                오늘 주워온 글 <span th:text="${digestCount}">3</span>개
+            </p>
+        </div>
+
+        <div style="padding:22px;">
+            <p style="font-size:14px;line-height:1.6;color:#5c6b62;margin:0 0 18px;">
+                구독하신 키워드에 맞는 새 글이 올라왔어요. 제목과 키워드를 보고 원문에서 읽어보세요.
+            </p>
+            <div th:each="a : ${articles}"
+                 style="border:1px solid #e4e9e5;border-radius:12px;padding:16px 18px;margin-bottom:12px;">
+                <div style="font-size:13px;color:#5c6b62;margin-bottom:8px;">
+                    <span style="font-weight:700;color:#15201a;" th:text="${a.blogName()}">블로그</span>
+                    · <span th:text="${a.dateText()}">2026.06.15</span>
+                </div>
+                <a th:href="${a.url()}" target="_blank" rel="noopener"
+                   style="display:block;font-size:17px;font-weight:700;line-height:1.4;color:#15201a;text-decoration:none;margin-bottom:11px;"
+                   th:text="${a.title()}">글 제목</a>
+                <div style="margin-bottom:14px;">
+                    <span th:each="kw : ${a.keywords()}"
+                          style="display:inline-block;font-size:12px;color:#15201a;background:#eef3ee;padding:4px 9px;border-radius:7px;margin:0 6px 6px 0;"
+                          th:text="${kw}">키워드</span>
+                </div>
+                <a th:href="${a.url()}" target="_blank" rel="noopener"
+                   style="display:inline-block;font-size:13px;font-weight:700;color:#ffffff;background:#1f6f4a;padding:10px 16px;border-radius:9px;text-decoration:none;">원문 보기 →</a>
+            </div>
+        </div>
+
+        <div style="padding:20px 22px;border-top:1px solid #e4e9e5;background:#f7f9f7;">
+            <p style="font-size:12px;line-height:1.6;color:#5c6b62;margin:0;">
+                글의 저작권은 원저작자에게 있으며 원문으로 연결됩니다. 더 이상 받고 싶지 않다면
+                <a th:href="${unsubscribeUrl}" style="color:#1f6f4a;font-weight:700;">구독 해지</a> 하세요.
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>
