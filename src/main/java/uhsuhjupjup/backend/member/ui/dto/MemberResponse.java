@@ -8,6 +8,7 @@ public record MemberResponse(
         Long id,
         String email,
         String provider,
+        String role,
         LocalDateTime consentAt,
         LocalDateTime createdAt
 ) {
@@ -16,6 +17,7 @@ public record MemberResponse(
                 member.getId(),
                 member.getEmail(),
                 member.getProvider(),
+                member.getRole().name(),
                 member.getConsentAt(),
                 member.getCreatedAt()
         );
