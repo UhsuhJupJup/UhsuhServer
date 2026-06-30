@@ -8,4 +8,8 @@ import java.util.List;
 public interface BlogRepository extends JpaRepository<Blog, Long> {
 
     List<Blog> findByActiveTrueOrderByIdAsc();
+
+    List<Blog> findAllByOrderByIdAsc();
+
+    boolean existsByDomain(String domain);
 }

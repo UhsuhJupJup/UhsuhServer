@@ -47,4 +47,8 @@ public class Blog extends BaseEntity {
     public void deactivate() {
         this.active = false;
     }
+
+    public void activate() {
+        this.active = true;
+    }
 }

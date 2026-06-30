@@ -3,6 +3,7 @@ package uhsuhjupjup.backend.blog.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.exception.BusinessException;
@@ -24,5 +25,30 @@ public class BlogService {
     public Blog getDetail(Long blogId) {
         return blogRepository.findById(blogId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BLOG_NOT_FOUND));
+    }
+
+    public List<Blog> findAllForAdmin() {
+        return blogRepository.findAllByOrderByIdAsc();
+    }
+
+    @Transactional
+    public Blog add(String name, String domain, String rssUrl) {
+        if (!StringUtils.hasText(name) || !StringUtils.hasText(domain) || !StringUtils.hasText(rssUrl)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
+        if (blogRepository.existsByDomain(domain)) {
+            throw new BusinessException(ErrorCode.BLOG_ALREADY_EXISTS);
+        }
+        return blogRepository.save(Blog.create(name, domain, rssUrl));
+    }
+
+    @Transactional
+    public void deactivate(Long blogId) {
+        getDetail(blogId).deactivate();
+    }
+
+    @Transactional
+    public void activate(Long blogId) {
+        getDetail(blogId).activate();
     }
 }
