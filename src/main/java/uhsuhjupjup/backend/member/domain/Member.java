@@ -2,6 +2,8 @@ package uhsuhjupjup.backend.member.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -39,15 +41,24 @@ public class Member extends BaseEntity {
     @Column(name = "unsubscribe_token", nullable = false, length = 36)
     private String unsubscribeToken;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role;
+
     private Member(String provider, String providerUid, String email) {
         this.provider = provider;
         this.providerUid = providerUid;
         this.email = email;
         this.unsubscribeToken = UUID.randomUUID().toString();
+        this.role = Role.USER;
     }
 
     public static Member create(String provider, String providerUid, String email) {
         return new Member(provider, providerUid, email);
+    }
+
+    public boolean isAdmin() {
+        return role == Role.ADMIN;
     }
 
     public void agreeConsent(LocalDateTime at) {

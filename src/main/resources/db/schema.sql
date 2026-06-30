@@ -6,6 +6,7 @@ CREATE TABLE member (
     email             VARCHAR(255) NOT NULL,
     consent_at        DATETIME     NULL,
     unsubscribe_token VARCHAR(36)  NOT NULL,
+    role              VARCHAR(20)  NOT NULL DEFAULT 'USER',
     created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
