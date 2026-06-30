@@ -160,3 +160,22 @@ CREATE TABLE notification (
     CONSTRAINT fk_noti_member  FOREIGN KEY (member_id)  REFERENCES member(id)  ON DELETE CASCADE,
     CONSTRAINT fk_noti_article FOREIGN KEY (article_id) REFERENCES article(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- pipeline_run (배치 실행 이력)
+CREATE TABLE pipeline_run (
+    id                     BIGINT      NOT NULL AUTO_INCREMENT,
+    started_at             DATETIME    NOT NULL,
+    finished_at            DATETIME    NOT NULL,
+    status                 VARCHAR(20) NOT NULL,
+    collected_total        INT         NOT NULL DEFAULT 0,
+    collected_new          INT         NOT NULL DEFAULT 0,
+    collect_failed         INT         NOT NULL DEFAULT 0,
+    matched_articles       INT         NOT NULL DEFAULT 0,
+    tags_created           INT         NOT NULL DEFAULT 0,
+    members_notified       INT         NOT NULL DEFAULT 0,
+    notifications_recorded INT         NOT NULL DEFAULT 0,
+    notify_failed          INT         NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (id),
+    INDEX idx_pipeline_run_started (started_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
