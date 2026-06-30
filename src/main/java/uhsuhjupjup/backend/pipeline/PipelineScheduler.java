@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import uhsuhjupjup.backend.collection.application.CollectionService;
-import uhsuhjupjup.backend.matching.application.MatchingService;
-import uhsuhjupjup.backend.notification.application.NotificationService;
+import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
+import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
+import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 
 @Slf4j
 @Component

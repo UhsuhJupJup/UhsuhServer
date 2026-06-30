@@ -6,9 +6,9 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uhsuhjupjup.backend.collection.application.CollectionService;
-import uhsuhjupjup.backend.matching.application.MatchingService;
-import uhsuhjupjup.backend.notification.application.NotificationService;
+import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
+import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
+import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
