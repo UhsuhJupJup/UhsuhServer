@@ -7,6 +7,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import uhsuhjupjup.backend.common.auth.AdminMemberArgumentResolver;
 import uhsuhjupjup.backend.common.auth.FirebaseAuthInterceptor;
 import uhsuhjupjup.backend.common.auth.LoginMemberArgumentResolver;
 
@@ -18,6 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final FirebaseAuthInterceptor firebaseAuthInterceptor;
     private final LoginMemberArgumentResolver loginMemberArgumentResolver;
+    private final AdminMemberArgumentResolver adminMemberArgumentResolver;
 
     @Value("${app.cors.allowed-origins:http://localhost:3000}")
     private String[] allowedOrigins;
@@ -30,6 +32,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(loginMemberArgumentResolver);
+        resolvers.add(adminMemberArgumentResolver);
     }
 
     @Override
