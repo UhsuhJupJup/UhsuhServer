@@ -11,7 +11,7 @@ import java.util.List;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
     @Query("""
-            select new uhsuhjupjup.backend.notification.application.dto.RecipientPair(ks.member.id, ak.article.id)
+            select new uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair(ks.member.id, ak.article.id)
             from ArticleKeyword ak, KeywordSubscription ks
             where ks.keyword.id = ak.keyword.id
               and ak.article.collectedAt >= :threshold
@@ -21,7 +21,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<RecipientPair> findKeywordPathRecipients(LocalDateTime threshold);
 
     @Query("""
-            select new uhsuhjupjup.backend.notification.application.dto.RecipientPair(ts.member.id, ak.article.id)
+            select new uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair(ts.member.id, ak.article.id)
             from ArticleKeyword ak, TopicKeyword tk, TopicSubscription ts
             where tk.keyword.id = ak.keyword.id
               and ts.topic.id = tk.topic.id
