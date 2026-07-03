@@ -21,3 +21,18 @@ spring:
 
 firebase:
   service-account-path: ${UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: uhsuhjupjup-backend
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
