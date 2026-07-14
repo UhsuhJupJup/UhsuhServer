@@ -44,6 +44,8 @@ jobs:
       contents: read
       packages: read
     steps:
+      - uses: actions/checkout@v4
+
       - name: Copy compose file to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
