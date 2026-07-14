@@ -1,0 +1,11 @@
+.gradle/
+build/
+.git/
+.idea/
+*.iml
+*.log
+.env
+.env.*
+deploy/
+monitoring/
+src/test/

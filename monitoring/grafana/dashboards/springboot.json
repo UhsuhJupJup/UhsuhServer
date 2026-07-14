@@ -1,0 +1,1841 @@
+{
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "어서줍줍 Spring Boot 운영 모니터링 — Actuator + Micrometer 메트릭 기반. 위쪽에 가장 중요한 헬스/요청률/에러율, 아래로 갈수록 JVM/스레드/HikariCP/로그 상세 진단.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "🚦 핵심 헬스 — 한눈에 보기",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "앱 상태 (UP/DOWN)",
+      "description": "Prometheus 가 backend /actuator/prometheus 를 정상 scrape 하는지. 0 이면 backend 다운 또는 메트릭 endpoint 막힘.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "up{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "다운",
+                  "color": "red"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "정상",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "앱 가동 시간",
+      "description": "Spring Boot 프로세스 시작 이후 경과 시간. 잦은 재시작은 OOM/크래시 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "process_uptime_seconds{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 3600
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "CPU 사용률 %",
+      "description": "process_cpu_usage — 컨테이너/JVM 내부 CPU 비율. 지속 80%+ 면 스케일아웃/쿼리 최적화 필요.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "process_cpu_usage{job=\"uhsuhjupjup-backend\"} * 100",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Heap 사용률 %",
+      "description": "jvm_memory_used / max (heap). 90%+ 지속이면 OOM 임박. Old Gen 만 보면 더 정확.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "100 * sum(jvm_memory_used_bytes{job=\"uhsuhjupjup-backend\", area=\"heap\"}) / sum(jvm_memory_max_bytes{job=\"uhsuhjupjup-backend\", area=\"heap\"})",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP RPS",
+      "description": "초당 HTTP 요청 수. 평시/피크 대비.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\"}[1m]))",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "에러율 (5xx) %",
+      "description": "전체 요청 대비 5xx 응답 비율 (5분). 0% 가 정상. 0.5%+ 면 즉시 점검.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "100 * sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\"}[5m])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📈 HTTP 요청 / 응답 시간",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 110,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "상태 코드별 RPS",
+      "description": "2xx (정상), 3xx (리다이렉트), 4xx (클라이언트 에러), 5xx (서버 에러) 별 처리량. 4xx 가 튀면 잘못된 요청 / 인증 실패 / 권한. 5xx 면 서버 버그 / DB 단절.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", status=~\"2..\"}[1m]))",
+          "refId": "A",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", status=~\"3..\"}[1m]))",
+          "refId": "B",
+          "legendFormat": "3xx"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", status=~\"4..\"}[1m]))",
+          "refId": "C",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", status=~\"5..\"}[1m]))",
+          "refId": "D",
+          "legendFormat": "5xx"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "2xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "3xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "4xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "응답 시간 (평균 / 최대)",
+      "description": "전체 HTTP 요청의 평균 응답시간 (rate(sum) / rate(count)). max 가 튀면 특정 요청이 느림.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_sum{job=\"uhsuhjupjup-backend\"}[1m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\"}[1m])), 0.001)",
+          "refId": "A",
+          "legendFormat": "평균"
+        },
+        {
+          "expr": "max(http_server_requests_seconds_max{job=\"uhsuhjupjup-backend\"})",
+          "refId": "B",
+          "legendFormat": "최대 (직전 측정)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🎯 URI 별 활동 Top 10",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 120,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "URI 별 요청률 Top 10 (RPS)",
+      "description": "가장 자주 호출되는 엔드포인트. 캐싱/최적화 우선순위 판단 근거.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "topk(10, sum by(uri) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\"}[5m])))",
+          "refId": "A",
+          "legendFormat": "{{uri}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "URI 별 평균 응답시간 Top 10",
+      "description": "가장 느린 엔드포인트. 인덱스/쿼리 최적화 우선순위. /actuator 류는 무시.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "topk(10, sum by(uri) (rate(http_server_requests_seconds_sum{job=\"uhsuhjupjup-backend\"}[5m])) / clamp_min(sum by(uri) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\"}[5m])), 0.001))",
+          "refId": "A",
+          "legendFormat": "{{uri}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "💾 JVM 메모리 (Heap / NonHeap)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 130,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Heap 사용량 (영역별)",
+      "description": "Eden / Survivor / Old Gen (G1 면 Young/Old/Humongous) 별 사용량. Old Gen 이 우상향이면 메모리 누수.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"uhsuhjupjup-backend\", area=\"heap\"}",
+          "refId": "A",
+          "legendFormat": "{{id}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "NonHeap (Metaspace 등)",
+      "description": "Metaspace / Compressed Class Space / Code Cache. Metaspace 우상향이면 클래스 로드 누수 (devtools/redeploy 환경).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{job=\"uhsuhjupjup-backend\", area=\"nonheap\"}",
+          "refId": "A",
+          "legendFormat": "{{id}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "♻️ GC (Garbage Collection)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 140,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "GC pause 시간 (rate, by gc/action)",
+      "description": "1분당 누적 GC 정지 시간. Young GC 는 짧고 잦음, Old/Full GC 는 길고 드물어야. Full GC 가 잦으면 Old Gen 부족.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_sum{job=\"uhsuhjupjup-backend\"}[1m])",
+          "refId": "A",
+          "legendFormat": "{{action}} / {{cause}} / {{gc}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 4,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC 횟수 (rate)",
+      "description": "분당 GC 발생 횟수. Young 이 분당 수 회 정상. Old/Full 이 분당 1회 넘게 발생하면 메모리 압박.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 14,
+      "targets": [
+        {
+          "expr": "rate(jvm_gc_pause_seconds_count{job=\"uhsuhjupjup-backend\"}[1m])",
+          "refId": "A",
+          "legendFormat": "{{action}} / {{gc}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🧵 스레드",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 150,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "스레드 수 (전체 / daemon / peak)",
+      "description": "live 가 우상향이면 스레드 누수. peak 와 큰 차이 없으면 정상. 갑작스러운 폭증은 비동기 작업 lock-up 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "id": 15,
+      "targets": [
+        {
+          "expr": "jvm_threads_live_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A",
+          "legendFormat": "live"
+        },
+        {
+          "expr": "jvm_threads_daemon_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "B",
+          "legendFormat": "daemon"
+        },
+        {
+          "expr": "jvm_threads_peak_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "C",
+          "legendFormat": "peak"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "스레드 상태 분포 (Runnable / Blocked / Waiting)",
+      "description": "Blocked 가 늘면 lock 경합. Waiting/Timed-waiting 은 정상 (DB/IO 대기).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 16,
+      "targets": [
+        {
+          "expr": "jvm_threads_states_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🛢 HikariCP (DB 커넥션 풀)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 160,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "커넥션 풀 상태 (active / idle / pending / max)",
+      "description": "active 가 max 에 근접하면 풀 고갈. pending > 0 지속이면 트래픽 대비 풀 크기 부족 → 응답 지연.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "id": 17,
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "hikaricp_connections_idle{job=\"uhsuhjupjup-backend\"}",
+          "refId": "B",
+          "legendFormat": "idle"
+        },
+        {
+          "expr": "hikaricp_connections_pending{job=\"uhsuhjupjup-backend\"}",
+          "refId": "C",
+          "legendFormat": "pending (대기)"
+        },
+        {
+          "expr": "hikaricp_connections_max{job=\"uhsuhjupjup-backend\"}",
+          "refId": "D",
+          "legendFormat": "max (한도)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pending (대기)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "커넥션 획득 시간 (평균) + timeout 발생",
+      "description": "획득 시간 평균 — 풀에서 커넥션 얻는 데 걸리는 시간. ms 단위. 0.1초 넘으면 풀 부족. timeout 은 한도 초과 후 30초 대기해도 못 얻어 실패한 횟수.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "id": 18,
+      "targets": [
+        {
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum{job=\"uhsuhjupjup-backend\"}[1m]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count{job=\"uhsuhjupjup-backend\"}[1m]), 0.001)",
+          "refId": "A",
+          "legendFormat": "평균 획득시간"
+        },
+        {
+          "expr": "rate(hikaricp_connections_timeout_total{job=\"uhsuhjupjup-backend\"}[5m])",
+          "refId": "B",
+          "legendFormat": "timeout (회/초)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 4,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🐱 Tomcat / HTTP 세션",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "id": 170,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Tomcat 스레드 (busy / current / config max)",
+      "description": "busy 가 max 에 근접하면 worker thread 고갈 → 요청 대기 발생. server.tomcat.threads.max 늘리거나 응답시간 단축 필요.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 62
+      },
+      "id": 19,
+      "targets": [
+        {
+          "expr": "tomcat_threads_busy_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A",
+          "legendFormat": "busy"
+        },
+        {
+          "expr": "tomcat_threads_current_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "B",
+          "legendFormat": "current"
+        },
+        {
+          "expr": "tomcat_threads_config_max_threads{job=\"uhsuhjupjup-backend\"}",
+          "refId": "C",
+          "legendFormat": "config max"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "활성 HTTP 세션",
+      "description": "Tomcat 세션 — 어서줍줍 은 JWT 기반이라 사실상 0 이 정상. 0 이 아니면 어디서 세션 사용 중인지 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 62
+      },
+      "id": 20,
+      "targets": [
+        {
+          "expr": "tomcat_sessions_active_current_sessions{job=\"uhsuhjupjup-backend\"}",
+          "refId": "A",
+          "legendFormat": "active"
+        },
+        {
+          "expr": "tomcat_sessions_active_max_sessions{job=\"uhsuhjupjup-backend\"}",
+          "refId": "B",
+          "legendFormat": "max 기록"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📜 로그 발생률 (Logback)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 180,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "로그 레벨별 발생률 (rate)",
+      "description": "ERROR 가 0 이 정상. WARN 도 누적 추세 관찰. ERROR 튀면 즉시 backend 로그 확인.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 71
+      },
+      "id": 21,
+      "targets": [
+        {
+          "expr": "rate(logback_events_total{job=\"uhsuhjupjup-backend\"}[1m])",
+          "refId": "A",
+          "legendFormat": "{{level}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "warn"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "info"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "debug"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "gray"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "🖥 시스템 / 프로세스 (접힘)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 190,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "System Load Average (1m)",
+          "description": "호스트 OS 의 load average. CPU 코어 수 대비. 코어 수 초과 지속이면 부하 과다.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 80
+          },
+          "id": 22,
+          "targets": [
+            {
+              "expr": "system_load_average_1m{job=\"uhsuhjupjup-backend\"}",
+              "refId": "A",
+              "legendFormat": "load 1m"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 2,
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "열린 파일 디스크립터 (open files)",
+          "description": "process_files_open / process_files_max. max 에 근접하면 ulimit 늘리거나 누수 점검.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 80
+          },
+          "id": 23,
+          "targets": [
+            {
+              "expr": "process_files_open_files{job=\"uhsuhjupjup-backend\"}",
+              "refId": "A",
+              "legendFormat": "열린 파일"
+            },
+            {
+              "expr": "process_files_max_files{job=\"uhsuhjupjup-backend\"}",
+              "refId": "B",
+              "legendFormat": "한도 (max)"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 5,
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "JVM 클래스 로드",
+          "description": "loaded 가 계속 증가하면 클래스 누수 (devtools 활성/hot reload). 운영은 안정 상태.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 88
+          },
+          "id": 24,
+          "targets": [
+            {
+              "expr": "jvm_classes_loaded_classes{job=\"uhsuhjupjup-backend\"}",
+              "refId": "A",
+              "legendFormat": "loaded"
+            },
+            {
+              "expr": "jvm_classes_unloaded_classes_total{job=\"uhsuhjupjup-backend\"}",
+              "refId": "B",
+              "legendFormat": "unloaded (누적)"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 5,
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Direct + Mapped Buffer 메모리",
+          "description": "JVM heap 외 native 버퍼 사용량 (NIO 등). 우상향이면 native leak 의심.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 88
+          },
+          "id": 25,
+          "targets": [
+            {
+              "expr": "jvm_buffer_memory_used_bytes{job=\"uhsuhjupjup-backend\"}",
+              "refId": "A",
+              "legendFormat": "{{id}}"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "응답 시간 백분위 (p95 / p99)",
+      "description": "전체 HTTP 요청의 평균 응답시간 (rate(sum) / rate(count)). max 가 튀면 특정 요청이 느림.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 80
+      },
+      "id": 200,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\"}[5m])) by (le))",
+          "refId": "A",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\"}[5m])) by (le))",
+          "refId": "B",
+          "legendFormat": "p99"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "URI 별 p95 응답시간 Top 10",
+      "description": "전체 HTTP 요청의 평균 응답시간 (rate(sum) / rate(count)). max 가 튀면 특정 요청이 느림.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 80
+      },
+      "id": 210,
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\"}[5m])) by (le, uri)))",
+          "refId": "A",
+          "legendFormat": "{{uri}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "uhsuhjupjup",
+    "spring-boot",
+    "operations"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
+  },
+  "timezone": "Asia/Seoul",
+  "title": "어서줍줍 Spring Boot 모니터링",
+  "uid": "uhsuhjupjup-springboot",
+  "version": 1,
+  "weekStart": ""
+}

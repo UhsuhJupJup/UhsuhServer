@@ -1,0 +1,1397 @@
+{
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.0.0"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "어서줍줍 운영 MySQL 모니터링 — mysqld_exporter v0.15+ 기반. 위쪽에 가장 중요한 헬스/연결/캐시 지표, 아래로 갈수록 상세 진단.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "row",
+      "title": "🚦 핵심 헬스 — 한눈에 보기",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "MySQL 가동 상태",
+      "description": "1=정상, 0=다운. exporter 가 mysql 에 접속 가능한지. 0 이면 즉시 점검.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "mysql_up",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "다운",
+                  "color": "red"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "정상",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "가동 시간 (Uptime)",
+      "description": "서버가 마지막 재시작 이후 얼마나 떠있었는지. 자주 떨어지면 안정성 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "mysql_global_status_uptime",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 3600
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "현재 연결 수",
+      "description": "지금 mysql 에 붙어있는 클라이언트 수. 갑자기 튀면 트래픽 폭증 또는 커넥션 풀 leak.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "mysql_global_status_threads_connected",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "연결 사용률 %",
+      "description": "max_connections 대비 현재 사용 비율. 80%+ 면 풀 확대 또는 누수 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
+      },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "100 * mysql_global_status_threads_connected / mysql_global_variables_max_connections",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "gauge",
+      "title": "Buffer Pool 적중률 %",
+      "description": "Innodb Buffer Pool 캐시 hit ratio. 99%+ 가 정상. 떨어지면 쿼리/인덱스 비효율 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 1
+      },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "100 * (1 - rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / clamp_min(rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]), 1))",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 95
+              },
+              {
+                "color": "green",
+                "value": 99
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "QPS (초당 쿼리)",
+      "description": "1분 평균 초당 쿼리 처리 수. 트래픽 추이 한눈에.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_questions[1m])",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📈 트래픽 / 쿼리 분포",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 110,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "시간별 QPS 추이",
+      "description": "쿼리 처리량의 시간대별 변화. 평시/피크 대비 + 갑작스러운 감소(서비스 장애)나 폭증(공격/스파이크) 감지.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_questions[1m])",
+          "refId": "A",
+          "legendFormat": "QPS"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "명령어 분포 (SELECT / INSERT / UPDATE / DELETE)",
+      "description": "어떤 DML 이 얼마나 발생하는지. read-heavy/write-heavy 패턴 파악. uhsuhjupjup 은 read 비중이 압도적이어야 정상.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_commands_total{command=\"select\"}[1m])",
+          "refId": "A",
+          "legendFormat": "SELECT"
+        },
+        {
+          "expr": "rate(mysql_global_status_commands_total{command=\"insert\"}[1m])",
+          "refId": "B",
+          "legendFormat": "INSERT"
+        },
+        {
+          "expr": "rate(mysql_global_status_commands_total{command=\"update\"}[1m])",
+          "refId": "C",
+          "legendFormat": "UPDATE"
+        },
+        {
+          "expr": "rate(mysql_global_status_commands_total{command=\"delete\"}[1m])",
+          "refId": "D",
+          "legendFormat": "DELETE"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🔌 연결 / 에러",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 120,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "연결 추이 (현재 / 최대사용 / 한도)",
+      "description": "threads_connected (현재 활성), max_used_connections (지금까지 최고치), max_connections (서버 한도). max 가 한도에 근접하면 풀 확대 필요.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "mysql_global_status_threads_connected",
+          "refId": "A",
+          "legendFormat": "현재 연결"
+        },
+        {
+          "expr": "mysql_global_status_threads_running",
+          "refId": "B",
+          "legendFormat": "실행 중 (running)"
+        },
+        {
+          "expr": "mysql_global_status_max_used_connections",
+          "refId": "C",
+          "legendFormat": "최대 사용 기록"
+        },
+        {
+          "expr": "mysql_global_variables_max_connections",
+          "refId": "D",
+          "legendFormat": "한도 (max_connections)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "연결 실패 (aborted)",
+      "description": "aborted_connects 는 인증/handshake 실패. aborted_clients 는 비정상 종료. 0 이 정상. 튀면 클라 측 버그 / 권한 문제 / 네트워크 단절 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_aborted_connects[5m])",
+          "refId": "A",
+          "legendFormat": "인증/handshake 실패"
+        },
+        {
+          "expr": "rate(mysql_global_status_aborted_clients[5m])",
+          "refId": "B",
+          "legendFormat": "비정상 종료"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "💾 Innodb Buffer Pool",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 130,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Buffer Pool 페이지 분포",
+      "description": "data (캐시된 실제 데이터), dirty (변경되었지만 디스크 미반영), free (사용 가능). dirty 가 지속적으로 많으면 flush 부담.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "mysql_global_status_innodb_buffer_pool_pages{state=\"data\"}",
+          "refId": "A",
+          "legendFormat": "data"
+        },
+        {
+          "expr": "mysql_global_status_innodb_buffer_pool_pages{state=\"dirty\"}",
+          "refId": "B",
+          "legendFormat": "dirty"
+        },
+        {
+          "expr": "mysql_global_status_innodb_buffer_pool_pages{state=\"free\"}",
+          "refId": "C",
+          "legendFormat": "free"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 30,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Disk 읽기 vs 메모리 읽기 (rate)",
+      "description": "pool_reads = 디스크 IO 발생한 횟수 (cache miss). pool_read_requests = 총 읽기 요청. 둘의 비율 = miss ratio. miss 가 늘면 인덱스/쿼리/메모리 부족 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_innodb_buffer_pool_read_requests[1m])",
+          "refId": "A",
+          "legendFormat": "총 읽기 요청 (메모리 포함)"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_buffer_pool_reads[1m])",
+          "refId": "B",
+          "legendFormat": "디스크 직접 읽기 (cache miss)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🔒 락 / 트랜잭션",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 140,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Innodb Row Lock 대기 (rate + 누적 시간)",
+      "description": "lock_waits = 대기 발생 빈도. lock_time = 누적 대기 시간(ms). 둘 다 0 에 가까워야 정상. 튀면 동시 트랜잭션 충돌/스키마 문제.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_innodb_row_lock_waits[1m])",
+          "refId": "A",
+          "legendFormat": "Row Lock 대기 발생률 (회/초)"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_lock_time[1m])",
+          "refId": "B",
+          "legendFormat": "Row Lock 누적 대기 시간 (ms/초)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Table Lock (즉시 vs 대기)",
+      "description": "table_locks_immediate = 즉시 획득. table_locks_waited = 대기 발생. waited 가 많아지면 MyISAM 류 테이블 락 경합 (Innodb 만 쓰면 거의 0).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "id": 14,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_table_locks_immediate[1m])",
+          "refId": "A",
+          "legendFormat": "즉시 획득"
+        },
+        {
+          "expr": "rate(mysql_global_status_table_locks_waited[1m])",
+          "refId": "B",
+          "legendFormat": "대기 발생"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "📊 행 작업 / 슬로우 쿼리",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 150,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Innodb 행 처리량 (read / inserted / updated / deleted)",
+      "description": "내부적으로 처리된 행 수. read 가 압도적으로 큰 게 정상 (write 적은 OLTP). update/delete 가 평소보다 튀면 일괄 작업 또는 버그 의심.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 42
+      },
+      "id": 15,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[1m])",
+          "refId": "A",
+          "legendFormat": "read"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"inserted\"}[1m])",
+          "refId": "B",
+          "legendFormat": "inserted"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"updated\"}[1m])",
+          "refId": "C",
+          "legendFormat": "updated"
+        },
+        {
+          "expr": "rate(mysql_global_status_innodb_row_ops_total{operation=\"deleted\"}[1m])",
+          "refId": "D",
+          "legendFormat": "deleted"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Slow Query 발생률",
+      "description": "long_query_time 초과 쿼리의 발생률. 0 이 정상. 튀면 즉시 slow log 확인.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 42
+      },
+      "id": 16,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_slow_queries[5m])",
+          "refId": "A",
+          "legendFormat": "Slow Queries / sec"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 1,
+            "showPoints": "never"
+          },
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🌐 네트워크 트래픽",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 50
+      },
+      "id": 160,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "수신 / 송신 바이트 (B/s)",
+      "description": "클라이언트 ↔ mysql 네트워크 트래픽. 평소 패턴 학습 후 이상 폭증 감지.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 17,
+      "targets": [
+        {
+          "expr": "rate(mysql_global_status_bytes_received[1m])",
+          "refId": "A",
+          "legendFormat": "수신 (received)"
+        },
+        {
+          "expr": "rate(mysql_global_status_bytes_sent[1m])",
+          "refId": "B",
+          "legendFormat": "송신 (sent)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🚂 어서줍줍 도메인 — 테이블별 활동",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "id": 170,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "bargauge",
+      "title": "테이블별 row 수 (uhsuhjupjup DB)",
+      "description": "uhsuhjupjup 스키마의 각 테이블에 쌓인 row 수. 가입자(users), 세션(focus_sessions), 노선(routes) 등 도메인 활동 한 눈에. info_schema.tables 컬렉터 필요.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
+      "id": 18,
+      "targets": [
+        {
+          "expr": "mysql_info_schema_table_rows{schema=\"uhsuhjupjup\"}",
+          "refId": "A",
+          "legendFormat": "{{table}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "테이블별 data + index 크기 (MB)",
+      "description": "각 테이블이 디스크에서 차지하는 바이트 (데이터 + 인덱스). MB 단위. 급증하면 archive 정책 / partitioning 검토.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
+      "id": 19,
+      "targets": [
+        {
+          "expr": "(mysql_info_schema_table_size{schema=\"uhsuhjupjup\", component=\"data_length\"} + mysql_info_schema_table_size{schema=\"uhsuhjupjup\", component=\"index_length\"}) / 1024 / 1024",
+          "refId": "A",
+          "legendFormat": "{{table}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "valueMode": "color"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "🛠 핸들러 / 임시 테이블 (성능 진단)",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 180,
+      "collapsed": true,
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Handler 호출 — 풀스캔 vs 인덱스",
+          "description": "handler_read_rnd_next 가 높으면 풀테이블 스캔 빈번 (인덱스 미사용). handler_read_key 가 정상 (인덱스 hit).",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 71
+          },
+          "id": 20,
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_handlers_total{handler=\"read_rnd_next\"}[5m])",
+              "refId": "A",
+              "legendFormat": "풀스캔 (read_rnd_next)"
+            },
+            {
+              "expr": "rate(mysql_global_status_handlers_total{handler=\"read_key\"}[5m])",
+              "refId": "B",
+              "legendFormat": "인덱스 (read_key)"
+            },
+            {
+              "expr": "rate(mysql_global_status_handlers_total{handler=\"read_first\"}[5m])",
+              "refId": "C",
+              "legendFormat": "read_first"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 2
+              }
+            }
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "임시 테이블 생성 — 메모리 vs 디스크",
+          "description": "created_tmp_tables = 메모리 임시. created_tmp_disk_tables = 디스크 임시. 디스크가 늘면 메모리 임시 크기(tmp_table_size) 부족 또는 쿼리 비효율.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 71
+          },
+          "id": 21,
+          "targets": [
+            {
+              "expr": "rate(mysql_global_status_created_tmp_tables[5m])",
+              "refId": "A",
+              "legendFormat": "메모리 임시 테이블"
+            },
+            {
+              "expr": "rate(mysql_global_status_created_tmp_disk_tables[5m])",
+              "refId": "B",
+              "legendFormat": "디스크 임시 테이블"
+            }
+          ],
+          "options": {
+            "legend": {
+              "showLegend": true,
+              "displayMode": "table",
+              "placement": "bottom",
+              "calcs": [
+                "mean",
+                "lastNotNull"
+              ]
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "lineWidth": 2
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "uhsuhjupjup",
+    "mysql",
+    "operations"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h"
+    ]
+  },
+  "timezone": "Asia/Seoul",
+  "title": "어서줍줍 MySQL 모니터링",
+  "uid": "uhsuhjupjup-mysql",
+  "version": 1,
+  "weekStart": ""
+}
