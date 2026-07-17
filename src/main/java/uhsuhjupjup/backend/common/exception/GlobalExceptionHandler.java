@@ -8,6 +8,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -41,6 +42,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMethod(HttpRequestMethodNotSupportedException e, HttpServletRequest req) {
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus())
                 .body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, req.getRequestURI()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e, HttpServletRequest req) {
+        return ResponseEntity.status(ErrorCode.NOT_FOUND.getStatus())
+                .body(ErrorResponse.of(ErrorCode.NOT_FOUND, req.getRequestURI()));
     }
 
     @ExceptionHandler(Exception.class)
