@@ -1,6 +1,5 @@
 package uhsuhjupjup.backend.common.auth;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -10,19 +9,14 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
-import uhsuhjupjup.backend.member.application.MemberService;
-import uhsuhjupjup.backend.member.domain.Member;
 
 @Component
-@RequiredArgsConstructor
-public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolver {
-
-    private final MemberService memberService;
+public class LoginAuthUserArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
-        return parameter.hasParameterAnnotation(LoginMember.class)
-                && parameter.getParameterType().equals(Member.class);
+        return parameter.hasParameterAnnotation(LoginAuthUser.class)
+                && parameter.getParameterType().equals(AuthUser.class);
     }
 
     @Override
@@ -33,7 +27,6 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
         if (authUser == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        return memberService.find(authUser)
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        return authUser;
     }
 }

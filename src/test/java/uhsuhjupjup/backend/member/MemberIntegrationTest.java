@@ -57,6 +57,18 @@ class MemberIntegrationTest extends MySqlTestSupport {
     }
 
     @Test
+    void me_withValidTokenButUnregistered_returnsUnauthorized() throws Exception {
+        given(firebaseTokenVerifier.verify("valid-token"))
+                .willReturn(new AuthUser("github", "uid-2", "stranger@github.com"));
+
+        mockMvc.perform(get("/api/members/me").header(AUTHORIZATION, "Bearer valid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        assertThat(memberRepository.findByEmail("stranger@github.com")).isEmpty();
+    }
+
+    @Test
     void me_withoutToken_returnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/members/me"))
                 .andExpect(status().isUnauthorized())

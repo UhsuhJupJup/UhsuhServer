@@ -84,6 +84,7 @@ class SubscriptionIntegrationTest extends MySqlTestSupport {
 
     @Test
     void replace_withoutConsent_returns403() throws Exception {
+        memberRepository.save(Member.create("github", "uid-new", "new@example.com"));
         given(firebaseTokenVerifier.verify(anyString()))
                 .willReturn(new AuthUser("github", "uid-new", "new@example.com"));
 
