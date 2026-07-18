@@ -34,6 +34,6 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return memberService.find(authUser)
-                .orElseGet(() -> memberService.register(authUser));
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
     }
 }
