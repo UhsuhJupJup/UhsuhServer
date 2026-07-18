@@ -6,8 +6,7 @@ import org.testcontainers.containers.MySQLContainer;
 
 public abstract class MySqlTestSupport {
 
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
-            .withInitScript("db/schema.sql");
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0");
 
     static {
         MYSQL.start();
