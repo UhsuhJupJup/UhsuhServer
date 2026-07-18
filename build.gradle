@@ -26,6 +26,7 @@ dependencies {
     implementation 'io.micrometer:micrometer-registry-prometheus'
     implementation 'com.google.firebase:firebase-admin:9.4.3'
     implementation 'com.rometools:rome:2.1.0'
+    implementation 'com.anthropic:anthropic-java:2.34.0'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
     implementation 'org.flywaydb:flyway-core'
