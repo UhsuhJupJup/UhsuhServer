@@ -24,6 +24,10 @@ spring:
 
 firebase:
   service-account-path: ${UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH}
+
+claude:
+  enabled: ${CLAUDE_ENABLED:false}
+  model: ${CLAUDE_MODEL:claude-haiku-4-5}
 management:
   endpoints:
     web:
