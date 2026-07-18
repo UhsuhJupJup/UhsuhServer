@@ -54,15 +54,12 @@ class MemberServiceTest {
     }
 
     @Test
-    void register_onUniqueConflict_returnsAlreadyExistingMember() {
-        Member existing = MemberFixture.member(1L, "octocat@github.com");
+    void register_onUniqueConflict_propagatesException() {
         given(memberRepository.save(any(Member.class)))
                 .willThrow(new DataIntegrityViolationException("duplicate"));
-        given(memberRepository.findByEmail("octocat@github.com")).willReturn(Optional.of(existing));
 
-        Member result = memberService.register(authUser);
-
-        assertThat(result).isSameAs(existing);
+        assertThatThrownBy(() -> memberService.register(authUser))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

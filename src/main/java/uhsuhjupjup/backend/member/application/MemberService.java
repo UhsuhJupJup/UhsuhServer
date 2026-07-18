@@ -1,7 +1,6 @@
 package uhsuhjupjup.backend.member.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.auth.AuthUser;
@@ -26,13 +25,8 @@ public class MemberService {
 
     @Transactional
     public Member register(AuthUser authUser) {
-        try {
-            return memberRepository.save(
-                    Member.create(authUser.provider(), authUser.providerUid(), authUser.email()));
-        } catch (DataIntegrityViolationException e) {
-            return memberRepository.findByEmail(authUser.email())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-        }
+        return memberRepository.save(
+                Member.create(authUser.provider(), authUser.providerUid(), authUser.email()));
     }
 
     @Transactional
