@@ -34,6 +34,10 @@ class JavaMailEmailSender implements EmailSender {
             helper.setTo(message.to());
             helper.setSubject(message.subject());
             helper.setText(message.htmlBody(), true);
+            if (message.unsubscribeUrl() != null) {
+                mimeMessage.setHeader("List-Unsubscribe", "<" + message.unsubscribeUrl() + ">");
+                mimeMessage.setHeader("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
+            }
             javaMailSender.send(mimeMessage);
         } catch (MailException | MessagingException e) {
             throw new EmailSendException(message.to(), e);
