@@ -44,6 +44,9 @@ public class Article {
     @Column(name = "collected_at", nullable = false, updatable = false)
     private LocalDateTime collectedAt;
 
+    @Column(name = "classified_at")
+    private LocalDateTime classifiedAt;
+
     private Article(Blog blog, String title, String url, LocalDateTime publishedAt) {
         this.blog = blog;
         this.title = title;
@@ -53,5 +56,9 @@ public class Article {
 
     public static Article create(Blog blog, String title, String url, LocalDateTime publishedAt) {
         return new Article(blog, title, url, publishedAt);
+    }
+
+    public void markClassified(LocalDateTime at) {
+        this.classifiedAt = at;
     }
 }
