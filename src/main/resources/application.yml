@@ -18,10 +18,12 @@ spring:
     client:
       connect-timeout: 5s
       read-timeout: 10s
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 1
 
 firebase:
   service-account-path: ${UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH}
-
 management:
   endpoints:
     web:
