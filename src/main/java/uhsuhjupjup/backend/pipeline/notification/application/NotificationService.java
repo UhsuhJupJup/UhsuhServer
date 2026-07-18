@@ -74,7 +74,8 @@ public class NotificationService {
                         .toList();
                 String html = digestRenderer.render(member, views, digestDate);
                 emailSender.send(new EmailMessage(member.getEmail(),
-                        "🧹 오늘 주워온 글 " + views.size() + "개", html));
+                        "🧹 오늘 주워온 글 " + views.size() + "개", html,
+                        digestRenderer.unsubscribeUrl(member)));
                 notificationsRecorded += notificationSaver.record(member.getId(),
                         matchedKeywordsByArticle(orderedArticleIds, keywordsByArticle));
                 membersNotified++;

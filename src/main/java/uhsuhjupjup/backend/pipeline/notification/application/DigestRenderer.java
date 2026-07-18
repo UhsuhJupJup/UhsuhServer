@@ -25,7 +25,11 @@ public class DigestRenderer {
         context.setVariable("digestDate", digestDate);
         context.setVariable("digestCount", articles.size());
         context.setVariable("articles", articles);
-        context.setVariable("unsubscribeUrl", unsubscribeBaseUrl + "?token=" + member.getUnsubscribeToken());
+        context.setVariable("unsubscribeUrl", unsubscribeUrl(member));
         return templateEngine.process("mail/digest", context);
+    }
+
+    public String unsubscribeUrl(Member member) {
+        return unsubscribeBaseUrl + "?token=" + member.getUnsubscribeToken();
     }
 }

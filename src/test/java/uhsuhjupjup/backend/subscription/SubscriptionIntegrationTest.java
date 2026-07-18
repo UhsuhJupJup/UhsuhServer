@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,6 +120,23 @@ class SubscriptionIntegrationTest extends MySqlTestSupport {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/unsubscribe").param("token", member.getUnsubscribeToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unsubscribed").value(true));
+
+        mockMvc.perform(get("/api/subscriptions").header("Authorization", BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topics.length()").value(0))
+                .andExpect(jsonPath("$.keywords.length()").value(0));
+    }
+
+    @Test
+    void unsubscribeOneClickByPost_clearsAllWithoutAuth() throws Exception {
+        mockMvc.perform(put("/api/subscriptions").header("Authorization", BEARER)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicIds\":[" + database.getId() + "],\"keywordIds\":[" + kafka.getId() + "]}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/unsubscribe").param("token", member.getUnsubscribeToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.unsubscribed").value(true));
 
