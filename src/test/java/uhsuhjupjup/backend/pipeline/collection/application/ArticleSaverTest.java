@@ -71,7 +71,7 @@ class ArticleSaverTest {
     @Test
     void saveNew_whenNoDate_fallsBackToNonNull() {
         given(articleRepository.findExistingUrls(anyCollection())).willReturn(List.of());
-        FetchedArticle noDate = new FetchedArticle("t", "https://a.com/x", null);
+        FetchedArticle noDate = new FetchedArticle("t", "https://a.com/x", null, null);
 
         articleSaver.saveNew(blog, List.of(noDate));
 
@@ -88,6 +88,6 @@ class ArticleSaverTest {
     }
 
     private FetchedArticle article(String title, String url) {
-        return new FetchedArticle(title, url, LocalDateTime.now());
+        return new FetchedArticle(title, url, LocalDateTime.now(), null);
     }
 }
