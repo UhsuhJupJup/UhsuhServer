@@ -1,11 +1,13 @@
 package uhsuhjupjup.backend.article.application;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.article.application.dto.ArticleDetailResult;
+import uhsuhjupjup.backend.article.application.dto.ArticlePageResult;
 import uhsuhjupjup.backend.article.application.dto.ArticleSummaryResult;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
@@ -23,27 +25,30 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ArticleService {
 
-    private static final int DEFAULT_LIMIT = 20;
-    private static final int MAX_LIMIT = 50;
+    private static final int DEFAULT_SIZE = 10;
+    private static final int MAX_SIZE = 50;
 
     private final ArticleRepository articleRepository;
     private final ArticleKeywordRepository articleKeywordRepository;
 
-    public List<ArticleSummaryResult> search(Long blogId, Long keywordId, Long topicId, String q, Integer limit) {
-        List<Article> articles = articleRepository.search(
-                blogId, keywordId, topicId, trimToNull(q), PageRequest.of(0, clampLimit(limit)));
-        if (articles.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, List<String>> keywordsByArticle = articleKeywordRepository
-                .findWithKeywordByArticleIdIn(articles.stream().map(Article::getId).toList()).stream()
-                .collect(Collectors.groupingBy(
-                        ak -> ak.getArticle().getId(),
-                        Collectors.mapping(ak -> ak.getKeyword().getName(), Collectors.toList())));
-        return articles.stream()
+    public ArticlePageResult search(Long blogId, Long keywordId, Long topicId, String q, Integer page, Integer size) {
+        int pageNumber = (page == null || page < 1) ? 0 : page - 1;
+        Page<Article> result = articleRepository.search(
+                blogId, keywordId, topicId, trimToNull(q), PageRequest.of(pageNumber, clampSize(size)));
+
+        Map<Long, List<String>> keywordsByArticle = result.isEmpty() ? Map.of()
+                : articleKeywordRepository
+                        .findWithKeywordByArticleIdIn(result.getContent().stream().map(Article::getId).toList()).stream()
+                        .collect(Collectors.groupingBy(
+                                ak -> ak.getArticle().getId(),
+                                Collectors.mapping(ak -> ak.getKeyword().getName(), Collectors.toList())));
+        List<ArticleSummaryResult> content = result.getContent().stream()
                 .map(article -> new ArticleSummaryResult(
                         article, keywordsByArticle.getOrDefault(article.getId(), List.of())))
                 .toList();
+
+        return new ArticlePageResult(content, result.getNumber() + 1, result.getSize(),
+                result.getTotalElements(), result.getTotalPages(), result.hasNext(), result.hasPrevious());
     }
 
     public ArticleDetailResult getDetail(Long articleId) {
@@ -52,11 +57,11 @@ public class ArticleService {
         return new ArticleDetailResult(article, articleKeywordRepository.findWithKeywordByArticleId(articleId));
     }
 
-    private int clampLimit(Integer limit) {
-        if (limit == null || limit < 1) {
-            return DEFAULT_LIMIT;
+    private int clampSize(Integer size) {
+        if (size == null || size < 1) {
+            return DEFAULT_SIZE;
         }
-        return Math.min(limit, MAX_LIMIT);
+        return Math.min(size, MAX_SIZE);
     }
 
     private String trimToNull(String q) {

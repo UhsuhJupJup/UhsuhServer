@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.article.infra;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,7 +16,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @Query("select a from Article a join fetch a.blog where a.id = :id")
     Optional<Article> findWithBlogById(Long id);
 
-    @Query("""
+    @Query(value = """
             select a from Article a join fetch a.blog
             where (:blogId is null or a.blog.id = :blogId)
             and (:q is null or lower(a.title) like lower(concat('%', :q, '%')))
@@ -25,8 +26,18 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
                 select 1 from ArticleKeyword ak2 join TopicKeyword tk on tk.keyword = ak2.keyword
                 where ak2.article = a and tk.topic.id = :topicId))
             order by a.publishedAt desc, a.id desc
+            """,
+            countQuery = """
+            select count(a) from Article a
+            where (:blogId is null or a.blog.id = :blogId)
+            and (:q is null or lower(a.title) like lower(concat('%', :q, '%')))
+            and (:keywordId is null or exists (
+                select 1 from ArticleKeyword ak where ak.article = a and ak.keyword.id = :keywordId))
+            and (:topicId is null or exists (
+                select 1 from ArticleKeyword ak2 join TopicKeyword tk on tk.keyword = ak2.keyword
+                where ak2.article = a and tk.topic.id = :topicId))
             """)
-    List<Article> search(Long blogId, Long keywordId, Long topicId, String q, Pageable pageable);
+    Page<Article> search(Long blogId, Long keywordId, Long topicId, String q, Pageable pageable);
 
     @Query("select a.url from Article a where a.url in :urls")
     List<String> findExistingUrls(Collection<String> urls);
