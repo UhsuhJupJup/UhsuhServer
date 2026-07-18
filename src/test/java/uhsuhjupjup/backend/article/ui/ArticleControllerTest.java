@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uhsuhjupjup.backend.article.application.ArticleService;
 import uhsuhjupjup.backend.article.application.dto.ArticleDetailResult;
+import uhsuhjupjup.backend.article.application.dto.ArticlePageResult;
 import uhsuhjupjup.backend.article.application.dto.ArticleSummaryResult;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
@@ -46,23 +47,26 @@ class ArticleControllerTest {
 
     @Test
     void list_returnsArticleCards() throws Exception {
-        given(articleService.search(null, null, null, null, null))
-                .willReturn(List.of(new ArticleSummaryResult(article, List.of("MySQL"))));
+        given(articleService.search(null, null, null, null, null, null))
+                .willReturn(new ArticlePageResult(
+                        List.of(new ArticleSummaryResult(article, List.of("MySQL"))), 1, 10, 1, 1, false, false));
 
         mockMvc.perform(get("/api/articles"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].title").value("MySQL 데드락 디버깅 회고"))
-                .andExpect(jsonPath("$[0].blog.name").value("우아한형제들"))
-                .andExpect(jsonPath("$[0].keywords[0]").value("MySQL"));
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("MySQL 데드락 디버깅 회고"))
+                .andExpect(jsonPath("$.content[0].blog.name").value("우아한형제들"))
+                .andExpect(jsonPath("$.content[0].keywords[0]").value("MySQL"))
+                .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test
     void list_withFilters_passesParamsToService() throws Exception {
-        given(articleService.search(2L, null, null, "kafka", 5)).willReturn(List.of());
+        given(articleService.search(2L, null, null, "kafka", 2, 5))
+                .willReturn(new ArticlePageResult(List.of(), 2, 5, 0, 0, false, true));
 
         mockMvc.perform(get("/api/articles")
-                        .param("blogId", "2").param("q", "kafka").param("limit", "5"))
+                        .param("blogId", "2").param("q", "kafka").param("page", "2").param("size", "5"))
                 .andExpect(status().isOk());
     }
 

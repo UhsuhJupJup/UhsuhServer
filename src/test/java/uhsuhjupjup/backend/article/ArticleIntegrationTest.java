@@ -82,18 +82,40 @@ class ArticleIntegrationTest extends MySqlTestSupport {
     void list_returnsAllOrderedByPublishedDesc() throws Exception {
         mockMvc.perform(get("/api/articles"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(3))
-                .andExpect(jsonPath("$[0].title").value("Kafka 파티션 재조정"))
-                .andExpect(jsonPath("$[2].title").value("MySQL 데드락 디버깅 회고"));
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[0].title").value("Kafka 파티션 재조정"))
+                .andExpect(jsonPath("$.content[2].title").value("MySQL 데드락 디버깅 회고"))
+                .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test
     void list_byTopicId_returnsTopicArticles() throws Exception {
         mockMvc.perform(get("/api/articles").param("topicId", database.getId().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].title").value("Redis 캐시 전략"))
-                .andExpect(jsonPath("$[1].title").value("MySQL 데드락 디버깅 회고"));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Redis 캐시 전략"))
+                .andExpect(jsonPath("$.content[1].title").value("MySQL 데드락 디버깅 회고"));
+    }
+
+    @Test
+    void list_paginatesByPage() throws Exception {
+        mockMvc.perform(get("/api/articles").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].title").value("Kafka 파티션 재조정"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.hasNext").value(true))
+                .andExpect(jsonPath("$.hasPrevious").value(false));
+
+        mockMvc.perform(get("/api/articles").param("size", "2").param("page", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("MySQL 데드락 디버깅 회고"))
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.hasNext").value(false))
+                .andExpect(jsonPath("$.hasPrevious").value(true));
     }
 
     @Test
