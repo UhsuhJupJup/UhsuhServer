@@ -5,9 +5,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import uhsuhjupjup.backend.article.application.dto.ArticleDetailResult;
-import uhsuhjupjup.backend.article.application.dto.ArticleSummaryResult;
+import uhsuhjupjup.backend.article.application.dto.ArticlePageResult;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
@@ -75,22 +76,23 @@ class ArticleServiceTest {
     void search_returnsArticlesWithKeywordNames() {
         Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
         given(articleRepository.search(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
-                .willReturn(List.of(article));
+                .willReturn(new PageImpl<>(List.of(article)));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(anyCollection()))
                 .willReturn(List.of(ArticleKeyword.of(article, mysql, "title")));
 
-        List<ArticleSummaryResult> result = articleService.search(null, null, null, null, null);
+        ArticlePageResult result = articleService.search(null, null, null, null, null, null);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).article()).isEqualTo(article);
-        assertThat(result.get(0).keywordNames()).containsExactly("MySQL");
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).article()).isEqualTo(article);
+        assertThat(result.content().get(0).keywordNames()).containsExactly("MySQL");
+        assertThat(result.hasNext()).isFalse();
     }
 
     @Test
     void search_whenNoArticles_returnsEmpty() {
         given(articleRepository.search(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
-                .willReturn(List.of());
+                .willReturn(new PageImpl<>(List.of()));
 
-        assertThat(articleService.search(null, null, null, null, null)).isEmpty();
+        assertThat(articleService.search(null, null, null, null, null, null).content()).isEmpty();
     }
 }

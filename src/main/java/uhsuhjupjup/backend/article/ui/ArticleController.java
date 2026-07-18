@@ -8,9 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.article.application.ArticleService;
 import uhsuhjupjup.backend.article.ui.dto.ArticleDetailResponse;
-import uhsuhjupjup.backend.article.ui.dto.ArticleResponse;
-
-import java.util.List;
+import uhsuhjupjup.backend.article.ui.dto.ArticlePageResponse;
 
 @RestController
 @RequestMapping("/api/articles")
@@ -20,14 +18,14 @@ public class ArticleController {
     private final ArticleService articleService;
 
     @GetMapping
-    public List<ArticleResponse> list(@RequestParam(required = false) Long topicId,
-                                      @RequestParam(required = false) Long keywordId,
-                                      @RequestParam(required = false) Long blogId,
-                                      @RequestParam(required = false) String q,
-                                      @RequestParam(required = false) Integer limit) {
-        return articleService.search(blogId, keywordId, topicId, q, limit).stream()
-                .map(ArticleResponse::from)
-                .toList();
+    public ArticlePageResponse list(@RequestParam(required = false) Long topicId,
+                                    @RequestParam(required = false) Long keywordId,
+                                    @RequestParam(required = false) Long blogId,
+                                    @RequestParam(required = false) String q,
+                                    @RequestParam(required = false) Integer page,
+                                    @RequestParam(required = false) Integer size) {
+        return ArticlePageResponse.from(
+                articleService.search(blogId, keywordId, topicId, q, page, size));
     }
 
     @GetMapping("/{id}")
