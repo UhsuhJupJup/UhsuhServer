@@ -9,6 +9,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import uhsuhjupjup.backend.common.auth.AdminMemberArgumentResolver;
 import uhsuhjupjup.backend.common.auth.FirebaseAuthInterceptor;
+import uhsuhjupjup.backend.common.auth.LoginAuthUserArgumentResolver;
 import uhsuhjupjup.backend.common.auth.LoginMemberArgumentResolver;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 public class WebConfig implements WebMvcConfigurer {
 
     private final FirebaseAuthInterceptor firebaseAuthInterceptor;
+    private final LoginAuthUserArgumentResolver loginAuthUserArgumentResolver;
     private final LoginMemberArgumentResolver loginMemberArgumentResolver;
     private final AdminMemberArgumentResolver adminMemberArgumentResolver;
 
@@ -31,6 +33,7 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(loginAuthUserArgumentResolver);
         resolvers.add(loginMemberArgumentResolver);
         resolvers.add(adminMemberArgumentResolver);
     }
