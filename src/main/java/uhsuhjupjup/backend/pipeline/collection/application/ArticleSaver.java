@@ -49,7 +49,7 @@ public class ArticleSaver {
     }
 
     private FetchedArticle withUrl(FetchedArticle article, String url) {
-        return new FetchedArticle(article.title(), url, article.publishedAt());
+        return new FetchedArticle(article.title(), url, article.publishedAt(), article.body());
     }
 
     private LocalDateTime publishedAtOf(FetchedArticle article) {
