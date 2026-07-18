@@ -42,7 +42,8 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @Query("select a.url from Article a where a.url in :urls")
     List<String> findExistingUrls(Collection<String> urls);
 
-    List<Article> findByCollectedAtGreaterThanEqual(LocalDateTime threshold);
+    @Query("select a from Article a join fetch a.blog where a.classifiedAt is null and a.collectedAt >= :threshold")
+    List<Article> findPendingClassificationWithBlog(LocalDateTime threshold);
 
     @Query("select a from Article a join fetch a.blog where a.id in :ids")
     List<Article> findWithBlogByIdIn(Collection<Long> ids);
