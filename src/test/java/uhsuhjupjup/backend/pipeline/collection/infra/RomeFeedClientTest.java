@@ -80,6 +80,42 @@ class RomeFeedClientTest {
     }
 
     @Test
+    void fetch_extractsBody_strippingHtmlAndDecodingEntities() {
+        String rss = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rss version="2.0"><channel>
+                  <item>
+                    <title>본문 글</title>
+                    <link>https://blog.example.com/3</link>
+                    <description><![CDATA[<p>Redis 캐시 &amp; 성능</p>]]></description>
+                  </item>
+                </channel></rss>
+                """;
+        server.expect(requestTo(RSS_URL)).andRespond(withSuccess(rss, MediaType.APPLICATION_XML));
+
+        List<FetchedArticle> result = feedClient.fetch(RSS_URL);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).body()).isEqualTo("Redis 캐시 & 성능");
+    }
+
+    @Test
+    void fetch_whenNoContentOrDescription_bodyIsNull() {
+        String rss = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rss version="2.0"><channel>
+                  <item><title>본문 없음</title><link>https://blog.example.com/4</link></item>
+                </channel></rss>
+                """;
+        server.expect(requestTo(RSS_URL)).andRespond(withSuccess(rss, MediaType.APPLICATION_XML));
+
+        List<FetchedArticle> result = feedClient.fetch(RSS_URL);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).body()).isNull();
+    }
+
+    @Test
     void fetch_skipsEntriesWithoutTitleOrLink() {
         String rss = """
                 <?xml version="1.0" encoding="UTF-8"?>

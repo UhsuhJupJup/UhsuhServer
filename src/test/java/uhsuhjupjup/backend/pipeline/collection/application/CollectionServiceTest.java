@@ -90,6 +90,6 @@ class CollectionServiceTest {
     }
 
     private FetchedArticle fetched(String title) {
-        return new FetchedArticle(title, "https://a.com/" + title, LocalDateTime.now());
+        return new FetchedArticle(title, "https://a.com/" + title, LocalDateTime.now(), null);
     }
 }
