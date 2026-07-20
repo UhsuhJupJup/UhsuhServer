@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.pipeline.notification.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
@@ -41,6 +42,9 @@ public class NotificationService {
     private final EmailSender emailSender;
     private final NotificationSaver notificationSaver;
 
+    @Value("${notification.max-per-member:5}")
+    private int maxPerMember;
+
     public NotificationResult notifyRecent() {
         LocalDateTime threshold = LocalDateTime.now().minusDays(WINDOW_DAYS);
         Map<Long, Set<Long>> articlesByMember = fanOut(threshold);
@@ -64,7 +68,7 @@ public class NotificationService {
         int failedMembers = 0;
         for (Map.Entry<Long, Set<Long>> entry : articlesByMember.entrySet()) {
             Member member = memberById.get(entry.getKey());
-            List<Long> orderedArticleIds = orderByPublishedDesc(entry.getValue(), articleById);
+            List<Long> orderedArticleIds = pickRecentByCollected(entry.getValue(), articleById);
             if (member == null || orderedArticleIds.isEmpty()) {
                 continue;
             }
@@ -95,10 +99,12 @@ public class NotificationService {
                 Collectors.mapping(RecipientPair::articleId, Collectors.toCollection(LinkedHashSet::new))));
     }
 
-    private List<Long> orderByPublishedDesc(Set<Long> articleIds, Map<Long, Article> articleById) {
+    private List<Long> pickRecentByCollected(Set<Long> articleIds, Map<Long, Article> articleById) {
         return articleIds.stream()
                 .filter(articleById::containsKey)
-                .sorted(Comparator.comparing((Long id) -> articleById.get(id).getPublishedAt()).reversed())
+                .sorted(Comparator.comparing((Long id) -> articleById.get(id).getCollectedAt()).reversed()
+                        .thenComparing(Comparator.reverseOrder()))
+                .limit(maxPerMember)
                 .toList();
     }
 
