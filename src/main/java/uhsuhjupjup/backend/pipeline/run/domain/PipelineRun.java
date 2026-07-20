@@ -25,6 +25,10 @@ public class PipelineRun {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kind", nullable = false, length = 20)
+    private RunKind kind;
+
     @Column(name = "started_at", nullable = false)
     private LocalDateTime startedAt;
 
@@ -60,10 +64,11 @@ public class PipelineRun {
     private int notifyFailed;
 
     @Builder
-    private PipelineRun(LocalDateTime startedAt, LocalDateTime finishedAt, RunStatus status,
+    private PipelineRun(RunKind kind, LocalDateTime startedAt, LocalDateTime finishedAt, RunStatus status,
                         int collectedTotal, int collectedNew, int collectFailed,
                         int matchedArticles, int tagsCreated,
                         int membersNotified, int notificationsRecorded, int notifyFailed) {
+        this.kind = kind;
         this.startedAt = startedAt;
         this.finishedAt = finishedAt;
         this.status = status;
