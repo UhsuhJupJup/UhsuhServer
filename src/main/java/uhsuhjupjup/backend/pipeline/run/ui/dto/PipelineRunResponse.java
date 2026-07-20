@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 
 public record PipelineRunResponse(
         Long id,
+        String kind,
         LocalDateTime startedAt,
         LocalDateTime finishedAt,
         String status,
@@ -23,6 +24,7 @@ public record PipelineRunResponse(
     public static PipelineRunResponse from(PipelineRun run) {
         return new PipelineRunResponse(
                 run.getId(),
+                run.getKind().name(),
                 run.getStartedAt(),
                 run.getFinishedAt(),
                 run.getStatus().name(),
