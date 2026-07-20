@@ -25,6 +25,7 @@ import uhsuhjupjup.backend.support.ArticleFixture;
 import uhsuhjupjup.backend.support.BlogFixture;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,15 +61,16 @@ class NotificationServiceTest {
     private final Member member1 = member(1L, "a@test.com");
     private final Member member2 = member(2L, "b@test.com");
     private final Article article10 = ArticleFixture.article(10L, blog, "글10", "https://t.com/10",
-            LocalDateTime.of(2026, 6, 20, 10, 0));
+            LocalDateTime.of(2026, 6, 20, 10, 0), LocalDateTime.of(2026, 6, 20, 10, 0));
     private final Article article20 = ArticleFixture.article(20L, blog, "글20", "https://t.com/20",
-            LocalDateTime.of(2026, 6, 21, 10, 0));
+            LocalDateTime.of(2026, 6, 21, 10, 0), LocalDateTime.of(2026, 6, 21, 10, 0));
 
     @BeforeEach
     void setUp() {
         emailSender = new FakeEmailSender();
         service = new NotificationService(notificationRepository, articleRepository, articleKeywordRepository,
                 memberRepository, digestRenderer, emailSender, notificationSaver);
+        ReflectionTestUtils.setField(service, "maxPerMember", 5);
     }
 
     @Test
@@ -90,6 +92,33 @@ class NotificationServiceTest {
         assertThat(result.notificationsRecorded()).isEqualTo(2);
         verify(digestRenderer).render(eq(member1), viewsCaptor.capture(), any());
         assertThat(viewsCaptor.getValue()).hasSize(2);
+    }
+
+    @Test
+    void notifyRecent_capsToTopFiveByCollectedDesc() {
+        List<Article> articles = new ArrayList<>();
+        List<RecipientPair> pairs = new ArrayList<>();
+        for (int i = 1; i <= 7; i++) {
+            long id = i;
+            articles.add(ArticleFixture.article(id, blog, "글" + i, "https://t.com/" + i,
+                    LocalDateTime.of(2026, 6, 1, 0, 0),
+                    LocalDateTime.of(2026, 6, 1, 0, 0).plusHours(i)));
+            pairs.add(new RecipientPair(1L, id));
+        }
+        given(notificationRepository.findKeywordPathRecipients(any())).willReturn(pairs);
+        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
+        given(articleRepository.findWithBlogByIdIn(any())).willReturn(articles);
+        given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
+        given(memberRepository.findAllById(any())).willReturn(List.of(member1));
+        given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
+        given(notificationSaver.record(eq(1L), any())).willReturn(5);
+
+        NotificationResult result = service.notifyRecent();
+
+        verify(digestRenderer).render(eq(member1), viewsCaptor.capture(), any());
+        assertThat(viewsCaptor.getValue()).extracting(DigestArticleView::title)
+                .containsExactly("글7", "글6", "글5", "글4", "글3");
+        assertThat(result.notificationsRecorded()).isEqualTo(5);
     }
 
     @Test
