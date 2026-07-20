@@ -28,6 +28,10 @@ firebase:
 claude:
   enabled: ${CLAUDE_ENABLED:false}
   model: ${CLAUDE_MODEL:claude-haiku-4-5}
+
+notification:
+  max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
+
 management:
   endpoints:
     web:
