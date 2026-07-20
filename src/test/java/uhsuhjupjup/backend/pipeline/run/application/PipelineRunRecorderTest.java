@@ -10,6 +10,7 @@ import uhsuhjupjup.backend.pipeline.collection.application.dto.CollectionResult;
 import uhsuhjupjup.backend.pipeline.matching.application.dto.MatchingResult;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
 import uhsuhjupjup.backend.pipeline.run.domain.PipelineRun;
+import uhsuhjupjup.backend.pipeline.run.domain.RunKind;
 import uhsuhjupjup.backend.pipeline.run.domain.RunStatus;
 import uhsuhjupjup.backend.pipeline.run.infra.PipelineRunRepository;
 
@@ -31,42 +32,57 @@ class PipelineRunRecorderTest {
     private final LocalDateTime finished = LocalDateTime.of(2026, 6, 30, 6, 1, 0);
 
     @Test
-    void 모든_단계_성공이면_SUCCESS이고_카운트를_매핑한다() {
-        recorder.record(started, finished,
+    void 수집_매칭_성공이면_INGEST_SUCCESS이고_카운트를_매핑한다() {
+        recorder.recordIngest(started, finished,
                 new CollectionResult(6, 5, 1, 0, 12),
-                new MatchingResult(20, 8, 9),
-                new NotificationResult(3, 14, 1));
+                new MatchingResult(20, 8, 9));
 
         PipelineRun run = captureSaved();
+        assertThat(run.getKind()).isEqualTo(RunKind.INGEST);
         assertThat(run.getStatus()).isEqualTo(RunStatus.SUCCESS);
         assertThat(run.getCollectedTotal()).isEqualTo(6);
         assertThat(run.getCollectedNew()).isEqualTo(12);
         assertThat(run.getCollectFailed()).isEqualTo(1);
         assertThat(run.getMatchedArticles()).isEqualTo(8);
         assertThat(run.getTagsCreated()).isEqualTo(9);
-        assertThat(run.getMembersNotified()).isEqualTo(3);
-        assertThat(run.getNotificationsRecorded()).isEqualTo(14);
-        assertThat(run.getNotifyFailed()).isEqualTo(1);
+        assertThat(run.getMembersNotified()).isZero();
     }
 
     @Test
-    void 일부_단계_실패면_PARTIAL이다() {
-        recorder.record(started, finished,
-                new CollectionResult(6, 6, 0, 0, 10),
-                null,
-                new NotificationResult(0, 0, 0));
+    void 수집_매칭_한_단계_실패면_PARTIAL이다() {
+        recorder.recordIngest(started, finished, new CollectionResult(6, 6, 0, 0, 10), null);
 
         assertThat(captureSaved().getStatus()).isEqualTo(RunStatus.PARTIAL);
     }
 
     @Test
-    void 전_단계_실패면_FAILED이고_카운트는_0이다() {
-        recorder.record(started, finished, null, null, null);
+    void 수집_매칭_전부_실패면_FAILED이다() {
+        recorder.recordIngest(started, finished, null, null);
+
+        assertThat(captureSaved().getStatus()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void 알림_성공이면_NOTIFICATION_SUCCESS이고_카운트를_매핑한다() {
+        recorder.recordNotification(started, finished, new NotificationResult(3, 14, 1));
 
         PipelineRun run = captureSaved();
-        assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
-        assertThat(run.getCollectedNew()).isZero();
+        assertThat(run.getKind()).isEqualTo(RunKind.NOTIFICATION);
+        assertThat(run.getStatus()).isEqualTo(RunStatus.SUCCESS);
+        assertThat(run.getMembersNotified()).isEqualTo(3);
+        assertThat(run.getNotificationsRecorded()).isEqualTo(14);
+        assertThat(run.getNotifyFailed()).isEqualTo(1);
+        assertThat(run.getCollectedTotal()).isZero();
         assertThat(run.getMatchedArticles()).isZero();
+    }
+
+    @Test
+    void 알림_단계_실패면_NOTIFICATION_FAILED이다() {
+        recorder.recordNotification(started, finished, null);
+
+        PipelineRun run = captureSaved();
+        assertThat(run.getKind()).isEqualTo(RunKind.NOTIFICATION);
+        assertThat(run.getStatus()).isEqualTo(RunStatus.FAILED);
         assertThat(run.getMembersNotified()).isZero();
     }
 
