@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  external_labels:
+    env: prod
+
+scrape_configs:
+  - job_name: 'uhsuhjupjup-backend'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['uhsuh-backend:8080']
+        labels:
+          application: 'uhsuhjupjup-backend'
+
+  - job_name: 'mysqld-exporter'
+    static_configs:
+      - targets: ['uhsuh-mysqld-exporter:9104']
+        labels:
+          application: 'uhsuhjupjup-mysql'
+
+remote_write:
+  - url: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
+    basic_auth:
+      username: 3377528
+      password_file: /etc/prometheus/gc_token
