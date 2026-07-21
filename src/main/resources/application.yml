@@ -28,6 +28,10 @@ firebase:
 claude:
   enabled: ${CLAUDE_ENABLED:false}
   model: ${CLAUDE_MODEL:claude-haiku-4-5}
+
+notification:
+  max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
+
 management:
   endpoints:
     web:
@@ -43,5 +47,7 @@ management:
     tags:
       application: uhsuhjupjup-backend
     distribution:
+      slo:
+        http.server.requests: 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
       percentiles-histogram:
-        http.server.requests: true
+        http.server.requests: false

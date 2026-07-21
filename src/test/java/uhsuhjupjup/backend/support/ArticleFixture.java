@@ -16,4 +16,11 @@ public final class ArticleFixture {
         ReflectionTestUtils.setField(article, "id", id);
         return article;
     }
+
+    public static Article article(Long id, Blog blog, String title, String url,
+                                  LocalDateTime publishedAt, LocalDateTime collectedAt) {
+        Article article = article(id, blog, title, url, publishedAt);
+        ReflectionTestUtils.setField(article, "collectedAt", collectedAt);
+        return article;
+    }
 }

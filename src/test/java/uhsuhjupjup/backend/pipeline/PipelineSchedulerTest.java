@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class PipelineSchedulerTest {
@@ -35,23 +36,31 @@ class PipelineSchedulerTest {
     private PipelineScheduler scheduler;
 
     @Test
-    void run_runsCollectThenMatchThenNotify_thenRecords() {
-        scheduler.run();
+    void ingest_runsCollectThenMatch_thenRecords() {
+        scheduler.ingest();
 
-        InOrder inOrder = inOrder(collectionService, matchingService, notificationService, pipelineRunRecorder);
+        InOrder inOrder = inOrder(collectionService, matchingService, pipelineRunRecorder);
         inOrder.verify(collectionService).collectAll();
         inOrder.verify(matchingService).matchRecent();
-        inOrder.verify(notificationService).notifyRecent();
-        inOrder.verify(pipelineRunRecorder).record(any(), any(), any(), any(), any());
+        inOrder.verify(pipelineRunRecorder).recordIngest(any(), any(), any(), any());
+        verifyNoInteractions(notificationService);
     }
 
     @Test
-    void run_whenAStageFails_laterStagesStillRunAndRunIsRecorded() {
+    void ingest_whenMatchFails_stillRecords() {
         given(matchingService.matchRecent()).willThrow(new RuntimeException("boom"));
 
-        scheduler.run();
+        scheduler.ingest();
+
+        verify(pipelineRunRecorder).recordIngest(any(), any(), any(), any());
+    }
+
+    @Test
+    void notifyMembers_runsNotification_thenRecords() {
+        scheduler.notifyMembers();
 
         verify(notificationService).notifyRecent();
-        verify(pipelineRunRecorder).record(any(), any(), any(), any(), any());
+        verify(pipelineRunRecorder).recordNotification(any(), any(), any());
+        verifyNoInteractions(collectionService, matchingService);
     }
 }

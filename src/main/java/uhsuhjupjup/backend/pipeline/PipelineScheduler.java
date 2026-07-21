@@ -26,12 +26,18 @@ public class PipelineScheduler {
     private final PipelineRunRecorder pipelineRunRecorder;
 
     @Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")
-    public void run() {
+    public void ingest() {
         LocalDateTime startedAt = LocalDateTime.now();
         CollectionResult collection = runStage("수집", collectionService::collectAll);
         MatchingResult matching = runStage("매칭", matchingService::matchRecent);
+        pipelineRunRecorder.recordIngest(startedAt, LocalDateTime.now(), collection, matching);
+    }
+
+    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
+    public void notifyMembers() {
+        LocalDateTime startedAt = LocalDateTime.now();
         NotificationResult notification = runStage("발송", notificationService::notifyRecent);
-        pipelineRunRecorder.record(startedAt, LocalDateTime.now(), collection, matching, notification);
+        pipelineRunRecorder.recordNotification(startedAt, LocalDateTime.now(), notification);
     }
 
     private <T> T runStage(String name, Supplier<T> stage) {
