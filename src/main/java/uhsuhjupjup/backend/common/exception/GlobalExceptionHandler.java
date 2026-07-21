@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.common.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -20,6 +21,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e, HttpServletRequest req) {
         ErrorCode ec = e.getErrorCode();
         return ResponseEntity.status(ec.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ec, req.getRequestURI()));
     }
 
@@ -29,24 +31,28 @@ public class GlobalExceptionHandler {
                 .map(f -> new ErrorResponse.FieldError(f.getField(), f.getDefaultMessage()))
                 .toList();
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, req.getRequestURI(), fields));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e, HttpServletRequest req) {
         return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.MALFORMED_REQUEST, req.getRequestURI()));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethod(HttpRequestMethodNotSupportedException e, HttpServletRequest req) {
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, req.getRequestURI()));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> handleNoResource(NoResourceFoundException e, HttpServletRequest req) {
         return ResponseEntity.status(ErrorCode.NOT_FOUND.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.NOT_FOUND, req.getRequestURI()));
     }
 
@@ -54,6 +60,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEtc(Exception e, HttpServletRequest req) {
         log.error("Unhandled exception at {}", req.getRequestURI(), e);
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, req.getRequestURI()));
     }
 }
