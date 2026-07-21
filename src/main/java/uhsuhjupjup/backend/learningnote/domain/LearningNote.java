@@ -55,4 +55,8 @@ public class LearningNote extends BaseEntity {
         this.content = content;
         this.analyzedAt = null;
     }
+
+    public void markAnalyzed(LocalDateTime at) {
+        this.analyzedAt = at;
+    }
 }
