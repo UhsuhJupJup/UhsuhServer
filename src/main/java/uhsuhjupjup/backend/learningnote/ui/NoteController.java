@@ -13,9 +13,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.LoginMember;
+import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
 import uhsuhjupjup.backend.learningnote.application.NoteService;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
+import uhsuhjupjup.backend.learningnote.ui.dto.RecommendedArticleResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 
 import java.util.List;
@@ -26,6 +28,7 @@ import java.util.List;
 public class NoteController {
 
     private final NoteService noteService;
+    private final NoteRecommendationService noteRecommendationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -55,5 +58,12 @@ public class NoteController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@LoginMember Member member, @PathVariable Long id) {
         noteService.delete(id, member.getId());
+    }
+
+    @GetMapping("/{id}/recommendations")
+    public List<RecommendedArticleResponse> recommendations(@LoginMember Member member, @PathVariable Long id) {
+        return noteRecommendationService.recommend(id, member.getId()).stream()
+                .map(RecommendedArticleResponse::from)
+                .toList();
     }
 }
