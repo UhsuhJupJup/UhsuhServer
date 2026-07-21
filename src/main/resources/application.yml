@@ -47,5 +47,7 @@ management:
     tags:
       application: uhsuhjupjup-backend
     distribution:
+      slo:
+        http.server.requests: 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
       percentiles-histogram:
-        http.server.requests: true
+        http.server.requests: false
