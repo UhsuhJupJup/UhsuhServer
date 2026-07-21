@@ -11,11 +11,17 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.auth.AuthUser;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
+import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
+import uhsuhjupjup.backend.learningnote.domain.NoteKeyword;
 import uhsuhjupjup.backend.learningnote.infra.LearningNoteRepository;
+import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.support.MySqlTestSupport;
+
+import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -42,6 +48,10 @@ class NoteIntegrationTest extends MySqlTestSupport {
     private MemberRepository memberRepository;
     @Autowired
     private LearningNoteRepository learningNoteRepository;
+    @Autowired
+    private KeywordRepository keywordRepository;
+    @Autowired
+    private NoteKeywordRepository noteKeywordRepository;
 
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
@@ -166,5 +176,32 @@ class NoteIntegrationTest extends MySqlTestSupport {
     void 없는_노트_삭제는_404() throws Exception {
         mockMvc.perform(delete("/api/notes/999999").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 분석된_노트는_키워드가_응답에_포함된다() throws Exception {
+        LearningNote note = learningNoteRepository.save(LearningNote.create(member, "제목", "본문"));
+        note.markAnalyzed(LocalDateTime.now());
+        learningNoteRepository.save(note);
+        Keyword redis = keywordRepository.save(Keyword.create("Redis"));
+        noteKeywordRepository.save(NoteKeyword.of(note, redis));
+
+        mockMvc.perform(get("/api/notes/" + note.getId()).header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords.length()").value(1))
+                .andExpect(jsonPath("$.keywords[0]").value("Redis"));
+
+        mockMvc.perform(get("/api/notes").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].keywords[0]").value("Redis"));
+    }
+
+    @Test
+    void 분석전_노트는_키워드가_비어있다() throws Exception {
+        Long id = learningNoteRepository.save(LearningNote.create(member, "제목", "본문")).getId();
+
+        mockMvc.perform(get("/api/notes/" + id).header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords.length()").value(0));
     }
 }

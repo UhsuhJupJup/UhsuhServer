@@ -31,6 +31,7 @@ import uhsuhjupjup.backend.support.MySqlTestSupport;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
@@ -107,13 +108,15 @@ class NoteRecommendationIntegrationTest extends MySqlTestSupport {
 
         mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].articleId").value(redisCachingArticle.getId()))
-                .andExpect(jsonPath("$[0].blogName").value("우아한형제들"))
-                .andExpect(jsonPath("$[0].matchedKeywords.length()").value(2))
-                .andExpect(jsonPath("$[1].articleId").value(redisOnlyArticle.getId()))
-                .andExpect(jsonPath("$[1].matchedKeywords.length()").value(1))
-                .andExpect(jsonPath("$[1].matchedKeywords[0]").value("Redis"));
+                .andExpect(jsonPath("$.keywords.length()").value(2))
+                .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
+                .andExpect(jsonPath("$.articles.length()").value(2))
+                .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()))
+                .andExpect(jsonPath("$.articles[0].blogName").value("우아한형제들"))
+                .andExpect(jsonPath("$.articles[0].matchedKeywords.length()").value(2))
+                .andExpect(jsonPath("$.articles[1].articleId").value(redisOnlyArticle.getId()))
+                .andExpect(jsonPath("$.articles[1].matchedKeywords.length()").value(1))
+                .andExpect(jsonPath("$.articles[1].matchedKeywords[0]").value("Redis"));
     }
 
     @Test
@@ -123,7 +126,21 @@ class NoteRecommendationIntegrationTest extends MySqlTestSupport {
 
         mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.keywords.length()").value(0))
+                .andExpect(jsonPath("$.articles.length()").value(0));
+    }
+
+    @Test
+    void 키워드는_추출됐지만_겹치는_글이_없으면_키워드만_반환한다() throws Exception {
+        Keyword kafka = keywordRepository.save(Keyword.create("Kafka"));
+        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(List.of(new KeywordMatch(kafka.getId(), "ai")));
+
+        mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords.length()").value(1))
+                .andExpect(jsonPath("$.keywords[0]").value("Kafka"))
+                .andExpect(jsonPath("$.articles.length()").value(0));
     }
 
     @Test
