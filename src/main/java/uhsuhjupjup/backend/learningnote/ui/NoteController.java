@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
 import uhsuhjupjup.backend.learningnote.application.NoteService;
+import uhsuhjupjup.backend.learningnote.ui.dto.NoteRecommendationResponse;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
-import uhsuhjupjup.backend.learningnote.ui.dto.RecommendedArticleResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 
 import java.util.List;
@@ -38,14 +38,14 @@ public class NoteController {
 
     @GetMapping
     public List<NoteResponse> list(@LoginMember Member member) {
-        return noteService.findByMember(member.getId()).stream()
+        return noteService.findSummaries(member.getId()).stream()
                 .map(NoteResponse::from)
                 .toList();
     }
 
     @GetMapping("/{id}")
     public NoteResponse get(@LoginMember Member member, @PathVariable Long id) {
-        return NoteResponse.from(noteService.get(id, member.getId()));
+        return NoteResponse.from(noteService.getDetail(id, member.getId()));
     }
 
     @PutMapping("/{id}")
@@ -61,9 +61,7 @@ public class NoteController {
     }
 
     @GetMapping("/{id}/recommendations")
-    public List<RecommendedArticleResponse> recommendations(@LoginMember Member member, @PathVariable Long id) {
-        return noteRecommendationService.recommend(id, member.getId()).stream()
-                .map(RecommendedArticleResponse::from)
-                .toList();
+    public NoteRecommendationResponse recommendations(@LoginMember Member member, @PathVariable Long id) {
+        return NoteRecommendationResponse.from(noteRecommendationService.recommend(id, member.getId()));
     }
 }

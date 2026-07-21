@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
 import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
@@ -29,29 +30,31 @@ public class NoteRecommendationService {
     private final ArticleKeywordRepository articleKeywordRepository;
     private final ArticleRepository articleRepository;
 
-    public List<RecommendedArticleResult> recommend(Long noteId, Long memberId) {
+    public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
         if (note.getAnalyzedAt() == null) {
             noteAnalyzer.analyze(note);
         }
+        List<String> keywords = noteKeywordRepository.findKeywordNamesByNoteId(noteId);
         List<Long> keywordIds = noteKeywordRepository.findKeywordIdsByNoteId(noteId);
         if (keywordIds.isEmpty()) {
-            return List.of();
+            return new NoteRecommendationResult(keywords, List.of());
         }
         List<Long> articleIds = articleKeywordRepository.findTopArticleIdsByKeywordIds(
                 keywordIds, PageRequest.of(0, MAX_RECOMMENDATIONS));
         if (articleIds.isEmpty()) {
-            return List.of();
+            return new NoteRecommendationResult(keywords, List.of());
         }
         Map<Long, List<String>> matchedByArticle = matchedKeywordsByArticle(articleIds, Set.copyOf(keywordIds));
         Map<Long, Article> articleById = articleRepository.findWithBlogByIdIn(articleIds).stream()
                 .collect(Collectors.toMap(Article::getId, Function.identity()));
-        return articleIds.stream()
+        List<RecommendedArticleResult> articles = articleIds.stream()
                 .map(articleById::get)
                 .filter(Objects::nonNull)
                 .map(article -> new RecommendedArticleResult(
                         article, matchedByArticle.getOrDefault(article.getId(), List.of())))
                 .toList();
+        return new NoteRecommendationResult(keywords, articles);
     }
 
     private Map<Long, List<String>> matchedKeywordsByArticle(List<Long> articleIds, Set<Long> noteKeywordIds) {
