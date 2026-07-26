@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -26,4 +27,12 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
 
     @Query("select ak.keyword.id from ArticleKeyword ak where ak.article.id = :articleId")
     List<Long> findKeywordIdsByArticleId(Long articleId);
+
+    @Query("""
+            select ak.article.id FROM ArticleKeyword ak 
+            where ak.keyword.id = :keywordId 
+            and ak.article.collectedAt >= :cutOff
+            order by ak.article.collectedAt desc
+            """)
+    List<Long> findCandidateArticleIds(Long keywordId, LocalDateTime cutOff, Pageable pageable);
 }
