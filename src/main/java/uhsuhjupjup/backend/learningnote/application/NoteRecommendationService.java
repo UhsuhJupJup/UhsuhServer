@@ -1,8 +1,8 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
@@ -11,10 +11,12 @@ import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
 
+import java.util.Set;
+import java.util.Objects;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,6 +31,7 @@ public class NoteRecommendationService {
     private final NoteKeywordRepository noteKeywordRepository;
     private final ArticleKeywordRepository articleKeywordRepository;
     private final ArticleRepository articleRepository;
+    private final KeywordArticleQueryService keywordArticleQueryService;
 
     public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
@@ -40,14 +43,30 @@ public class NoteRecommendationService {
         if (keywordIds.isEmpty()) {
             return new NoteRecommendationResult(keywords, List.of());
         }
-        List<Long> articleIds = articleKeywordRepository.findTopArticleIdsByKeywordIds(
-                keywordIds, PageRequest.of(0, MAX_RECOMMENDATIONS));
-        if (articleIds.isEmpty()) {
+
+        Map<Long, Integer> overlapByArticle = new HashMap<>();
+        for (Long keywordId : keywordIds) {
+            for (Long articleId : keywordArticleQueryService.candidateArticleIds(keywordId)) {
+                overlapByArticle.merge(articleId, 1, Integer::sum);
+            }
+        }
+        if (overlapByArticle.isEmpty()) {
             return new NoteRecommendationResult(keywords, List.of());
         }
-        Map<Long, List<String>> matchedByArticle = matchedKeywordsByArticle(articleIds, Set.copyOf(keywordIds));
-        Map<Long, Article> articleById = articleRepository.findWithBlogByIdIn(articleIds).stream()
+
+        Map<Long, Article> articleById = articleRepository.findWithBlogByIdIn(overlapByArticle.keySet()).stream()
                 .collect(Collectors.toMap(Article::getId, Function.identity()));
+        List<Long> articleIds = articleById.values().stream()
+                .sorted(Comparator.comparingInt((Article a) ->
+                                overlapByArticle.get(a.getId())).reversed()
+                        .thenComparing(Article::getCollectedAt, Comparator.reverseOrder()))
+                .limit(MAX_RECOMMENDATIONS)
+                .map(Article::getId)
+                .toList();
+
+
+        Map<Long, List<String>> matchedByArticle = matchedKeywordsByArticle(articleIds, Set.copyOf(keywordIds));
+
         List<RecommendedArticleResult> articles = articleIds.stream()
                 .map(articleById::get)
                 .filter(Objects::nonNull)

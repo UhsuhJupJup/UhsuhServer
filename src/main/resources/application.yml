@@ -44,6 +44,8 @@ management:
     mail:
       enabled: false
   metrics:
+    cache:
+      enabled: true
     tags:
       application: uhsuhjupjup-backend
     distribution:
@@ -51,3 +53,4 @@ management:
         http.server.requests: 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
       percentiles-histogram:
         http.server.requests: false
+
