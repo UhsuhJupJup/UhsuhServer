@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class MatchingService {
 
     private static final int WINDOW_DAYS = 2;
+    private static final int MAX_KEYWORDS = 5;
 
     private final ArticleRepository articleRepository;
     private final KeywordRepository keywordRepository;
@@ -54,7 +55,9 @@ public class MatchingService {
             for (Article article : blogArticles) {
                 try {
                     String body = bodyByUrl.get().get(article.getUrl());
-                    List<KeywordMatch> matches = keywordClassifier.classify(article.getTitle(), body, catalog);
+                    List<KeywordMatch> matches = keywordClassifier.classify(article.getTitle(), body, catalog).stream()
+                            .limit(MAX_KEYWORDS)
+                            .toList();
                     int created = articleKeywordSaver.recordClassification(
                             article.getId(), matches, LocalDateTime.now());
                     if (created > 0) {

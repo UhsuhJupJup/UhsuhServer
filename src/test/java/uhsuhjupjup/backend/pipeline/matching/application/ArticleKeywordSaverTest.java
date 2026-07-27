@@ -7,6 +7,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
@@ -40,6 +41,9 @@ class ArticleKeywordSaverTest {
 
     @Mock
     private KeywordRepository keywordRepository;
+
+    @Mock
+    private KeywordArticleQueryService keywordArticleQueryService;
 
     @InjectMocks
     private ArticleKeywordSaver saver;
