@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.LoginMember;
+import uhsuhjupjup.backend.learningnote.application.NoteGraphService;
 import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
 import uhsuhjupjup.backend.learningnote.application.NoteService;
+import uhsuhjupjup.backend.learningnote.ui.dto.NoteGraphResponse;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteRecommendationResponse;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
@@ -29,6 +31,7 @@ public class NoteController {
 
     private final NoteService noteService;
     private final NoteRecommendationService noteRecommendationService;
+    private final NoteGraphService noteGraphService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -63,5 +66,10 @@ public class NoteController {
     @GetMapping("/{id}/recommendations")
     public NoteRecommendationResponse recommendations(@LoginMember Member member, @PathVariable Long id) {
         return NoteRecommendationResponse.from(noteRecommendationService.recommend(id, member.getId()));
+    }
+
+    @GetMapping("/{id}/graph")
+    public NoteGraphResponse graph(@LoginMember Member member, @PathVariable Long id) {
+        return NoteGraphResponse.from(noteGraphService.graph(id, member.getId()));
     }
 }

@@ -5,7 +5,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
@@ -122,6 +125,31 @@ class NoteRecommendationServiceTest {
         assertThat(result.articles())
                 .extracting(recommended -> recommended.article().getId())
                 .containsExactly(1L, 2L, 3L, 4L, 5L); // 최신 5개
+    }
+
+    @Test
+    void 관련_키워드로_확장해_직접_안겹치는_글도_추천한다() {
+        LearningNote note = analyzedNote();
+        Article direct = article(1L, LocalDateTime.now().minusDays(1));   // 노트 키워드 직접 매칭
+        Article related = article(2L, LocalDateTime.now().minusDays(1));  // 관련(확장) 키워드로만 매칭
+
+        given(noteService.get(1L, 1L)).willReturn(note);
+        given(noteKeywordRepository.findKeywordNamesByNoteId(1L)).willReturn(List.of("자바"));
+        given(noteKeywordRepository.findKeywordIdsByNoteId(1L)).willReturn(List.of(100L));
+        // 자바(100)와 함께 나온 관련 키워드 300 → 그래프 확장
+        given(articleKeywordRepository.findNeighbors(anyCollection(), any(Pageable.class)))
+                .willReturn(List.of(new KeywordNeighbor(300L, 5L)));
+        given(keywordArticleQueryService.candidateArticleIds(100L)).willReturn(List.of(1L)); // 직접(가중 2.0)
+        given(keywordArticleQueryService.candidateArticleIds(300L)).willReturn(List.of(2L)); // 관련(가중 1.0)
+        given(articleRepository.findWithBlogByIdIn(anyCollection())).willReturn(List.of(direct, related));
+        given(articleKeywordRepository.findWithKeywordByArticleIdIn(anyCollection())).willReturn(List.of());
+
+        NoteRecommendationResult result = noteRecommendationService.recommend(1L, 1L);
+
+        // 노트에 없는 관련 키워드로만 매칭된 글2도 추천에 포함되고, 직접 매칭 글1이 위
+        assertThat(result.articles())
+                .extracting(recommended -> recommended.article().getId())
+                .containsExactly(1L, 2L);
     }
 
     @Test
