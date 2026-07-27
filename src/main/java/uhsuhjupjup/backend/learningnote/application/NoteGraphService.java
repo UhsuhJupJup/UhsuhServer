@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class NoteGraphService {
 
-    private static final int MAX_NEIGHBORS = 20;
+    private static final int MAX_NEIGHBORS = 10;
 
     private final NoteService noteService;
     private final NoteRecommendationService noteRecommendationService;
