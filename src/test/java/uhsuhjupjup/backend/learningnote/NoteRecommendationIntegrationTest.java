@@ -158,4 +158,25 @@ class NoteRecommendationIntegrationTest extends MySqlTestSupport {
         mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void 노트_그래프는_노트_키워드_추천글_노드와_간선을_반환한다() throws Exception {
+        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")));
+
+        mockMvc.perform(get("/api/notes/" + noteId + "/graph").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes").isNotEmpty())
+                .andExpect(jsonPath("$.edges").isNotEmpty())
+                .andExpect(jsonPath("$.nodes[?(@.id=='note:" + noteId + "')]").exists())
+                .andExpect(jsonPath("$.nodes[?(@.id=='kw:" + redis.getId() + "')]").exists())
+                .andExpect(jsonPath("$.nodes[?(@.type=='article')]").exists())
+                .andExpect(jsonPath("$.edges[?(@.source=='note:" + noteId + "')]").exists());
+    }
+
+    @Test
+    void 인증_없이_그래프는_401() throws Exception {
+        mockMvc.perform(get("/api/notes/" + noteId + "/graph"))
+                .andExpect(status().isUnauthorized());
+    }
 }
