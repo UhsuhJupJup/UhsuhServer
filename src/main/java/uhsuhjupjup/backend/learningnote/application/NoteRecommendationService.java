@@ -1,8 +1,10 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
@@ -11,12 +13,12 @@ import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
 
-import java.util.Set;
-import java.util.Objects;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -25,6 +27,9 @@ import java.util.stream.Collectors;
 public class NoteRecommendationService {
 
     private static final int MAX_RECOMMENDATIONS = 5;
+    private static final int MAX_NEIGHBORS = 20;
+    private static final double ORIGINAL_WEIGHT = 2.0;
+    private static final double RELATED_WEIGHT = 1.0;
 
     private final NoteService noteService;
     private final NoteAnalyzer noteAnalyzer;
@@ -44,28 +49,28 @@ public class NoteRecommendationService {
             return new NoteRecommendationResult(keywords, List.of());
         }
 
-        Map<Long, Integer> overlapByArticle = new HashMap<>();
-        for (Long keywordId : keywordIds) {
+        Map<Long, Double> weightByKeyword = expandedKeywordWeights(keywordIds);
+
+        Map<Long, Double> scoreByArticle = new HashMap<>();
+        weightByKeyword.forEach((keywordId, weight) -> {
             for (Long articleId : keywordArticleQueryService.candidateArticleIds(keywordId)) {
-                overlapByArticle.merge(articleId, 1, Integer::sum);
+                scoreByArticle.merge(articleId, weight, Double::sum);
             }
-        }
-        if (overlapByArticle.isEmpty()) {
+        });
+        if (scoreByArticle.isEmpty()) {
             return new NoteRecommendationResult(keywords, List.of());
         }
 
-        Map<Long, Article> articleById = articleRepository.findWithBlogByIdIn(overlapByArticle.keySet()).stream()
+        Map<Long, Article> articleById = articleRepository.findWithBlogByIdIn(scoreByArticle.keySet()).stream()
                 .collect(Collectors.toMap(Article::getId, Function.identity()));
         List<Long> articleIds = articleById.values().stream()
-                .sorted(Comparator.comparingInt((Article a) ->
-                                overlapByArticle.get(a.getId())).reversed()
+                .sorted(Comparator.comparingDouble((Article article) -> scoreByArticle.get(article.getId())).reversed()
                         .thenComparing(Article::getCollectedAt, Comparator.reverseOrder()))
                 .limit(MAX_RECOMMENDATIONS)
                 .map(Article::getId)
                 .toList();
 
-
-        Map<Long, List<String>> matchedByArticle = matchedKeywordsByArticle(articleIds, Set.copyOf(keywordIds));
+        Map<Long, List<String>> matchedByArticle = matchedKeywordsByArticle(articleIds, weightByKeyword.keySet());
 
         List<RecommendedArticleResult> articles = articleIds.stream()
                 .map(articleById::get)
@@ -76,9 +81,22 @@ public class NoteRecommendationService {
         return new NoteRecommendationResult(keywords, articles);
     }
 
-    private Map<Long, List<String>> matchedKeywordsByArticle(List<Long> articleIds, Set<Long> noteKeywordIds) {
+    private Map<Long, Double> expandedKeywordWeights(List<Long> noteKeywordIds) {
+        Map<Long, Double> weights = new HashMap<>();
+        for (Long keywordId : noteKeywordIds) {
+            weights.put(keywordId, ORIGINAL_WEIGHT);
+        }
+        List<KeywordNeighbor> neighbors = articleKeywordRepository.findNeighbors(
+                noteKeywordIds, PageRequest.of(0, MAX_NEIGHBORS));
+        for (KeywordNeighbor neighbor : neighbors) {
+            weights.putIfAbsent(neighbor.keywordId(), RELATED_WEIGHT);
+        }
+        return weights;
+    }
+
+    private Map<Long, List<String>> matchedKeywordsByArticle(List<Long> articleIds, Set<Long> matchKeywordIds) {
         return articleKeywordRepository.findWithKeywordByArticleIdIn(articleIds).stream()
-                .filter(articleKeyword -> noteKeywordIds.contains(articleKeyword.getKeyword().getId()))
+                .filter(articleKeyword -> matchKeywordIds.contains(articleKeyword.getKeyword().getId()))
                 .collect(Collectors.groupingBy(
                         articleKeyword -> articleKeyword.getArticle().getId(),
                         Collectors.mapping(articleKeyword -> articleKeyword.getKeyword().getName(), Collectors.toList())));
