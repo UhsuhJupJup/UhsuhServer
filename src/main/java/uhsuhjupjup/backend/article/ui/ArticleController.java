@@ -10,6 +10,8 @@ import uhsuhjupjup.backend.article.application.ArticleService;
 import uhsuhjupjup.backend.article.ui.dto.ArticleDetailResponse;
 import uhsuhjupjup.backend.article.ui.dto.ArticlePageResponse;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/articles")
 @RequiredArgsConstructor
@@ -18,14 +20,14 @@ public class ArticleController {
     private final ArticleService articleService;
 
     @GetMapping
-    public ArticlePageResponse list(@RequestParam(required = false) Long topicId,
-                                    @RequestParam(required = false) Long keywordId,
+    public ArticlePageResponse list(@RequestParam(required = false) List<Long> topicIds,
+                                    @RequestParam(required = false) List<Long> keywordIds,
                                     @RequestParam(required = false) Long blogId,
                                     @RequestParam(required = false) String q,
                                     @RequestParam(required = false) Integer page,
                                     @RequestParam(required = false) Integer size) {
         return ArticlePageResponse.from(
-                articleService.search(blogId, keywordId, topicId, q, page, size));
+                articleService.search(blogId, keywordIds, topicIds, q, page, size));
     }
 
     @GetMapping("/{id}")
