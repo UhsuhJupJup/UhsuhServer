@@ -13,6 +13,8 @@ import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
 import uhsuhjupjup.backend.topic.infra.TopicRepository;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +26,15 @@ public class TopicService {
 
     public List<Topic> findAll() {
         return topicRepository.findAllByOrderByIdAsc();
+    }
+
+    public List<TopicDetailResult> findAllWithKeywords() {
+        Map<Long, List<Keyword>> keywordsByTopicId = topicKeywordRepository.findAllWithTopicAndKeyword().stream()
+                .collect(Collectors.groupingBy(topicKeyword -> topicKeyword.getTopic().getId(),
+                        Collectors.mapping(TopicKeyword::getKeyword, Collectors.toList())));
+        return topicRepository.findAllByOrderByIdAsc().stream()
+                .map(topic -> new TopicDetailResult(topic, keywordsByTopicId.getOrDefault(topic.getId(), List.of())))
+                .toList();
     }
 
     public TopicDetailResult getDetail(Long topicId) {
