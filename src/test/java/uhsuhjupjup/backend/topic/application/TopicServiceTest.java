@@ -67,4 +67,37 @@ class TopicServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.TOPIC_NOT_FOUND);
     }
+
+    @Test
+    void findAllWithKeywords_groupsKeywordsPerTopic() {
+        Topic database = TopicFixture.topic(1L, "Database");
+        Topic backend = TopicFixture.topic(2L, "Backend");
+        Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
+        Keyword redis = KeywordFixture.keyword(1L, "Redis");
+        Keyword spring = KeywordFixture.keyword(5L, "Spring");
+        given(topicRepository.findAllByOrderByIdAsc()).willReturn(List.of(database, backend));
+        given(topicKeywordRepository.findAllWithTopicAndKeyword()).willReturn(List.of(
+                TopicKeyword.of(database, mysql), TopicKeyword.of(database, redis),
+                TopicKeyword.of(backend, spring)));
+
+        List<TopicDetailResult> result = topicService.findAllWithKeywords();
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).topic()).isEqualTo(database);
+        assertThat(result.get(0).keywords()).containsExactly(mysql, redis);
+        assertThat(result.get(1).topic()).isEqualTo(backend);
+        assertThat(result.get(1).keywords()).containsExactly(spring);
+    }
+
+    @Test
+    void findAllWithKeywords_topicWithNoKeywords_returnsEmptyList() {
+        Topic empty = TopicFixture.topic(9L, "Empty");
+        given(topicRepository.findAllByOrderByIdAsc()).willReturn(List.of(empty));
+        given(topicKeywordRepository.findAllWithTopicAndKeyword()).willReturn(List.of());
+
+        List<TopicDetailResult> result = topicService.findAllWithKeywords();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).keywords()).isEmpty();
+    }
 }
