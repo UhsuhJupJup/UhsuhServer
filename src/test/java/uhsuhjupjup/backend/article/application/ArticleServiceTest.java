@@ -28,7 +28,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 
@@ -75,7 +77,7 @@ class ArticleServiceTest {
     @Test
     void search_returnsArticlesWithKeywordNames() {
         Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
-        given(articleRepository.search(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+        given(articleRepository.search(isNull(), anyBoolean(), anyCollection(), anyBoolean(), anyCollection(), isNull(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(article)));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(anyCollection()))
                 .willReturn(List.of(ArticleKeyword.of(article, mysql, "title")));
@@ -90,9 +92,29 @@ class ArticleServiceTest {
 
     @Test
     void search_whenNoArticles_returnsEmpty() {
-        given(articleRepository.search(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+        given(articleRepository.search(isNull(), anyBoolean(), anyCollection(), anyBoolean(), anyCollection(), isNull(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of()));
 
         assertThat(articleService.search(null, null, null, null, null, null).content()).isEmpty();
+    }
+
+    @Test
+    void search_withTopicIds_filtersByGivenTopics() {
+        given(articleRepository.search(isNull(), eq(true), anyCollection(), eq(false), eq(List.of(1L, 2L)), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        ArticlePageResult result = articleService.search(null, null, List.of(1L, 2L), null, null, null);
+
+        assertThat(result.content()).isEmpty();
+    }
+
+    @Test
+    void search_withKeywordIds_filtersByGivenKeywords() {
+        given(articleRepository.search(isNull(), eq(false), eq(List.of(3L, 4L)), eq(true), anyCollection(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        ArticlePageResult result = articleService.search(null, List.of(3L, 4L), null, null, null, null);
+
+        assertThat(result.content()).isEmpty();
     }
 }
