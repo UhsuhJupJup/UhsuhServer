@@ -25,6 +25,13 @@ public class TopicController {
                 .toList();
     }
 
+    @GetMapping("/with-keywords")
+    public List<TopicDetailResponse> listWithKeywords() {
+        return topicService.findAllWithKeywords().stream()
+                .map(TopicDetailResponse::from)
+                .toList();
+    }
+
     @GetMapping("/{id}")
     public TopicDetailResponse detail(@PathVariable Long id) {
         return TopicDetailResponse.from(topicService.getDetail(id));
