@@ -57,4 +57,17 @@ class TopicControllerTest {
                 .andExpect(jsonPath("$.keywords[0].name").value("MySQL"))
                 .andExpect(jsonPath("$.keywords[1].name").value("Redis"));
     }
+
+    @Test
+    void listWithKeywords_returnsTopicsWithKeywords() throws Exception {
+        Topic database = TopicFixture.topic(1L, "Database");
+        given(topicService.findAllWithKeywords()).willReturn(List.of(
+                new TopicDetailResult(database, List.of(KeywordFixture.keyword(3L, "MySQL")))));
+
+        mockMvc.perform(get("/api/topics/with-keywords"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].name").value("Database"))
+                .andExpect(jsonPath("$[0].keywords[0].name").value("MySQL"));
+    }
 }
