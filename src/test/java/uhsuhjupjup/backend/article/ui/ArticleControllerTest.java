@@ -71,6 +71,24 @@ class ArticleControllerTest {
     }
 
     @Test
+    void list_withTopicIds_passesToService() throws Exception {
+        given(articleService.search(null, null, List.of(1L, 2L), null, null, null))
+                .willReturn(new ArticlePageResult(List.of(), 1, 10, 0, 0, false, false));
+
+        mockMvc.perform(get("/api/articles").param("topicIds", "1,2"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void list_withKeywordIds_passesToService() throws Exception {
+        given(articleService.search(null, List.of(3L, 4L), null, null, null, null))
+                .willReturn(new ArticlePageResult(List.of(), 1, 10, 0, 0, false, false));
+
+        mockMvc.perform(get("/api/articles").param("keywordIds", "3,4"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void detail_returnsArticleWithMatchedKeywords() throws Exception {
         Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
         given(articleService.getDetail(1L))

@@ -1806,6 +1806,67 @@
           }
         }
       }
+    },
+    {
+      "type": "row",
+      "title": "♻️ 캐시 (keywordArticles)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 88 },
+      "id": 300,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "캐시 히트율 %",
+      "description": "keyword→글 후보 캐시 적중률 hit/(hit+miss) (5분). 높을수록 좋음. 트래픽·워밍업에 따라 변동.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 89 },
+      "id": 301,
+      "targets": [
+        { "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\", result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\"}[5m])), 0.001)", "refId": "A" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "min": 0, "max": 100, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 80 } ] } } }
+    },
+    {
+      "type": "stat",
+      "title": "캐시 점유 (/ 2000)",
+      "description": "현재 캐시된 키워드 수 cache_size. 상한 2000(maximumSize) 근처면 축출 발생.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 93 },
+      "id": 302,
+      "targets": [
+        { "expr": "sum(cache_size{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\"})", "refId": "A" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1600 }, { "color": "red", "value": 2000 } ] } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "캐시 히트 vs 미스 (rate)",
+      "description": "초당 캐시 조회를 hit/miss로 분리. miss 지속이면 캐시가 잘 안 채워짐(낮은 재사용·TTL 만료).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 89 },
+      "id": 303,
+      "targets": [
+        { "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\", result=\"hit\"}[1m]))", "refId": "A", "legendFormat": "hit" },
+        { "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\", result=\"miss\"}[1m]))", "refId": "B", "legendFormat": "miss" }
+      ],
+      "options": { "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 30, "lineWidth": 2, "showPoints": "never" } }, "overrides": [ { "matcher": { "id": "byName", "options": "hit" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }, { "matcher": { "id": "byName", "options": "miss" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] } ] }
+    },
+    {
+      "type": "timeseries",
+      "title": "캐시 축출 (rate)",
+      "description": "초당 축출 건수 cache_evictions_total. 꾸준히 높으면 maximumSize 상향 검토.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 89 },
+      "id": 304,
+      "targets": [
+        { "expr": "sum(rate(cache_evictions_total{job=\"uhsuhjupjup-backend\", cache=\"keywordArticles\"}[5m]))", "refId": "A", "legendFormat": "evictions" }
+      ],
+      "options": { "legend": { "showLegend": true, "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" } } }
     }
   ],
   "refresh": "30s",

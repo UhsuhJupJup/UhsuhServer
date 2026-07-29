@@ -77,7 +77,6 @@ class NotificationServiceTest {
     void notifyRecent_batchesMultipleArticlesIntoOneEmail() {
         given(notificationRepository.findKeywordPathRecipients(any()))
                 .willReturn(List.of(new RecipientPair(1L, 10L), new RecipientPair(1L, 20L)));
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10, article20));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
@@ -106,7 +105,6 @@ class NotificationServiceTest {
             pairs.add(new RecipientPair(1L, id));
         }
         given(notificationRepository.findKeywordPathRecipients(any())).willReturn(pairs);
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(articles);
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
@@ -125,7 +123,6 @@ class NotificationServiceTest {
     void notifyRecent_sendsOneEmailPerMember() {
         given(notificationRepository.findKeywordPathRecipients(any()))
                 .willReturn(List.of(new RecipientPair(1L, 10L), new RecipientPair(2L, 10L)));
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1, member2));
@@ -140,9 +137,9 @@ class NotificationServiceTest {
     }
 
     @Test
-    void notifyRecent_dedupsArticleAcrossPaths() {
-        given(notificationRepository.findKeywordPathRecipients(any())).willReturn(List.of(new RecipientPair(1L, 10L)));
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of(new RecipientPair(1L, 10L)));
+    void notifyRecent_dedupsRepeatedArticleForMember() {
+        given(notificationRepository.findKeywordPathRecipients(any()))
+                .willReturn(List.of(new RecipientPair(1L, 10L), new RecipientPair(1L, 10L)));
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
@@ -159,7 +156,6 @@ class NotificationServiceTest {
     void notifyRecent_isolatesPerMemberFailure() {
         given(notificationRepository.findKeywordPathRecipients(any()))
                 .willReturn(List.of(new RecipientPair(1L, 10L), new RecipientPair(2L, 20L)));
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10, article20));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1, member2));
@@ -178,7 +174,6 @@ class NotificationServiceTest {
     @Test
     void notifyRecent_whenNoRecipients_sendsNothing() {
         given(notificationRepository.findKeywordPathRecipients(any())).willReturn(List.of());
-        given(notificationRepository.findTopicPathRecipients(any())).willReturn(List.of());
 
         NotificationResult result = service.notifyRecent();
 

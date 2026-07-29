@@ -22,6 +22,7 @@ import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
 import uhsuhjupjup.backend.topic.infra.TopicRepository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,6 +48,7 @@ class ArticleRepositoryTest extends MySqlTestSupport {
 
     private Blog toss;
     private Keyword redis;
+    private Keyword kafka;
     private Topic database;
 
     @BeforeEach
@@ -56,7 +58,7 @@ class ArticleRepositoryTest extends MySqlTestSupport {
 
         Keyword mysql = keywordRepository.save(Keyword.create("MySQL"));
         redis = keywordRepository.save(Keyword.create("Redis"));
-        Keyword kafka = keywordRepository.save(Keyword.create("Kafka"));
+        kafka = keywordRepository.save(Keyword.create("Kafka"));
 
         database = topicRepository.save(Topic.create("Database"));
         topicKeywordRepository.save(TopicKeyword.of(database, mysql));
@@ -72,42 +74,59 @@ class ArticleRepositoryTest extends MySqlTestSupport {
 
     @Test
     void search_all_orderedByPublishedDesc() {
-        assertThat(articleRepository.search(null, null, null, null, PAGE))
+        assertThat(articleRepository.search(null, true, List.of(0L), true, List.of(0L), null, PAGE))
                 .extracting(Article::getTitle)
                 .containsExactly("Kafka 파티션 재조정", "Redis 캐시 전략", "MySQL 데드락 디버깅 회고");
     }
 
     @Test
     void search_byBlogId() {
-        assertThat(articleRepository.search(toss.getId(), null, null, null, PAGE))
+        assertThat(articleRepository.search(toss.getId(), true, List.of(0L), true, List.of(0L), null, PAGE))
                 .extracting(Article::getTitle)
                 .containsExactly("Kafka 파티션 재조정");
     }
 
     @Test
     void search_byKeywordId() {
-        assertThat(articleRepository.search(null, redis.getId(), null, null, PAGE))
+        assertThat(articleRepository.search(null, false, List.of(redis.getId()), true, List.of(0L), null, PAGE))
                 .extracting(Article::getTitle)
                 .containsExactly("Redis 캐시 전략");
     }
 
     @Test
+    void search_byMultipleKeywords_returnsUnionOrderedByPublishedDesc() {
+        assertThat(articleRepository.search(null, false, List.of(redis.getId(), kafka.getId()), true, List.of(0L), null, PAGE))
+                .extracting(Article::getTitle)
+                .containsExactly("Kafka 파티션 재조정", "Redis 캐시 전략");
+    }
+
+    @Test
     void search_byTopicId() {
-        assertThat(articleRepository.search(null, null, database.getId(), null, PAGE))
+        assertThat(articleRepository.search(null, true, List.of(0L), false, List.of(database.getId()), null, PAGE))
                 .extracting(Article::getTitle)
                 .containsExactly("Redis 캐시 전략", "MySQL 데드락 디버깅 회고");
     }
 
     @Test
+    void search_byMultipleTopics_returnsUnionOrderedByPublishedDesc() {
+        Topic messaging = topicRepository.save(Topic.create("Messaging"));
+        topicKeywordRepository.save(TopicKeyword.of(messaging, kafka));
+
+        assertThat(articleRepository.search(null, true, List.of(0L), false, List.of(database.getId(), messaging.getId()), null, PAGE))
+                .extracting(Article::getTitle)
+                .containsExactly("Kafka 파티션 재조정", "Redis 캐시 전략", "MySQL 데드락 디버깅 회고");
+    }
+
+    @Test
     void search_byQuery_matchesTitle() {
-        assertThat(articleRepository.search(null, null, null, "kafka", PAGE))
+        assertThat(articleRepository.search(null, true, List.of(0L), true, List.of(0L), "kafka", PAGE))
                 .extracting(Article::getTitle)
                 .containsExactly("Kafka 파티션 재조정");
     }
 
     @Test
     void search_respectsLimit() {
-        assertThat(articleRepository.search(null, null, null, null, PageRequest.of(0, 1)))
+        assertThat(articleRepository.search(null, true, List.of(0L), true, List.of(0L), null, PageRequest.of(0, 1)))
                 .extracting(Article::getTitle)
                 .containsExactly("Kafka 파티션 재조정");
     }
