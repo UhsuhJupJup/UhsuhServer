@@ -13,4 +13,7 @@ public interface TopicKeywordRepository extends JpaRepository<TopicKeyword, Long
 
     @Query("select tk from TopicKeyword tk join fetch tk.topic where tk.keyword.id = :keywordId order by tk.topic.id")
     List<TopicKeyword> findWithTopicByKeywordId(Long keywordId);
+
+    @Query("select tk from TopicKeyword tk join fetch tk.topic join fetch tk.keyword order by tk.topic.id, tk.keyword.name")
+    List<TopicKeyword> findAllWithTopicAndKeyword();
 }
