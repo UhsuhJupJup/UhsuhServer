@@ -51,7 +51,9 @@ class RomeFeedClient implements FeedClient {
                     .uri(URI.create(rssUrl))
                     .accept(MediaType.APPLICATION_ATOM_XML,
                             MediaType.valueOf("application/rss+xml"),
-                            MediaType.APPLICATION_XML)
+                            MediaType.APPLICATION_XML,
+                            MediaType.TEXT_XML,
+                            MediaType.ALL)
                     .exchange((request, response) -> {
                         HttpStatusCode status = response.getStatusCode();
                         if (!status.is2xxSuccessful()) {
