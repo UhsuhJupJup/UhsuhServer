@@ -17,7 +17,6 @@ import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -92,11 +91,10 @@ public class NotificationService {
     }
 
     private Map<Long, Set<Long>> fanOut(LocalDateTime threshold) {
-        List<RecipientPair> pairs = new ArrayList<>(notificationRepository.findKeywordPathRecipients(threshold));
-        pairs.addAll(notificationRepository.findTopicPathRecipients(threshold));
-        return pairs.stream().collect(Collectors.groupingBy(
-                RecipientPair::memberId,
-                Collectors.mapping(RecipientPair::articleId, Collectors.toCollection(LinkedHashSet::new))));
+        return notificationRepository.findKeywordPathRecipients(threshold).stream()
+                .collect(Collectors.groupingBy(
+                        RecipientPair::memberId,
+                        Collectors.mapping(RecipientPair::articleId, Collectors.toCollection(LinkedHashSet::new))));
     }
 
     private List<Long> pickRecentByCollected(Set<Long> articleIds, Map<Long, Article> articleById) {
