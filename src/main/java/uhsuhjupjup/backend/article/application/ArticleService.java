@@ -16,6 +16,7 @@ import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,10 +32,15 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final ArticleKeywordRepository articleKeywordRepository;
 
-    public ArticlePageResult search(Long blogId, Long keywordId, Long topicId, String q, Integer page, Integer size) {
+    public ArticlePageResult search(Long blogId, Collection<Long> keywordIds, Collection<Long> topicIds, String q, Integer page, Integer size) {
         int pageNumber = (page == null || page < 1) ? 0 : page - 1;
+        boolean allKeywords = keywordIds == null || keywordIds.isEmpty();
+        boolean allTopics = topicIds == null || topicIds.isEmpty();
+        Collection<Long> effectiveKeywordIds = allKeywords ? List.of(0L) : keywordIds;
+        Collection<Long> effectiveTopicIds = allTopics ? List.of(0L) : topicIds;
         Page<Article> result = articleRepository.search(
-                blogId, keywordId, topicId, trimToNull(q), PageRequest.of(pageNumber, clampSize(size)));
+                blogId, allKeywords, effectiveKeywordIds, allTopics, effectiveTopicIds,
+                trimToNull(q), PageRequest.of(pageNumber, clampSize(size)));
 
         Map<Long, List<String>> keywordsByArticle = result.isEmpty() ? Map.of()
                 : articleKeywordRepository
