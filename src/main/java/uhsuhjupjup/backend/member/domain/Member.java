@@ -13,7 +13,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import uhsuhjupjup.backend.common.domain.BaseEntity;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
@@ -37,6 +39,9 @@ public class Member extends BaseEntity {
 
     @Column(name = "consent_at")
     private LocalDateTime consentAt;
+
+    @Column(name = "sessions_valid_after")
+    private LocalDateTime sessionsValidAfter;
 
     @Column(name = "unsubscribe_token", nullable = false, length = 36)
     private String unsubscribeToken;
@@ -69,5 +74,19 @@ public class Member extends BaseEntity {
 
     public boolean hasConsented() {
         return consentAt != null;
+    }
+
+    public void revokeSessions(LocalDateTime at) {
+        this.sessionsValidAfter = at;
+    }
+
+    public boolean isSessionValid(Instant authTime) {
+        if (sessionsValidAfter == null) {
+            return true;
+        }
+        if (authTime == null) {
+            return false;
+        }
+        return !LocalDateTime.ofInstant(authTime, ZoneId.systemDefault()).isBefore(sessionsValidAfter);
     }
 }
