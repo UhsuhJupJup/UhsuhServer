@@ -51,12 +51,12 @@ public class NoteGraphService {
         List<GraphEdge> edges = new ArrayList<>();
 
         String noteNodeId = "note:" + noteId;
-        nodes.add(new GraphNode(noteNodeId, "note", note.getTitle(), null, null));
+        nodes.add(new GraphNode(noteNodeId, "note", note.getTitle(), null, null, null));
 
         Set<Long> noteKeywordIdSet = Set.copyOf(noteKeywordIds);
         for (Long keywordId : graphKeywordIds) {
             nodes.add(new GraphNode("kw:" + keywordId, "keyword",
-                    nameByKeyword.getOrDefault(keywordId, ""), noteKeywordIdSet.contains(keywordId), null));
+                    nameByKeyword.getOrDefault(keywordId, ""), noteKeywordIdSet.contains(keywordId), null, null));
         }
         for (Long keywordId : noteKeywordIds) {
             edges.add(new GraphEdge(noteNodeId, "kw:" + keywordId, null));
@@ -73,7 +73,7 @@ public class NoteGraphService {
         int rank = 1;
         for (RecommendedArticleResult recommended : recommendation.articles()) {
             nodes.add(new GraphNode("art:" + recommended.article().getId(), "article",
-                    recommended.article().getTitle(), null, rank++));
+                    recommended.article().getTitle(), null, rank++, null));
         }
         if (!articleIds.isEmpty()) {
             articleKeywordRepository.findWithKeywordByArticleIdIn(articleIds).stream()
