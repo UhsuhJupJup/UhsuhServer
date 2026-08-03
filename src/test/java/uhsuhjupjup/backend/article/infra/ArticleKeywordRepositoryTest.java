@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
+import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
@@ -20,8 +21,11 @@ import uhsuhjupjup.backend.support.MySqlTestSupport;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -98,5 +102,44 @@ class ArticleKeywordRepositoryTest extends MySqlTestSupport {
                         && edge.keywordBId().equals(lock.getId()))
                 .extracting(KeywordEdge::cooccurrence)
                 .containsExactly(2L);
+    }
+
+    @Test
+    void 전역_동시출현_간선을_많은순으로_반환한다() {
+        List<KeywordEdge> edges = articleKeywordRepository.findTopCooccurrenceEdges(PageRequest.of(0, 10));
+
+        assertThat(edges).hasSize(4);
+        assertThat(edges.get(0)).extracting(KeywordEdge::keywordAId, KeywordEdge::keywordBId, KeywordEdge::cooccurrence)
+                .containsExactly(mysql.getId(), lock.getId(), 2L);
+        assertThat(edges).extracting(KeywordEdge::cooccurrence).containsExactly(2L, 1L, 1L, 1L);
+    }
+
+    @Test
+    void 전역_간선은_top_N으로_제한된다() {
+        List<KeywordEdge> edges = articleKeywordRepository.findTopCooccurrenceEdges(PageRequest.of(0, 1));
+
+        assertThat(edges).hasSize(1);
+        assertThat(edges.get(0).cooccurrence()).isEqualTo(2L);
+    }
+
+    @Test
+    void 키워드별_글수를_반환한다() {
+        Map<Long, Long> countByKeyword = articleKeywordRepository.findKeywordFrequencies().stream()
+                .collect(Collectors.toMap(KeywordFrequency::keywordId, KeywordFrequency::articleCount));
+
+        assertThat(countByKeyword).containsOnly(
+                Map.entry(lock.getId(), 3L),
+                Map.entry(mysql.getId(), 2L),
+                Map.entry(transaction.getId(), 1L),
+                Map.entry(redis.getId(), 1L));
+    }
+
+    @Test
+    void 지정_키워드의_글수만_반환한다() {
+        List<KeywordFrequency> frequencies = articleKeywordRepository.findKeywordFrequenciesByIds(
+                List.of(lock.getId(), redis.getId()));
+
+        assertThat(frequencies).extracting(KeywordFrequency::keywordId, KeywordFrequency::articleCount)
+                .containsExactlyInAnyOrder(tuple(lock.getId(), 3L), tuple(redis.getId(), 1L));
     }
 }
