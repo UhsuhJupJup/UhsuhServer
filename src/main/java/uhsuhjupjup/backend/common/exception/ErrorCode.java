@@ -17,6 +17,7 @@ public enum ErrorCode {
 
     INVALID_ID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 인증 토큰입니다."),
     EXPIRED_ID_TOKEN(HttpStatus.UNAUTHORIZED, "인증 토큰이 만료되었습니다."),
+    SESSION_REVOKED(HttpStatus.UNAUTHORIZED, "세션이 종료되었습니다. 다시 로그인해 주세요."),
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "검증되지 않은 이메일입니다."),
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."),
 

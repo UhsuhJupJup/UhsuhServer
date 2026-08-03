@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 
+import java.time.Instant;
 import java.util.Map;
 
 @Component
@@ -34,7 +35,7 @@ public class FirebaseTokenVerifier {
             // 발송 주소(=로그인 이메일)가 검증되지 않으면 회원으로 받을 수 없다.
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
-        return new AuthUser(extractProvider(token), token.getUid(), email);
+        return new AuthUser(extractProvider(token), token.getUid(), email, extractAuthTime(token));
     }
 
     /** firebase.sign_in_provider("google.com"/"github.com") → "google"/"github". */
@@ -50,5 +51,13 @@ public class FirebaseTokenVerifier {
             }
         }
         return "unknown";
+    }
+
+    private Instant extractAuthTime(FirebaseToken token) {
+        Object authTime = token.getClaims().get("auth_time");
+        if (authTime instanceof Number number) {
+            return Instant.ofEpochSecond(number.longValue());
+        }
+        return null;
     }
 }

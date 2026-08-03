@@ -33,7 +33,11 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
         if (authUser == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
-        return memberService.find(authUser)
+        Member member = memberService.find(authUser)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        if (!member.isSessionValid(authUser.authTime())) {
+            throw new BusinessException(ErrorCode.SESSION_REVOKED);
+        }
+        return member;
     }
 }
