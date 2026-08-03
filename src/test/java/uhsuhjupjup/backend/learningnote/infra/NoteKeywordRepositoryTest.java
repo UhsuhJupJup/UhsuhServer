@@ -18,6 +18,7 @@ import uhsuhjupjup.backend.support.MySqlTestSupport;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -53,6 +54,22 @@ class NoteKeywordRepositoryTest extends MySqlTestSupport {
         List<Long> ids = noteKeywordRepository.findKeywordIdsByNoteId(note.getId());
 
         assertThat(ids).containsExactlyInAnyOrder(redis.getId(), caching.getId());
+    }
+
+    @Test
+    void 여러_노트의_노트_키워드_쌍을_조회한다() {
+        noteKeywordRepository.save(NoteKeyword.of(note, redis));
+        noteKeywordRepository.save(NoteKeyword.of(note, caching));
+
+        List<NoteKeywordRepository.NoteKeywordId> pairs =
+                noteKeywordRepository.findKeywordIdsByNoteIdIn(List.of(note.getId()));
+
+        assertThat(pairs).extracting(
+                        NoteKeywordRepository.NoteKeywordId::getNoteId,
+                        NoteKeywordRepository.NoteKeywordId::getKeywordId)
+                .containsExactlyInAnyOrder(
+                        tuple(note.getId(), redis.getId()),
+                        tuple(note.getId(), caching.getId()));
     }
 
     @Test
