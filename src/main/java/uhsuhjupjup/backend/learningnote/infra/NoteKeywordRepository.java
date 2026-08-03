@@ -20,6 +20,9 @@ public interface NoteKeywordRepository extends JpaRepository<NoteKeyword, Long> 
             + "where nk.note.id in :noteIds order by nk.keyword.name")
     List<NoteKeywordName> findKeywordNamesByNoteIdIn(Collection<Long> noteIds);
 
+    @Query("select nk.note.id as noteId, nk.keyword.id as keywordId from NoteKeyword nk where nk.note.id in :noteIds")
+    List<NoteKeywordId> findKeywordIdsByNoteIdIn(Collection<Long> noteIds);
+
     @Modifying
     @Query("delete from NoteKeyword nk where nk.note.id = :noteId")
     void deleteByNoteId(Long noteId);
@@ -28,5 +31,11 @@ public interface NoteKeywordRepository extends JpaRepository<NoteKeyword, Long> 
         Long getNoteId();
 
         String getName();
+    }
+
+    interface NoteKeywordId {
+        Long getNoteId();
+
+        Long getKeywordId();
     }
 }
