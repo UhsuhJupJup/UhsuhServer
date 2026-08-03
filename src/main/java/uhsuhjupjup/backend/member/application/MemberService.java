@@ -18,6 +18,7 @@ import java.util.Optional;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final SessionRevoker sessionRevoker;
 
     public Optional<Member> find(AuthUser authUser) {
         return memberRepository.findByEmail(authUser.email());
@@ -35,5 +36,13 @@ public class MemberService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
         member.agreeConsent(LocalDateTime.now());
         return member;
+    }
+
+    @Transactional
+    public void revokeSessions(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        member.revokeSessions(LocalDateTime.now());
+        sessionRevoker.revoke(member.getProviderUid());
     }
 }
