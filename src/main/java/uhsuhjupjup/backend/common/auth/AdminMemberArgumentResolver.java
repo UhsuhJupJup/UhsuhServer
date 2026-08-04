@@ -35,6 +35,9 @@ public class AdminMemberArgumentResolver implements HandlerMethodArgumentResolve
         }
         Member member = memberService.find(authUser)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
+        if (!member.isSessionValid(authUser.authTime())) {
+            throw new BusinessException(ErrorCode.SESSION_REVOKED);
+        }
         if (!member.isAdmin()) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }

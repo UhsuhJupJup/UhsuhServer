@@ -2,7 +2,9 @@ package uhsuhjupjup.backend.member.domain;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,5 +43,43 @@ class MemberTest {
         member.agreeConsent(second);
 
         assertThat(member.getConsentAt()).isEqualTo(first);
+    }
+
+    @Test
+    void isSessionValid_trueWhenNeverRevoked() {
+        Member member = Member.create("google", "uid", "user@example.com");
+
+        assertThat(member.isSessionValid(Instant.now())).isTrue();
+        assertThat(member.isSessionValid(null)).isTrue();
+    }
+
+    @Test
+    void isSessionValid_falseForTokenAuthedBeforeRevocation() {
+        Member member = Member.create("google", "uid", "user@example.com");
+        LocalDateTime cutoff = LocalDateTime.now();
+        member.revokeSessions(cutoff);
+
+        Instant authedBefore = cutoff.minusMinutes(1).atZone(ZoneId.systemDefault()).toInstant();
+
+        assertThat(member.isSessionValid(authedBefore)).isFalse();
+    }
+
+    @Test
+    void isSessionValid_trueForTokenAuthedAfterRevocation() {
+        Member member = Member.create("google", "uid", "user@example.com");
+        LocalDateTime cutoff = LocalDateTime.now();
+        member.revokeSessions(cutoff);
+
+        Instant authedAfter = cutoff.plusMinutes(1).atZone(ZoneId.systemDefault()).toInstant();
+
+        assertThat(member.isSessionValid(authedAfter)).isTrue();
+    }
+
+    @Test
+    void isSessionValid_falseWhenRevokedButAuthTimeUnknown() {
+        Member member = Member.create("google", "uid", "user@example.com");
+        member.revokeSessions(LocalDateTime.now());
+
+        assertThat(member.isSessionValid(null)).isFalse();
     }
 }

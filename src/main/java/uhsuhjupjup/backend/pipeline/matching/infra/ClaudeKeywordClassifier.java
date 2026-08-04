@@ -1,8 +1,13 @@
 package uhsuhjupjup.backend.pipeline.matching.infra;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.models.messages.CacheControlEphemeral;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
+import com.anthropic.models.messages.TextBlockParam;
+import com.anthropic.models.messages.Usage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -14,6 +19,7 @@ import uhsuhjupjup.backend.pipeline.matching.domain.MatchTarget;
 
 import java.util.List;
 
+@Slf4j
 @Component
 @ConditionalOnProperty(name = "claude.enabled", havingValue = "true")
 class ClaudeKeywordClassifier implements KeywordClassifier {
@@ -35,15 +41,27 @@ class ClaudeKeywordClassifier implements KeywordClassifier {
         if (catalog.targets().isEmpty()) {
             return List.of();
         }
+        TextBlockParam cachedSystem = TextBlockParam.builder()
+                .text(systemPrompt(catalog))
+                .cacheControl(CacheControlEphemeral.builder().build())
+                .build();
+
         StructuredMessageCreateParams<ClassifierOutput> params = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(MAX_TOKENS)
-                .system(systemPrompt(catalog))
+                .systemOfTextBlockParams(List.of(cachedSystem))
                 .addUserMessage(userPrompt(title, body))
                 .outputConfig(ClassifierOutput.class)
                 .build();
 
-        ClassifierOutput output = anthropicClient.messages().create(params).content().stream()
+        StructuredMessage<ClassifierOutput> message = anthropicClient.messages().create(params);
+        Usage usage = message.usage();
+        log.debug("분류 토큰 input={} cacheWrite={} cacheRead={}",
+                usage.inputTokens(),
+                usage.cacheCreationInputTokens().orElse(0L),
+                usage.cacheReadInputTokens().orElse(0L));
+
+        ClassifierOutput output = message.content().stream()
                 .flatMap(block -> block.text().stream())
                 .map(structured -> structured.text())
                 .findFirst()

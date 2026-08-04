@@ -20,12 +20,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
 
     @Mock
     private MemberRepository memberRepository;
+
+    @Mock
+    private SessionRevoker sessionRevoker;
 
     @InjectMocks
     private MemberService memberService;
@@ -88,6 +92,27 @@ class MemberServiceTest {
         given(memberRepository.findById(99L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> memberService.consent(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+    }
+
+    @Test
+    void revokeSessions_setsTimestampAndRevokesRefreshTokens() {
+        Member member = MemberFixture.member(1L, "octocat@github.com");
+        given(memberRepository.findById(1L)).willReturn(Optional.of(member));
+
+        memberService.revokeSessions(1L);
+
+        assertThat(member.getSessionsValidAfter()).isNotNull();
+        verify(sessionRevoker).revoke(member.getProviderUid());
+    }
+
+    @Test
+    void revokeSessions_whenMemberNotFound_throws() {
+        given(memberRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.revokeSessions(99L))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.MEMBER_NOT_FOUND);

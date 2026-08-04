@@ -4,6 +4,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
+import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 
@@ -59,4 +60,29 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
             group by ak1.keyword.id, ak2.keyword.id
             """)
     List<KeywordEdge> findCooccurrenceEdges(Collection<Long> keywordIds);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordEdge(ak1.keyword.id, ak2.keyword.id, count(distinct ak1.article.id))
+            from ArticleKeyword ak1, ArticleKeyword ak2
+            where ak1.article.id = ak2.article.id
+              and ak1.keyword.id < ak2.keyword.id
+            group by ak1.keyword.id, ak2.keyword.id
+            order by count(distinct ak1.article.id) desc
+            """)
+    List<KeywordEdge> findTopCooccurrenceEdges(Pageable pageable);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordFrequency(ak.keyword.id, count(distinct ak.article.id))
+            from ArticleKeyword ak
+            group by ak.keyword.id
+            """)
+    List<KeywordFrequency> findKeywordFrequencies();
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordFrequency(ak.keyword.id, count(distinct ak.article.id))
+            from ArticleKeyword ak
+            where ak.keyword.id in :keywordIds
+            group by ak.keyword.id
+            """)
+    List<KeywordFrequency> findKeywordFrequenciesByIds(Collection<Long> keywordIds);
 }

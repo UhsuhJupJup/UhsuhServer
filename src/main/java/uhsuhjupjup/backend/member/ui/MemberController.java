@@ -1,9 +1,12 @@
 package uhsuhjupjup.backend.member.ui;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.member.application.MemberService;
 import uhsuhjupjup.backend.member.domain.Member;
@@ -27,5 +30,11 @@ public class MemberController {
     public ConsentResponse consent(@LoginMember Member member) {
         Member updated = memberService.consent(member.getId());
         return new ConsentResponse(updated.getConsentAt());
+    }
+
+    @DeleteMapping("/me/sessions")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logoutAll(@LoginMember Member member) {
+        memberService.revokeSessions(member.getId());
     }
 }
