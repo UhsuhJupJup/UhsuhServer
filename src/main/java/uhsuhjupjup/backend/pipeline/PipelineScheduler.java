@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.pipeline;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
@@ -13,6 +14,7 @@ import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationRes
 import uhsuhjupjup.backend.pipeline.run.application.PipelineRunRecorder;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 
 @Slf4j
@@ -24,20 +26,25 @@ public class PipelineScheduler {
     private final MatchingService matchingService;
     private final NotificationService notificationService;
     private final PipelineRunRecorder pipelineRunRecorder;
+    private final RedisLockRegistry redisLockRegistry;
 
     @Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")
     public void ingest() {
-        LocalDateTime startedAt = LocalDateTime.now();
-        CollectionResult collection = runStage("수집", collectionService::collectAll);
-        MatchingResult matching = runStage("매칭", matchingService::matchRecent);
-        pipelineRunRecorder.recordIngest(startedAt, LocalDateTime.now(), collection, matching);
+        runWithLock("pipeline:ingest", () -> {
+            LocalDateTime startedAt = LocalDateTime.now();
+            CollectionResult collection = runStage("수집", collectionService::collectAll);
+            MatchingResult matching = runStage("매칭", matchingService::matchRecent);
+            pipelineRunRecorder.recordIngest(startedAt, LocalDateTime.now(), collection, matching);
+        });
     }
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
     public void notifyMembers() {
-        LocalDateTime startedAt = LocalDateTime.now();
-        NotificationResult notification = runStage("발송", notificationService::notifyRecent);
-        pipelineRunRecorder.recordNotification(startedAt, LocalDateTime.now(), notification);
+        runWithLock("pipeline:notify", () -> {
+            LocalDateTime startedAt = LocalDateTime.now();
+            NotificationResult notification = runStage("발송", notificationService::notifyRecent);
+            pipelineRunRecorder.recordNotification(startedAt, LocalDateTime.now(), notification);
+        });
     }
 
     private <T> T runStage(String name, Supplier<T> stage) {
@@ -46,6 +53,27 @@ public class PipelineScheduler {
         } catch (Exception e) {
             log.error("파이프라인 단계 실패 stage={}", name, e);
             return null;
+        }
+    }
+
+    private void runWithLock(String key, Runnable task) {
+        Lock lock = redisLockRegistry.obtain(key);
+        boolean acquired;
+        try {
+            acquired = lock.tryLock();
+        } catch (Exception e) {
+            log.error("락 획득 실패 - 스킵 key={}", key, e);
+            return;
+        }
+        if (!acquired) {
+            log.info("다른 인스턴스가 실행 중 - 스킵 key={}", key);
+            return;
+        }
+
+        try {
+            task.run();
+        } finally {
+            lock.unlock();
         }
     }
 }
