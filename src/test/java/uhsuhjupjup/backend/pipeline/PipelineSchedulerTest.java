@@ -1,15 +1,19 @@
 package uhsuhjupjup.backend.pipeline;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.integration.redis.util.RedisLockRegistry;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 import uhsuhjupjup.backend.pipeline.run.application.PipelineRunRecorder;
+
+import java.util.concurrent.locks.Lock;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -32,8 +36,21 @@ class PipelineSchedulerTest {
     @Mock
     private PipelineRunRecorder pipelineRunRecorder;
 
+    @Mock
+    private RedisLockRegistry redisLockRegistry;
+
+    @Mock
+    private Lock lock;
+
     @InjectMocks
     private PipelineScheduler scheduler;
+
+    @BeforeEach
+    void setUp() {
+        // 단일 인스턴스: 락은 항상 획득한다고 가정
+        given(redisLockRegistry.obtain(any())).willReturn(lock);
+        given(lock.tryLock()).willReturn(true);
+    }
 
     @Test
     void ingest_runsCollectThenMatch_thenRecords() {
