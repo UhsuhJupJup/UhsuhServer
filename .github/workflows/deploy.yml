@@ -52,7 +52,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/deploy/docker-compose.yml
+          source: backend/deploy/docker-compose.data.yml
           target: /opt/uhsuh/
           strip_components: 2
 
@@ -78,8 +78,8 @@ jobs:
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            docker compose pull
-            docker compose up -d
+            docker compose -f docker-compose.data.yml pull
+            docker compose -f docker-compose.data.yml up -d
             docker image prune -f
 
   deploy-app:
