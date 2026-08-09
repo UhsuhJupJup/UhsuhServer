@@ -90,7 +90,7 @@ class ArticleIntegrationTest extends MySqlTestSupport {
 
     @Test
     void list_byTopicId_returnsTopicArticles() throws Exception {
-        mockMvc.perform(get("/api/articles").param("topicId", database.getId().toString()))
+        mockMvc.perform(get("/api/articles").param("topicIds", database.getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.content[0].title").value("Redis 캐시 전략"))
