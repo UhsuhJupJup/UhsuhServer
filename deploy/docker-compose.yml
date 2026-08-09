@@ -40,6 +40,10 @@ services:
       DB_USERNAME: uhsuhjupjup
       DB_PASSWORD: ${DB_PASSWORD}
 
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
       MAIL_ENABLED: "true"
       MAIL_HOST: smtp.gmail.com
       MAIL_PORT: "587"
