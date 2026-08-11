@@ -32,7 +32,7 @@ services:
 
       UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH: /app/firebase.json
 
-      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m"
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx384m"
     volumes:
       - /opt/uhsuh/firebase.json:/app/firebase.json:ro
     ports:
