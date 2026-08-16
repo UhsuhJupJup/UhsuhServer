@@ -8,6 +8,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.config.CacheConfig;
+import uhsuhjupjup.backend.config.RedisConfig;
 
 import java.util.List;
 import java.util.Objects;
@@ -20,7 +21,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest(
-        classes = {CacheConfig.class, KeywordArticleQueryService.class},
+        classes = {CacheConfig.class, RedisConfig.class, KeywordArticleQueryService.class},
         webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class KeywordArticleQueryServiceCacheTest {
 
@@ -57,7 +58,7 @@ class KeywordArticleQueryServiceCacheTest {
 
         service.candidateArticleIds(10L);
         service.candidateArticleIds(20L);
-        service.candidateArticleIds(10L); // 10L은 캐시 히트
+        service.candidateArticleIds(10L);
 
         verify(repository, times(1)).findCandidateArticleIds(eq(10L), any(), any());
         verify(repository, times(1)).findCandidateArticleIds(eq(20L), any(), any());
