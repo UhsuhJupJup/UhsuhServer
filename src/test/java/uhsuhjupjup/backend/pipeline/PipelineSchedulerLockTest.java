@@ -9,6 +9,7 @@ import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
@@ -91,8 +92,9 @@ class PipelineSchedulerLockTest {
             return null;
         });
 
+        GlobalKeywordGraphProvider graphProvider = mock(GlobalKeywordGraphProvider.class);
         RedisLockRegistry registry = new RedisLockRegistry(connectionFactory, "uhsuh-lock", 60_000L);
-        return new PipelineScheduler(collection, matching, notification, recorder, registry);
+        return new PipelineScheduler(collection, matching, notification, recorder, registry, graphProvider);
     }
 
     private void awaitGate(CountDownLatch gate) {

@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.integration.redis.util.RedisLockRegistry;
+import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
@@ -40,6 +41,9 @@ class PipelineSchedulerTest {
     private RedisLockRegistry redisLockRegistry;
 
     @Mock
+    private GlobalKeywordGraphProvider globalKeywordGraphProvider;
+
+    @Mock
     private Lock lock;
 
     @InjectMocks
@@ -60,6 +64,7 @@ class PipelineSchedulerTest {
         inOrder.verify(collectionService).collectAll();
         inOrder.verify(matchingService).matchRecent();
         inOrder.verify(pipelineRunRecorder).recordIngest(any(), any(), any(), any());
+        verify(globalKeywordGraphProvider).refreshGlobalGraph();
         verifyNoInteractions(notificationService);
     }
 
