@@ -9,6 +9,7 @@ import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,13 +47,19 @@ class TwoLevelCacheTest {
     }
 
     private TwoLevelCache newCache(String name, RedisTemplate<String, byte[]> redis) {
+        return newCache(name, redis, CacheEvictBroadcaster.NOOP);
+    }
+
+    private TwoLevelCache newCache(String name, RedisTemplate<String, byte[]> redis, CacheEvictBroadcaster broadcaster) {
         return new TwoLevelCache(
                 name,
                 Caffeine.newBuilder().maximumSize(100).build(),
                 redis,
                 listLongSerializer(),
                 Duration.ofMinutes(10),
-                "test:" + name + "::");
+                "test:" + name + "::",
+                broadcaster,
+                null);
     }
 
     @Test
@@ -120,5 +127,62 @@ class TwoLevelCacheTest {
         List<Long> value = cache.get(1L, () -> List.of(1L, 2L));
 
         assertThat(value).containsExactly(1L, 2L);
+    }
+
+    @Test
+    void evict시_다른_인스턴스로_방송한다() {
+        RecordingBroadcaster broadcaster = new RecordingBroadcaster();
+        TwoLevelCache cache = newCache("c", fakeRedis(new HashMap<>()), broadcaster);
+        cache.get(1L, () -> List.of(5L));
+
+        cache.evict(1L);
+        cache.clear();
+
+        assertThat(broadcaster.evicted).containsExactly("c:1");
+        assertThat(broadcaster.cleared).isEqualTo(1);
+    }
+
+    @Test
+    void evictLocal은_L1만_비우고_L2는_유지한다() {
+        Map<String, byte[]> store = new HashMap<>();
+        TwoLevelCache cache = newCache("c", fakeRedis(store));
+        cache.get(1L, () -> List.of(5L));
+        assertThat(store).containsKey("test:c::1");
+
+        cache.evictLocal("1");
+
+        assertThat(store).containsKey("test:c::1");
+        AtomicInteger loads = new AtomicInteger();
+        List<Long> value = cache.get(1L, () -> {
+            loads.incrementAndGet();
+            return List.of(9L);
+        });
+        assertThat(value).containsExactly(5L);
+        assertThat(loads.get()).isZero();
+    }
+
+    @Test
+    void put시_다른_인스턴스로_방송한다() {
+        RecordingBroadcaster broadcaster = new RecordingBroadcaster();
+        TwoLevelCache cache = newCache("c", fakeRedis(new HashMap<>()), broadcaster);
+
+        cache.put(1L, List.of(5L));
+
+        assertThat(broadcaster.evicted).containsExactly("c:1");
+    }
+
+    private static final class RecordingBroadcaster implements CacheEvictBroadcaster {
+        private final List<String> evicted = new ArrayList<>();
+        private int cleared = 0;
+
+        @Override
+        public void broadcastEvict(String cacheName, Object key) {
+            evicted.add(cacheName + ":" + key);
+        }
+
+        @Override
+        public void broadcastClear(String cacheName) {
+            cleared++;
+        }
     }
 }

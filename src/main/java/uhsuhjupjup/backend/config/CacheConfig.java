@@ -3,13 +3,16 @@ package uhsuhjupjup.backend.config;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import uhsuhjupjup.backend.common.cache.CacheEvictBroadcaster;
 import uhsuhjupjup.backend.common.cache.TwoLevelCache;
 import uhsuhjupjup.backend.common.cache.TwoLevelCacheManager;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteGraphResult;
@@ -27,7 +30,9 @@ public class CacheConfig {
     private static final ObjectMapper CACHE_MAPPER = new ObjectMapper();
 
     @Bean
-    public CacheManager cacheManager(RedisTemplate<String, byte[]> cacheRedisTemplate) {
+    public CacheManager cacheManager(RedisTemplate<String, byte[]> cacheRedisTemplate,
+                                     @Lazy CacheEvictBroadcaster broadcaster,
+                                     @Lazy MeterRegistry meterRegistry) {
         JavaType listOfLong = CACHE_MAPPER.getTypeFactory().constructCollectionType(List.class, Long.class);
 
         TwoLevelCache globalGraph = new TwoLevelCache(
@@ -40,7 +45,9 @@ public class CacheConfig {
                 cacheRedisTemplate,
                 objectSerializer(new Jackson2JsonRedisSerializer<>(CACHE_MAPPER, NoteGraphResult.class)),
                 Duration.ofHours(25),
-                "uhsuh:cache:globalGraph::");
+                "uhsuh:cache:globalGraph::",
+                broadcaster,
+                meterRegistry);
 
         TwoLevelCache keywordArticles = new TwoLevelCache(
                 KEYWORD_ARTICLES,
@@ -52,7 +59,9 @@ public class CacheConfig {
                 cacheRedisTemplate,
                 objectSerializer(new Jackson2JsonRedisSerializer<>(CACHE_MAPPER, listOfLong)),
                 Duration.ofMinutes(10),
-                "uhsuh:cache:keywordArticles::");
+                "uhsuh:cache:keywordArticles::",
+                broadcaster,
+                meterRegistry);
 
         return new TwoLevelCacheManager(List.of(globalGraph, keywordArticles));
     }

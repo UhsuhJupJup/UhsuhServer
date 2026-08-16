@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.common.cache;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
@@ -19,19 +20,25 @@ public class TwoLevelCache implements Cache {
     private final RedisSerializer<Object> valueSerializer;
     private final Duration l2Ttl;
     private final String keyPrefix;
+    private final CacheEvictBroadcaster broadcaster;
+    private final MeterRegistry meterRegistry;
 
     public TwoLevelCache(String name,
                          com.github.benmanes.caffeine.cache.Cache<Object, Object> l1,
                          RedisTemplate<String, byte[]> l2,
                          RedisSerializer<Object> valueSerializer,
                          Duration l2Ttl,
-                         String keyPrefix) {
+                         String keyPrefix,
+                         CacheEvictBroadcaster broadcaster,
+                         MeterRegistry meterRegistry) {
         this.name = name;
         this.l1 = l1;
         this.l2 = l2;
         this.valueSerializer = valueSerializer;
         this.l2Ttl = l2Ttl;
         this.keyPrefix = keyPrefix;
+        this.broadcaster = broadcaster;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -69,7 +76,7 @@ public class TwoLevelCache implements Cache {
         if (cached != null) {
             return (T) cached;
         }
-        return (T) l1.get(key, ignored -> loadThroughL2(key, valueLoader));
+        return (T) l1.get(cacheKey(key), ignored -> loadThroughL2(key, valueLoader));
     }
 
     @Override
@@ -77,23 +84,26 @@ public class TwoLevelCache implements Cache {
         if (value == null) {
             return;
         }
-        l1.put(key, value);
+        l1.put(cacheKey(key), value);
         writeL2(key, value);
+        broadcast(() -> broadcaster.broadcastEvict(name, key));
     }
 
     @Override
     public void evict(Object key) {
-        l1.invalidate(key);
+        l1.invalidate(cacheKey(key));
         l2Delete(key);
+        broadcast(() -> broadcaster.broadcastEvict(name, key));
     }
 
     @Override
     public void clear() {
         l1.invalidateAll();
         l2Clear();
+        broadcast(() -> broadcaster.broadcastClear(name));
     }
 
-    public void evictLocal(Object key) {
+    public void evictLocal(String key) {
         l1.invalidate(key);
     }
 
@@ -102,8 +112,9 @@ public class TwoLevelCache implements Cache {
     }
 
     private Object lookup(Object key) {
-        Object l1Value = l1.getIfPresent(key);
+        Object l1Value = l1.getIfPresent(cacheKey(key));
         if (l1Value != null) {
+            recordGet("hit", "l1");
             return l1Value;
         }
         byte[] bytes = l2Get(key);
@@ -111,9 +122,11 @@ public class TwoLevelCache implements Cache {
             return null;
         }
         Object value = valueSerializer.deserialize(bytes);
-        if (value != null) {
-            l1.put(key, value);
+        if (value == null) {
+            return null;
         }
+        l1.put(cacheKey(key), value);
+        recordGet("hit", "l2");
         return value;
     }
 
@@ -122,6 +135,7 @@ public class TwoLevelCache implements Cache {
         if (bytes != null) {
             Object value = valueSerializer.deserialize(bytes);
             if (value != null) {
+                recordGet("hit", "l2");
                 return value;
             }
         }
@@ -134,6 +148,7 @@ public class TwoLevelCache implements Cache {
         if (loaded != null) {
             writeL2(key, loaded);
         }
+        recordGet("miss", "origin");
         return loaded;
     }
 
@@ -178,7 +193,30 @@ public class TwoLevelCache implements Cache {
         }
     }
 
+    private void broadcast(Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException e) {
+            log.warn("캐시 무효화 방송 실패 cache={}", name, e);
+        }
+    }
+
+    private void recordGet(String result, String tier) {
+        if (meterRegistry == null) {
+            return;
+        }
+        try {
+            meterRegistry.counter("cache.gets", "cache", name, "result", result, "tier", tier).increment();
+        } catch (RuntimeException e) {
+            log.debug("메트릭 기록 실패 cache={}", name, e);
+        }
+    }
+
+    private String cacheKey(Object key) {
+        return String.valueOf(key);
+    }
+
     private String redisKey(Object key) {
-        return keyPrefix + key;
+        return keyPrefix + cacheKey(key);
     }
 }
