@@ -41,15 +41,21 @@ public class PipelineScheduler {
                 globalKeywordGraphProvider.refreshGlobalGraph();
                 return null;
             });
+            return null;
         });
     }
 
     @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
     public void notifyMembers() {
-        runWithLock("pipeline:notify", () -> {
+        runNotificationNow();
+    }
+
+    public NotificationResult runNotificationNow() {
+        return runWithLock("pipeline:notify", () -> {
             LocalDateTime startedAt = LocalDateTime.now();
             NotificationResult notification = runStage("발송", notificationService::notifyRecent);
             pipelineRunRecorder.recordNotification(startedAt, LocalDateTime.now(), notification);
+            return notification;
         });
     }
 
@@ -62,22 +68,22 @@ public class PipelineScheduler {
         }
     }
 
-    private void runWithLock(String key, Runnable task) {
+    private <T> T runWithLock(String key, Supplier<T> task) {
         Lock lock = redisLockRegistry.obtain(key);
         boolean acquired;
         try {
             acquired = lock.tryLock();
         } catch (Exception e) {
             log.error("락 획득 실패 - 스킵 key={}", key, e);
-            return;
+            return null;
         }
         if (!acquired) {
             log.info("다른 인스턴스가 실행 중 - 스킵 key={}", key);
-            return;
+            return null;
         }
 
         try {
-            task.run();
+            return task.get();
         } finally {
             lock.unlock();
         }
