@@ -20,7 +20,7 @@ class JavaMailEmailSender implements EmailSender {
     private final String from;
 
     JavaMailEmailSender(JavaMailSender javaMailSender,
-                        @Value("${mail.from:어서줍줍 <noreply@uhsuh.dev>}") String from) {
+                        @Value("${mail.from:어서줍줍 <noreply@uhsuh.com>}") String from) {
         this.javaMailSender = javaMailSender;
         this.from = from;
     }
