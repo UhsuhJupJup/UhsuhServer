@@ -55,6 +55,8 @@ class NotificationServiceTest {
     private DigestRenderer digestRenderer;
     @Mock
     private NotificationSaver notificationSaver;
+    @Mock
+    private EmailSendLogService emailSendLogService;
 
     @Captor
     private ArgumentCaptor<List<DigestArticleView>> viewsCaptor;
@@ -74,7 +76,8 @@ class NotificationServiceTest {
     void setUp() {
         emailSender = new FakeEmailSender();
         service = new NotificationService(notificationRepository, articleRepository, articleKeywordRepository,
-                memberRepository, emailSubscriberRepository, digestRenderer, emailSender, notificationSaver);
+                memberRepository, emailSubscriberRepository, digestRenderer, emailSender, notificationSaver,
+                emailSendLogService);
         ReflectionTestUtils.setField(service, "maxPerMember", 5);
     }
 

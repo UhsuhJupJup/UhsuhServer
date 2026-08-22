@@ -16,6 +16,7 @@ import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair;
+import uhsuhjupjup.backend.pipeline.notification.domain.RecipientType;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 
 import java.time.LocalDateTime;
@@ -45,6 +46,7 @@ public class NotificationService {
     private final DigestRenderer digestRenderer;
     private final EmailSender emailSender;
     private final NotificationSaver notificationSaver;
+    private final EmailSendLogService emailSendLogService;
 
     @Value("${notification.max-per-member:5}")
     private int maxPerMember;
@@ -94,8 +96,10 @@ public class NotificationService {
             try {
                 List<DigestArticleView> views = buildViews(orderedArticleIds, articleById, keywordsByArticle);
                 String html = digestRenderer.render(member, views, digestDate);
-                emailSender.send(new EmailMessage(member.getEmail(), subject(views.size()), html,
+                String subject = subject(views.size());
+                emailSender.send(new EmailMessage(member.getEmail(), subject, html,
                         digestRenderer.unsubscribeUrl(member)));
+                emailSendLogService.record(member.getEmail(), RecipientType.MEMBER, views.size(), subject);
                 recorded += notificationSaver.record(member.getId(),
                         matchedKeywordsByArticle(orderedArticleIds, keywordsByArticle));
                 notified++;
@@ -126,8 +130,10 @@ public class NotificationService {
             try {
                 List<DigestArticleView> views = buildViews(orderedArticleIds, articleById, keywordsByArticle);
                 String unsubscribeUrl = digestRenderer.unsubscribeUrl(subscriber.getUnsubscribeToken());
+                String subject = subject(views.size());
                 String html = digestRenderer.render(subscriber.getEmail(), views, digestDate, unsubscribeUrl);
-                emailSender.send(new EmailMessage(subscriber.getEmail(), subject(views.size()), html, unsubscribeUrl));
+                emailSender.send(new EmailMessage(subscriber.getEmail(), subject, html, unsubscribeUrl));
+                emailSendLogService.record(subscriber.getEmail(), RecipientType.EMAIL_SUBSCRIBER, views.size(), subject);
                 recorded += notificationSaver.recordEmail(subscriber.getId(),
                         matchedKeywordsByArticle(orderedArticleIds, keywordsByArticle));
                 notified++;
