@@ -3,6 +3,7 @@ package uhsuhjupjup.backend.pipeline.notification.infra;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
 
@@ -20,6 +21,18 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                               where n.member.id = ks.member.id and n.article.id = ak.article.id)
             """)
     List<RecipientPair> findKeywordPathRecipients(LocalDateTime threshold);
+
+    @Query("""
+            select new uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair(es.id, ak.article.id)
+            from ArticleKeyword ak, EmailSubscription esub
+            join esub.emailSubscriber es
+            where esub.keyword.id = ak.keyword.id
+              and es.verifiedAt is not null
+              and ak.article.collectedAt >= :threshold
+              and not exists (select 1 from Notification n
+                              where n.emailSubscriber.id = es.id and n.article.id = ak.article.id)
+            """)
+    List<EmailRecipientPair> findKeywordPathEmailRecipients(LocalDateTime threshold);
 
     @Query("""
             select new uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair(ts.member.id, ak.article.id)

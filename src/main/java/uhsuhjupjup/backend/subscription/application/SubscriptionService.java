@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
+import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
+import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
@@ -31,6 +33,7 @@ public class SubscriptionService {
     private final TopicRepository topicRepository;
     private final KeywordRepository keywordRepository;
     private final MemberRepository memberRepository;
+    private final EmailSubscriberRepository emailSubscriberRepository;
 
     public SubscriptionsResult getMySubscriptions(Long memberId) {
         return new SubscriptionsResult(
@@ -110,9 +113,16 @@ public class SubscriptionService {
 
     @Transactional
     public void unsubscribeByToken(String token) {
-        Member member = memberRepository.findByUnsubscribeToken(token)
+        var member = memberRepository.findByUnsubscribeToken(token);
+        if (member.isPresent()) {
+            Long memberId = member.get().getId();
+            topicSubscriptionRepository.deleteByMemberId(memberId);
+            keywordSubscriptionRepository.deleteByMemberId(memberId);
+            return;
+        }
+        // 회원 토큰이 아니면 비회원 구독자 토큰으로 간주 — 구독자 삭제(email_subscription·notification은 FK CASCADE)
+        EmailSubscriber subscriber = emailSubscriberRepository.findByUnsubscribeToken(token)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_UNSUBSCRIBE_TOKEN));
-        topicSubscriptionRepository.deleteByMemberId(member.getId());
-        keywordSubscriptionRepository.deleteByMemberId(member.getId());
+        emailSubscriberRepository.delete(subscriber);
     }
 }

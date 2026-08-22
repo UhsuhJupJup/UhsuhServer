@@ -12,12 +12,15 @@ import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
+import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.pipeline.notification.application.DigestRenderer;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationSaver;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.DigestArticleView;
+import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
@@ -47,6 +50,8 @@ class NotificationServiceTest {
     @Mock
     private MemberRepository memberRepository;
     @Mock
+    private EmailSubscriberRepository emailSubscriberRepository;
+    @Mock
     private DigestRenderer digestRenderer;
     @Mock
     private NotificationSaver notificationSaver;
@@ -69,7 +74,7 @@ class NotificationServiceTest {
     void setUp() {
         emailSender = new FakeEmailSender();
         service = new NotificationService(notificationRepository, articleRepository, articleKeywordRepository,
-                memberRepository, digestRenderer, emailSender, notificationSaver);
+                memberRepository, emailSubscriberRepository, digestRenderer, emailSender, notificationSaver);
         ReflectionTestUtils.setField(service, "maxPerMember", 5);
     }
 
@@ -181,9 +186,37 @@ class NotificationServiceTest {
         assertThat(result.membersNotified()).isZero();
     }
 
+    @Test
+    void notifyRecent_sendsDigestToVerifiedEmailSubscribers() {
+        given(notificationRepository.findKeywordPathRecipients(any())).willReturn(List.of());
+        given(notificationRepository.findKeywordPathEmailRecipients(any()))
+                .willReturn(List.of(new EmailRecipientPair(100L, 10L)));
+        given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10));
+        given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
+        given(emailSubscriberRepository.findAllById(any()))
+                .willReturn(List.of(emailSubscriber(100L, "sub@test.com")));
+        given(digestRenderer.render(any(String.class), any(), any(), any())).willReturn("<html>");
+        given(digestRenderer.unsubscribeUrl(any(String.class))).willReturn("https://uhsuh/u");
+        given(notificationSaver.recordEmail(eq(100L), any())).willReturn(1);
+
+        NotificationResult result = service.notifyRecent();
+
+        assertThat(emailSender.sent()).hasSize(1);
+        assertThat(emailSender.sent().get(0).to()).isEqualTo("sub@test.com");
+        assertThat(result.emailSubscribersNotified()).isEqualTo(1);
+        assertThat(result.membersNotified()).isZero();
+        assertThat(result.notificationsRecorded()).isEqualTo(1);
+    }
+
     private Member member(Long id, String email) {
         Member member = Member.create("google", "uid" + id, email);
         ReflectionTestUtils.setField(member, "id", id);
         return member;
+    }
+
+    private EmailSubscriber emailSubscriber(Long id, String email) {
+        EmailSubscriber subscriber = EmailSubscriber.create(email);
+        ReflectionTestUtils.setField(subscriber, "id", id);
+        return subscriber;
     }
 }

@@ -7,6 +7,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
+import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
+import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
@@ -42,6 +44,8 @@ class SubscriptionServiceTest {
     private uhsuhjupjup.backend.keyword.infra.KeywordRepository keywordRepository;
     @Mock
     private MemberRepository memberRepository;
+    @Mock
+    private EmailSubscriberRepository emailSubscriberRepository;
 
     @InjectMocks
     private SubscriptionService subscriptionService;
@@ -100,5 +104,16 @@ class SubscriptionServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_UNSUBSCRIBE_TOKEN);
+    }
+
+    @Test
+    void unsubscribeByToken_whenEmailSubscriberToken_deletesSubscriber() {
+        given(memberRepository.findByUnsubscribeToken("etok")).willReturn(Optional.empty());
+        EmailSubscriber subscriber = EmailSubscriber.create("e@example.com");
+        given(emailSubscriberRepository.findByUnsubscribeToken("etok")).willReturn(Optional.of(subscriber));
+
+        subscriptionService.unsubscribeByToken("etok");
+
+        verify(emailSubscriberRepository).delete(subscriber);
     }
 }

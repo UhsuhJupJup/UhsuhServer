@@ -64,7 +64,7 @@ class PipelineRunRecorderTest {
 
     @Test
     void 알림_성공이면_NOTIFICATION_SUCCESS이고_카운트를_매핑한다() {
-        recorder.recordNotification(started, finished, new NotificationResult(3, 14, 1));
+        recorder.recordNotification(started, finished, new NotificationResult(3, 0, 14, 1));
 
         PipelineRun run = captureSaved();
         assertThat(run.getKind()).isEqualTo(RunKind.NOTIFICATION);
