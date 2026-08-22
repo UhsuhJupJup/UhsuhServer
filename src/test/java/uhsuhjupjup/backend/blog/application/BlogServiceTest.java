@@ -107,4 +107,24 @@ class BlogServiceTest {
 
         assertThat(blog.isActive()).isTrue();
     }
+
+    @Test
+    void update_이름과_RSS를_수정한다() {
+        Blog blog = BlogFixture.blog(1L, "토스", "toss.tech");
+        given(blogRepository.findById(1L)).willReturn(Optional.of(blog));
+
+        Blog updated = blogService.update(1L, "토스 테크", "https://toss.tech/feed");
+
+        assertThat(updated.getName()).isEqualTo("토스 테크");
+        assertThat(updated.getRssUrl()).isEqualTo("https://toss.tech/feed");
+    }
+
+    @Test
+    void update_빈값이면_검증오류() {
+        assertThatThrownBy(() -> blogService.update(1L, "", "https://toss.tech/feed"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+        verify(blogRepository, never()).findById(any());
+    }
 }

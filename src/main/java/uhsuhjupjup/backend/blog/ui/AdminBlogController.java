@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.blog.application.BlogService;
 import uhsuhjupjup.backend.blog.ui.dto.AdminBlogResponse;
 import uhsuhjupjup.backend.blog.ui.dto.BlogCreateRequest;
+import uhsuhjupjup.backend.blog.ui.dto.BlogUpdateRequest;
 import uhsuhjupjup.backend.common.auth.AdminMember;
 import uhsuhjupjup.backend.member.domain.Member;
 
@@ -36,6 +37,12 @@ public class AdminBlogController {
     @ResponseStatus(HttpStatus.CREATED)
     public AdminBlogResponse add(@AdminMember Member admin, @RequestBody BlogCreateRequest request) {
         return AdminBlogResponse.from(blogService.add(request.name(), request.domain(), request.rssUrl()));
+    }
+
+    @PatchMapping("/{id}")
+    public AdminBlogResponse update(@AdminMember Member admin, @PathVariable Long id,
+                                    @RequestBody BlogUpdateRequest request) {
+        return AdminBlogResponse.from(blogService.update(id, request.name(), request.rssUrl()));
     }
 
     @PatchMapping("/{id}/deactivate")
