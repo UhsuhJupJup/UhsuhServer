@@ -29,6 +29,8 @@ public enum ErrorCode {
 
     CONSENT_REQUIRED(HttpStatus.FORBIDDEN, "수신 동의가 필요합니다."),
     INVALID_UNSUBSCRIBE_TOKEN(HttpStatus.NOT_FOUND, "유효하지 않은 수신거부 링크입니다."),
+    EMAIL_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 가입된 이메일입니다. 로그인 후 구독해 주세요."),
+    INVALID_VERIFICATION_TOKEN(HttpStatus.NOT_FOUND, "유효하지 않거나 만료된 확인 링크입니다."),
 
     BLOG_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 블로그 도메인입니다.");
 
