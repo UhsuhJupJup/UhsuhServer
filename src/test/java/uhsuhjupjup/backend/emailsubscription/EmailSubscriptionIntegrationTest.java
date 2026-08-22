@@ -27,16 +27,20 @@ import uhsuhjupjup.backend.pipeline.notification.application.EmailSender;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
 import uhsuhjupjup.backend.support.MySqlTestSupport;
 
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -137,10 +141,81 @@ class EmailSubscriptionIntegrationTest extends MySqlTestSupport {
         verify(emailSender, never()).send(any());
     }
 
+    @Test
+    void 인증후_관리_매직링크로_구독을_조회하고_변경한다() throws Exception {
+        Keyword redis = keywordRepository.save(Keyword.create("Redis"));
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+
+        // 등록 → 확인메일 토큰으로 인증
+        register("manage@example.com", redis.getId());
+        String verifyToken = extractToken(captureLastEmailHtml());
+        mockMvc.perform(get("/api/email-subscriptions/confirm").param("token", verifyToken))
+                .andExpect(status().isFound());
+
+        // 관리 링크 요청 → 관리 토큰(실제 Redis 발급)
+        mockMvc.perform(post("/api/email-subscriptions/manage-link")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"manage@example.com\"}"))
+                .andExpect(status().isAccepted());
+        String manageToken = extractToken(captureLastEmailHtml());
+
+        // 조회 → 현재 Redis
+        mockMvc.perform(get("/api/email-subscriptions/manage").param("token", manageToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("manage@example.com"))
+                .andExpect(jsonPath("$.keywords[0].name").value("Redis"));
+
+        // 변경 → JPA
+        mockMvc.perform(put("/api/email-subscriptions/manage").param("token", manageToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"keywordIds\":[" + jpa.getId() + "]}"))
+                .andExpect(status().isNoContent());
+
+        // 재조회 → JPA로 교체됨
+        mockMvc.perform(get("/api/email-subscriptions/manage").param("token", manageToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords.length()").value(1))
+                .andExpect(jsonPath("$.keywords[0].name").value("JPA"));
+    }
+
+    @Test
+    void 이미_인증된_이메일로_다시_등록하면_409() throws Exception {
+        Keyword redis = keywordRepository.save(Keyword.create("Redis"));
+        register("dup2@example.com", redis.getId());
+        String verifyToken = extractToken(captureLastEmailHtml());
+        mockMvc.perform(get("/api/email-subscriptions/confirm").param("token", verifyToken))
+                .andExpect(status().isFound());
+
+        mockMvc.perform(post("/api/email-subscriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"dup2@example.com\",\"keywordIds\":[" + redis.getId() + "]}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void 무효한_관리토큰으로_조회하면_404() throws Exception {
+        mockMvc.perform(get("/api/email-subscriptions/manage").param("token", "not-a-real-token"))
+                .andExpect(status().isNotFound());
+    }
+
+    private void register(String email, Long keywordId) throws Exception {
+        mockMvc.perform(post("/api/email-subscriptions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"keywordIds\":[" + keywordId + "]}"))
+                .andExpect(status().isAccepted());
+    }
+
+    private String captureLastEmailHtml() {
+        ArgumentCaptor<EmailMessage> captor = ArgumentCaptor.forClass(EmailMessage.class);
+        verify(emailSender, atLeastOnce()).send(captor.capture());
+        List<EmailMessage> sent = captor.getAllValues();
+        return sent.get(sent.size() - 1).htmlBody();
+    }
+
     private static String extractToken(String html) {
         Matcher matcher = TOKEN_IN_LINK.matcher(html);
         if (!matcher.find()) {
-            throw new IllegalStateException("확인메일에서 토큰을 찾지 못했습니다: " + html);
+            throw new IllegalStateException("메일에서 토큰을 찾지 못했습니다: " + html);
         }
         return matcher.group(1);
     }

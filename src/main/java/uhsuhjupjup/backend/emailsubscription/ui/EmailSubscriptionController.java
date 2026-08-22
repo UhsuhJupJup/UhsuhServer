@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.emailsubscription.application.EmailSubscriptionService;
 import uhsuhjupjup.backend.emailsubscription.ui.dto.EmailSubscriptionRequest;
+import uhsuhjupjup.backend.emailsubscription.ui.dto.ManageLinkRequest;
+import uhsuhjupjup.backend.emailsubscription.ui.dto.ManageSubscriptionsRequest;
+import uhsuhjupjup.backend.emailsubscription.ui.dto.ManagedSubscriptionsResponse;
 
 import java.net.URI;
 
@@ -37,5 +41,25 @@ public class EmailSubscriptionController {
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(redirect))
                 .build();
+    }
+
+    /** 관리(매직 링크) 요청. 이메일 존재 여부와 무관하게 202(열거 방지). */
+    @PostMapping("/manage-link")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void requestManageLink(@RequestBody @Valid ManageLinkRequest request) {
+        emailSubscriptionService.requestManageLink(request.email());
+    }
+
+    /** 관리 토큰으로 현재 구독 키워드를 조회한다. */
+    @GetMapping("/manage")
+    public ManagedSubscriptionsResponse getManaged(@RequestParam String token) {
+        return emailSubscriptionService.getManagedSubscriptions(token);
+    }
+
+    /** 관리 토큰으로 구독 키워드를 교체한다. */
+    @PutMapping("/manage")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateManaged(@RequestParam String token, @RequestBody @Valid ManageSubscriptionsRequest request) {
+        emailSubscriptionService.updateManagedSubscriptions(token, request.keywordIds());
     }
 }
