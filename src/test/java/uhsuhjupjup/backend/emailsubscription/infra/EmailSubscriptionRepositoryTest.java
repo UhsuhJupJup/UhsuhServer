@@ -74,4 +74,31 @@ class EmailSubscriptionRepositoryTest extends MySqlTestSupport {
                 emailSubscriberRepository.saveAndFlush(EmailSubscriber.create("dup@example.com")))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void 구독자_목록을_생성_최신순으로_조회한다() {
+        emailSubscriberRepository.save(EmailSubscriber.create("first@example.com"));
+        emailSubscriberRepository.save(EmailSubscriber.create("second@example.com"));
+
+        List<EmailSubscriber> all = emailSubscriberRepository.findAllByOrderByCreatedAtDesc();
+
+        assertThat(all).extracting(EmailSubscriber::getEmail)
+                .contains("first@example.com", "second@example.com");
+    }
+
+    @Test
+    void 구독자별_키워드를_페치조인으로_한번에_조회한다() {
+        EmailSubscriber subscriber = emailSubscriberRepository.save(EmailSubscriber.create("kw@example.com"));
+        Keyword redis = keywordRepository.save(Keyword.create("Redis"));
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        emailSubscriptionRepository.save(EmailSubscription.of(subscriber, redis));
+        emailSubscriptionRepository.save(EmailSubscription.of(subscriber, jpa));
+
+        List<EmailSubscription> subs = emailSubscriptionRepository
+                .findWithKeywordByEmailSubscriberIdIn(List.of(subscriber.getId()));
+
+        assertThat(subs).hasSize(2);
+        assertThat(subs).extracting(es -> es.getKeyword().getName())
+                .containsExactlyInAnyOrder("Redis", "JPA");
+    }
 }
