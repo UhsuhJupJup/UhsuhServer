@@ -20,16 +20,24 @@ public class DigestRenderer {
     private String unsubscribeBaseUrl;
 
     public String render(Member member, List<DigestArticleView> articles, String digestDate) {
+        return render(member.getEmail(), articles, digestDate, unsubscribeUrl(member));
+    }
+
+    public String render(String subEmail, List<DigestArticleView> articles, String digestDate, String unsubscribeUrl) {
         Context context = new Context();
-        context.setVariable("subEmail", member.getEmail());
+        context.setVariable("subEmail", subEmail);
         context.setVariable("digestDate", digestDate);
         context.setVariable("digestCount", articles.size());
         context.setVariable("articles", articles);
-        context.setVariable("unsubscribeUrl", unsubscribeUrl(member));
+        context.setVariable("unsubscribeUrl", unsubscribeUrl);
         return templateEngine.process("mail/digest", context);
     }
 
     public String unsubscribeUrl(Member member) {
-        return unsubscribeBaseUrl + "?token=" + member.getUnsubscribeToken();
+        return unsubscribeUrl(member.getUnsubscribeToken());
+    }
+
+    public String unsubscribeUrl(String unsubscribeToken) {
+        return unsubscribeBaseUrl + "?token=" + unsubscribeToken;
     }
 }

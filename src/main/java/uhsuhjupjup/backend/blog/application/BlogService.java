@@ -51,4 +51,14 @@ public class BlogService {
     public void activate(Long blogId) {
         getDetail(blogId).activate();
     }
+
+    @Transactional
+    public Blog update(Long blogId, String name, String rssUrl) {
+        if (!StringUtils.hasText(name) || !StringUtils.hasText(rssUrl)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
+        Blog blog = getDetail(blogId);
+        blog.update(name, rssUrl);
+        return blog;
+    }
 }

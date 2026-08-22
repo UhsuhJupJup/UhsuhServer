@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.auth.AuthUser;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
+import uhsuhjupjup.backend.emailsubscription.application.EmailSubscriptionClaimService;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 
@@ -19,6 +20,7 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
     private final SessionRevoker sessionRevoker;
+    private final EmailSubscriptionClaimService emailSubscriptionClaimService;
 
     public Optional<Member> find(AuthUser authUser) {
         return memberRepository.findByEmail(authUser.email());
@@ -26,8 +28,10 @@ public class MemberService {
 
     @Transactional
     public Member register(AuthUser authUser) {
-        return memberRepository.save(
+        Member member = memberRepository.save(
                 Member.create(authUser.provider(), authUser.providerUid(), authUser.email()));
+        emailSubscriptionClaimService.claim(member);
+        return member;
     }
 
     @Transactional

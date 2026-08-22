@@ -51,4 +51,9 @@ public class Blog extends BaseEntity {
     public void activate() {
         this.active = true;
     }
+
+    public void update(String name, String rssUrl) {
+        this.name = name;
+        this.rssUrl = rssUrl;
+    }
 }

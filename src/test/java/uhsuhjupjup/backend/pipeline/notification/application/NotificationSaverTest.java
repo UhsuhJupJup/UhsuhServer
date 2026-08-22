@@ -9,6 +9,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
+import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationSaver;
@@ -35,6 +37,8 @@ class NotificationSaverTest {
     private MemberRepository memberRepository;
     @Mock
     private ArticleRepository articleRepository;
+    @Mock
+    private EmailSubscriberRepository emailSubscriberRepository;
 
     @InjectMocks
     private NotificationSaver saver;
@@ -65,5 +69,19 @@ class NotificationSaverTest {
 
         assertThat(saved).isZero();
         verify(memberRepository, never()).getReferenceById(anyLong());
+    }
+
+    @Test
+    void recordEmail_savesNotificationPerArticle() {
+        given(emailSubscriberRepository.getReferenceById(1L)).willReturn(mock(EmailSubscriber.class));
+        given(articleRepository.getReferenceById(10L)).willReturn(mock(Article.class));
+        Map<Long, String> matched = new LinkedHashMap<>();
+        matched.put(10L, "Redis");
+
+        int saved = saver.recordEmail(1L, matched);
+
+        assertThat(saved).isEqualTo(1);
+        verify(notificationRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(Notification::getMatchedKeywords).containsExactly("Redis");
     }
 }
