@@ -41,10 +41,10 @@ public class EmailSubscriptionService {
     @Value("${email-subscription.verify-url:https://api.uhsuh.com/api/email-subscriptions/confirm}")
     private String verifyUrl;
 
-    @Value("${email-subscription.confirm-redirect-url:https://www.uhsuh.com}")
+    @Value("${email-subscription.confirm-redirect-url:https://www.uhsuh.com/subscribe/email}")
     private String confirmRedirectUrl;
 
-    @Value("${email-subscription.manage-url:https://www.uhsuh.com/manage}")
+    @Value("${email-subscription.manage-url:https://www.uhsuh.com/subscribe/email/manage}")
     private String manageUrl;
 
     /**
