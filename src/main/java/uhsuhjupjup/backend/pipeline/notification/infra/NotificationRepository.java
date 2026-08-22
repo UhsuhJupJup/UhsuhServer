@@ -2,7 +2,10 @@ package uhsuhjupjup.backend.pipeline.notification.infra;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
@@ -53,4 +56,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             order by n.sentAt desc
             """)
     List<Notification> findRecentWithArticleByMemberId(Long memberId, Pageable pageable);
+
+    @Modifying
+    @Query("update Notification n set n.member = :member, n.emailSubscriber = null "
+            + "where n.emailSubscriber.id = :emailSubscriberId")
+    int reassignToMember(@Param("member") Member member, @Param("emailSubscriberId") Long emailSubscriberId);
 }

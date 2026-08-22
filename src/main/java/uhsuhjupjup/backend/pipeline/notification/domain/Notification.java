@@ -62,9 +62,4 @@ public class Notification {
     public static Notification ofEmail(EmailSubscriber emailSubscriber, Article article, String matchedKeywords) {
         return new Notification(null, emailSubscriber, article, matchedKeywords);
     }
-
-    public void reassignToMember(Member member) {
-        this.member = member;
-        this.emailSubscriber = null;
-    }
 }
