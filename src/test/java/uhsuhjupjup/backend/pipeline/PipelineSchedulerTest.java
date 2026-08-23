@@ -51,7 +51,6 @@ class PipelineSchedulerTest {
 
     @BeforeEach
     void setUp() {
-        // 단일 인스턴스: 락은 항상 획득한다고 가정
         given(redisLockRegistry.obtain(any())).willReturn(lock);
         given(lock.tryLock()).willReturn(true);
     }

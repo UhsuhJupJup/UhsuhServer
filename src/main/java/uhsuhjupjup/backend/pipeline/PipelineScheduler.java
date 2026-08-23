@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.pipeline;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -30,7 +31,10 @@ public class PipelineScheduler {
     private final RedisLockRegistry redisLockRegistry;
     private final GlobalKeywordGraphProvider globalKeywordGraphProvider;
 
-    @Scheduled(cron = "0 0 6 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "${pipeline.ingest-cron:0 0 6 * * *}", zone = "Asia/Seoul")
+    @SchedulerLock(name = "pipelineIngest",
+            lockAtLeastFor = "${pipeline.lock-at-least-for:PT30S}",
+            lockAtMostFor = "${pipeline.lock-at-most-for:PT10M}")
     public void ingest() {
         runWithLock("pipeline:ingest", () -> {
             LocalDateTime startedAt = LocalDateTime.now();
@@ -45,7 +49,10 @@ public class PipelineScheduler {
         });
     }
 
-    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "${pipeline.notify-cron:0 0 8 * * *}", zone = "Asia/Seoul")
+    @SchedulerLock(name = "pipelineNotify",
+            lockAtLeastFor = "${pipeline.lock-at-least-for:PT30S}",
+            lockAtMostFor = "${pipeline.lock-at-most-for:PT10M}")
     public void notifyMembers() {
         runNotificationNow();
     }
