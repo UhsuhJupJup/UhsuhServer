@@ -1,0 +1,89 @@
+# 로컬 2-인스턴스 클러스터 — 스케줄러 중복 실행(분산락) 재현/검증용.
+#
+# 왜 크론을 어긋나게 두나?
+#   로컬 두 컨테이너는 같은 호스트 시계라 크론이 "정확히 동시에" 떠서 락이 정상 dedup → 버그가 안 보인다.
+#   실제 운영은 인스턴스 간 시계 스큐로 몇 ms~초 어긋난다. 그래서 app2 크론을 5초 늦춰 스큐를 흉내낸다:
+#     app1: 매 20초 :00,:20,:40   |   app2: 매 20초 :05,:25,:45
+#   → app1이 :00에 실행·락 해제 후, app2가 :05에 빈 락을 획득 → "즉시 unlock"의 허점으로 2회 실행 재현.
+#
+# 사용법:
+#   docker compose -f docker-compose.local-cluster.yml up --build      # 빌드+기동(첫 빌드는 몇 분)
+#   docker exec -it uhsuh-lc-mysql mysql -uuhsuhjupjup -puhsuhjupjup uhsuhjupjup \
+#     -e "select id,kind,started_at,status from pipeline_run where kind='NOTIFICATION' order by id desc limit 12;"
+#   docker compose -f docker-compose.local-cluster.yml down -v          # 정리
+#
+# 인증(Firebase)은 firebase.enabled=false로 꺼서 firebase.json 없이 부팅한다(스케줄러 테스트엔 무관).
+# 수정 검증 시: Redis는 비영속(appendonly no)이라 컨테이너 재시작으로 멱등키가 초기화된다.
+name: uhsuh-local-cluster
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: uhsuh-lc-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: uhsuhjupjup
+      MYSQL_USER: uhsuhjupjup
+      MYSQL_PASSWORD: uhsuhjupjup
+    ports:
+      - "13306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: uhsuh-lc-redis
+    # 운영과 동일하게 캐시+락 공유 + allkeys-lru(락 키 축출 리스크까지 동일 조건)
+    command: ["redis-server", "--requirepass", "localpass", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "no"]
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "localpass", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  app1:
+    build: .
+    container_name: uhsuh-lc-app1
+    environment:
+      SPRING_PROFILES_ACTIVE: localcluster
+      TZ: Asia/Seoul
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      REDIS_PASSWORD: localpass
+      PIPELINE_NOTIFY_CRON: "0/20 * * * * *"    # :00,:20,:40
+      PIPELINE_LOCK_AT_LEAST_FOR: "PT8S"        # ShedLock: 스큐(5초)보다 크고 주기(20초)보다 작게 → 사이클마다 1회
+      PIPELINE_INGEST_CRON: "0 0 0 1 1 *"       # 사실상 비활성(수집은 이 테스트와 무관)
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx384m"
+    ports:
+      - "18081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  app2:
+    build: .
+    container_name: uhsuh-lc-app2
+    environment:
+      SPRING_PROFILES_ACTIVE: localcluster
+      TZ: Asia/Seoul
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      REDIS_PASSWORD: localpass
+      PIPELINE_NOTIFY_CRON: "5/20 * * * * *"    # :05,:25,:45 — 5초 오프셋 = 시계 스큐 흉내
+      PIPELINE_LOCK_AT_LEAST_FOR: "PT8S"
+      PIPELINE_INGEST_CRON: "0 0 0 1 1 *"
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx384m"
+    ports:
+      - "18082:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy

@@ -1,0 +1,33 @@
+# 로컬 2-인스턴스 클러스터 테스트용 프로파일 (docker-compose.local-cluster.yml에서 사용).
+# 운영과 달리 메일은 실제 발송하지 않고 로그로만 남기고(LoggingEmailSender), Claude는 끈다.
+# 인증(FirebaseTokenVerifier)은 FirebaseAuth 빈이 필요하므로 firebase.json을 마운트해 부팅한다.
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:uhsuhjupjup}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USERNAME:uhsuhjupjup}
+    password: ${DB_PASSWORD:uhsuhjupjup}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:localpass}
+
+# 인증 끔 → FirebaseAuth 빈 없이 부팅(firebase.json 불필요). 토큰 검증은 거부되지만 스케줄러 테스트엔 무관.
+firebase:
+  enabled: false
+
+# 메일 실제 발송 끔 → LoggingEmailSender가 "발송"을 로그로만 남긴다(SMTP 자격증명 불필요)
+mail:
+  enabled: false
+
+# 스케줄 크론(로컬 재현용으로 오버라이드). 두 인스턴스를 몇 초 오프셋해 "시계 스큐"를 흉내낸다.
+pipeline:
+  notify-cron: ${PIPELINE_NOTIFY_CRON:0 0 8 * * *}
+  ingest-cron: ${PIPELINE_INGEST_CRON:0 0 6 * * *}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
