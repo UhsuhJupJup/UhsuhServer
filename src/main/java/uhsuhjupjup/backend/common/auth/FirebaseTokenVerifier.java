@@ -5,6 +5,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.common.exception.BusinessException;
@@ -17,9 +18,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FirebaseTokenVerifier {
 
-    private final FirebaseAuth firebaseAuth;
+    private final ObjectProvider<FirebaseAuth> firebaseAuthProvider;
 
     public AuthUser verify(String idToken) {
+        FirebaseAuth firebaseAuth = firebaseAuthProvider.getIfAvailable();
+        if (firebaseAuth == null) {
+            throw new BusinessException(ErrorCode.INVALID_ID_TOKEN);
+        }
+
         FirebaseToken token;
         try {
             token = firebaseAuth.verifyIdToken(idToken);
@@ -32,7 +38,6 @@ public class FirebaseTokenVerifier {
 
         String email = token.getEmail();
         if (!StringUtils.hasText(email) || !token.isEmailVerified()) {
-            // 발송 주소(=로그인 이메일)가 검증되지 않으면 회원으로 받을 수 없다.
             throw new BusinessException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
         return new AuthUser(extractProvider(token), token.getUid(), email, extractAuthTime(token));
