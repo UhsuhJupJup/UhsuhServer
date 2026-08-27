@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -120,8 +121,8 @@ class SubscriptionIntegrationTest extends MySqlTestSupport {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/unsubscribe").param("token", member.getUnsubscribeToken()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.unsubscribed").value(true));
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("https://www.uhsuh.com/unsubscribe?status=success"));
 
         mockMvc.perform(get("/api/subscriptions").header("Authorization", BEARER))
                 .andExpect(status().isOk())
