@@ -13,6 +13,11 @@ public interface KeywordSubscriptionRepository extends JpaRepository<KeywordSubs
     @Query("select ks.keyword from KeywordSubscription ks where ks.member.id = :memberId order by ks.keyword.name")
     List<Keyword> findSubscribedKeywords(Long memberId);
 
+    @Query("select ks from KeywordSubscription ks"
+            + " join fetch ks.member join fetch ks.keyword"
+            + " order by ks.keyword.name")
+    List<KeywordSubscription> findAllWithMemberAndKeyword();
+
     void deleteByMemberIdAndKeywordIdIn(Long memberId, Collection<Long> keywordIds);
 
     void deleteByMemberId(Long memberId);

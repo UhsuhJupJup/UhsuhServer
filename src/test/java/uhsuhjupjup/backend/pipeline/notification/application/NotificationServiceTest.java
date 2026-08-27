@@ -16,9 +16,6 @@ import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.notification.application.DigestRenderer;
-import uhsuhjupjup.backend.pipeline.notification.application.NotificationSaver;
-import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.DigestArticleView;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
@@ -33,10 +30,14 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationServiceTest {
@@ -54,14 +55,11 @@ class NotificationServiceTest {
     @Mock
     private DigestRenderer digestRenderer;
     @Mock
-    private NotificationSaver notificationSaver;
-    @Mock
-    private EmailSendLogService emailSendLogService;
+    private OutboxEnqueuer outboxEnqueuer;
 
     @Captor
     private ArgumentCaptor<List<DigestArticleView>> viewsCaptor;
 
-    private FakeEmailSender emailSender;
     private NotificationService service;
 
     private final Blog blog = BlogFixture.blog(1L, "우아한형제들", "techblog.woowahan.com");
@@ -74,10 +72,8 @@ class NotificationServiceTest {
 
     @BeforeEach
     void setUp() {
-        emailSender = new FakeEmailSender();
         service = new NotificationService(notificationRepository, articleRepository, articleKeywordRepository,
-                memberRepository, emailSubscriberRepository, digestRenderer, emailSender, notificationSaver,
-                emailSendLogService);
+                memberRepository, emailSubscriberRepository, digestRenderer, outboxEnqueuer);
         ReflectionTestUtils.setField(service, "maxPerMember", 5);
     }
 
@@ -89,12 +85,12 @@ class NotificationServiceTest {
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
         given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
-        given(notificationSaver.record(eq(1L), any())).willReturn(2);
+        given(outboxEnqueuer.enqueueForMember(anyString(), anyInt(), any(), any(), any(), eq(1L), any()))
+                .willReturn(2);
 
         NotificationResult result = service.notifyRecent();
 
-        assertThat(emailSender.sent()).hasSize(1);
-        assertThat(emailSender.sent().get(0).to()).isEqualTo("a@test.com");
+        verify(outboxEnqueuer).enqueueForMember(eq("a@test.com"), eq(2), any(), any(), any(), eq(1L), any());
         assertThat(result.membersNotified()).isEqualTo(1);
         assertThat(result.notificationsRecorded()).isEqualTo(2);
         verify(digestRenderer).render(eq(member1), viewsCaptor.capture(), any());
@@ -117,7 +113,8 @@ class NotificationServiceTest {
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
         given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
-        given(notificationSaver.record(eq(1L), any())).willReturn(5);
+        given(outboxEnqueuer.enqueueForMember(anyString(), anyInt(), any(), any(), any(), eq(1L), any()))
+                .willReturn(5);
 
         NotificationResult result = service.notifyRecent();
 
@@ -128,18 +125,19 @@ class NotificationServiceTest {
     }
 
     @Test
-    void notifyRecent_sendsOneEmailPerMember() {
+    void notifyRecent_enqueuesOnePerMember() {
         given(notificationRepository.findKeywordPathRecipients(any()))
                 .willReturn(List.of(new RecipientPair(1L, 10L), new RecipientPair(2L, 10L)));
         given(articleRepository.findWithBlogByIdIn(any())).willReturn(List.of(article10));
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1, member2));
         given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
-        given(notificationSaver.record(anyLong(), any())).willReturn(1);
+        given(outboxEnqueuer.enqueueForMember(anyString(), anyInt(), any(), any(), any(), anyLong(), any()))
+                .willReturn(1);
 
         NotificationResult result = service.notifyRecent();
 
-        assertThat(emailSender.sent()).hasSize(2);
+        verify(outboxEnqueuer, times(2)).enqueueForMember(anyString(), anyInt(), any(), any(), any(), anyLong(), any());
         assertThat(result.membersNotified()).isEqualTo(2);
         assertThat(result.notificationsRecorded()).isEqualTo(2);
     }
@@ -152,7 +150,8 @@ class NotificationServiceTest {
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1));
         given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
-        given(notificationSaver.record(eq(1L), any())).willReturn(1);
+        given(outboxEnqueuer.enqueueForMember(anyString(), anyInt(), any(), any(), any(), eq(1L), any()))
+                .willReturn(1);
 
         service.notifyRecent();
 
@@ -168,29 +167,30 @@ class NotificationServiceTest {
         given(articleKeywordRepository.findWithKeywordByArticleIdIn(any())).willReturn(List.of());
         given(memberRepository.findAllById(any())).willReturn(List.of(member1, member2));
         given(digestRenderer.render(any(), any(), any())).willReturn("<html>");
-        given(notificationSaver.record(eq(2L), any())).willReturn(1);
-        emailSender.failFor("a@test.com");
+        given(outboxEnqueuer.enqueueForMember(eq("a@test.com"), anyInt(), any(), any(), any(), anyLong(), any()))
+                .willThrow(new RuntimeException("boom"));
+        given(outboxEnqueuer.enqueueForMember(eq("b@test.com"), anyInt(), any(), any(), any(), anyLong(), any()))
+                .willReturn(1);
 
         NotificationResult result = service.notifyRecent();
 
-        assertThat(emailSender.sent()).hasSize(1);
-        assertThat(emailSender.sent().get(0).to()).isEqualTo("b@test.com");
+        verify(outboxEnqueuer).enqueueForMember(eq("b@test.com"), anyInt(), any(), any(), any(), anyLong(), any());
         assertThat(result.membersNotified()).isEqualTo(1);
         assertThat(result.failedMembers()).isEqualTo(1);
     }
 
     @Test
-    void notifyRecent_whenNoRecipients_sendsNothing() {
+    void notifyRecent_whenNoRecipients_enqueuesNothing() {
         given(notificationRepository.findKeywordPathRecipients(any())).willReturn(List.of());
 
         NotificationResult result = service.notifyRecent();
 
-        assertThat(emailSender.sent()).isEmpty();
+        verifyNoInteractions(outboxEnqueuer);
         assertThat(result.membersNotified()).isZero();
     }
 
     @Test
-    void notifyRecent_sendsDigestToVerifiedEmailSubscribers() {
+    void notifyRecent_enqueuesDigestForVerifiedEmailSubscribers() {
         given(notificationRepository.findKeywordPathRecipients(any())).willReturn(List.of());
         given(notificationRepository.findKeywordPathEmailRecipients(any()))
                 .willReturn(List.of(new EmailRecipientPair(100L, 10L)));
@@ -200,12 +200,12 @@ class NotificationServiceTest {
                 .willReturn(List.of(emailSubscriber(100L, "sub@test.com")));
         given(digestRenderer.render(any(String.class), any(), any(), any())).willReturn("<html>");
         given(digestRenderer.unsubscribeUrl(any(String.class))).willReturn("https://uhsuh/u");
-        given(notificationSaver.recordEmail(eq(100L), any())).willReturn(1);
+        given(outboxEnqueuer.enqueueForEmailSubscriber(anyString(), anyInt(), any(), any(), any(), eq(100L), any()))
+                .willReturn(1);
 
         NotificationResult result = service.notifyRecent();
 
-        assertThat(emailSender.sent()).hasSize(1);
-        assertThat(emailSender.sent().get(0).to()).isEqualTo("sub@test.com");
+        verify(outboxEnqueuer).enqueueForEmailSubscriber(eq("sub@test.com"), eq(1), any(), any(), any(), eq(100L), any());
         assertThat(result.emailSubscribersNotified()).isEqualTo(1);
         assertThat(result.membersNotified()).isZero();
         assertThat(result.notificationsRecorded()).isEqualTo(1);

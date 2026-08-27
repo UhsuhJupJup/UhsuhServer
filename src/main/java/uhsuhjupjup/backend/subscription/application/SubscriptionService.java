@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.subscription.application;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.exception.BusinessException;
@@ -34,6 +35,9 @@ public class SubscriptionService {
     private final KeywordRepository keywordRepository;
     private final MemberRepository memberRepository;
     private final EmailSubscriberRepository emailSubscriberRepository;
+
+    @Value("${mail.unsubscribe-redirect-url:https://www.uhsuh.com/unsubscribe}")
+    private String unsubscribeRedirectUrl;
 
     public SubscriptionsResult getMySubscriptions(Long memberId) {
         return new SubscriptionsResult(
@@ -113,16 +117,29 @@ public class SubscriptionService {
 
     @Transactional
     public void unsubscribeByToken(String token) {
+        if (!tryUnsubscribe(token)) {
+            throw new BusinessException(ErrorCode.INVALID_UNSUBSCRIBE_TOKEN);
+        }
+    }
+
+    @Transactional
+    public String unsubscribeByTokenForLanding(String token) {
+        return unsubscribeRedirectUrl + (tryUnsubscribe(token) ? "?status=success" : "?status=failed");
+    }
+
+    private boolean tryUnsubscribe(String token) {
         var member = memberRepository.findByUnsubscribeToken(token);
         if (member.isPresent()) {
             Long memberId = member.get().getId();
             topicSubscriptionRepository.deleteByMemberId(memberId);
             keywordSubscriptionRepository.deleteByMemberId(memberId);
-            return;
+            return true;
         }
-        // 회원 토큰이 아니면 비회원 구독자 토큰으로 간주 — 구독자 삭제(email_subscription·notification은 FK CASCADE)
-        EmailSubscriber subscriber = emailSubscriberRepository.findByUnsubscribeToken(token)
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_UNSUBSCRIBE_TOKEN));
-        emailSubscriberRepository.delete(subscriber);
+        return emailSubscriberRepository.findByUnsubscribeToken(token)
+                .map(subscriber -> {
+                    emailSubscriberRepository.delete(subscriber);
+                    return true;
+                })
+                .orElse(false);
     }
 }

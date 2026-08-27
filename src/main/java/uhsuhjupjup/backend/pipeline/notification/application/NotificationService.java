@@ -12,11 +12,9 @@ import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.DigestArticleView;
-import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.RecipientPair;
-import uhsuhjupjup.backend.pipeline.notification.domain.RecipientType;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 
 import java.time.LocalDateTime;
@@ -44,9 +42,7 @@ public class NotificationService {
     private final MemberRepository memberRepository;
     private final EmailSubscriberRepository emailSubscriberRepository;
     private final DigestRenderer digestRenderer;
-    private final EmailSender emailSender;
-    private final NotificationSaver notificationSaver;
-    private final EmailSendLogService emailSendLogService;
+    private final OutboxEnqueuer outboxEnqueuer;
 
     @Value("${notification.max-per-member:5}")
     private int maxPerMember;
@@ -70,15 +66,16 @@ public class NotificationService {
                         Collectors.mapping(ak -> ak.getKeyword().getName(), Collectors.toList())));
         String digestDate = LocalDateTime.now().format(DATE);
 
-        SendOutcome members = sendToMembers(articlesByMember, articleById, keywordsByArticle, digestDate);
-        SendOutcome emails = sendToEmailSubscribers(articlesByEmailSubscriber, articleById, keywordsByArticle, digestDate);
+        SendOutcome members = enqueueForMembers(articlesByMember, articleById, keywordsByArticle, digestDate);
+        SendOutcome emails = enqueueForEmailSubscribers(articlesByEmailSubscriber, articleById, keywordsByArticle,
+                digestDate);
 
         return logged(new NotificationResult(members.notified(), emails.notified(),
                 members.recorded() + emails.recorded(), members.failed() + emails.failed()));
     }
 
-    private SendOutcome sendToMembers(Map<Long, Set<Long>> articlesByMember, Map<Long, Article> articleById,
-                                      Map<Long, List<String>> keywordsByArticle, String digestDate) {
+    private SendOutcome enqueueForMembers(Map<Long, Set<Long>> articlesByMember, Map<Long, Article> articleById,
+                                          Map<Long, List<String>> keywordsByArticle, String digestDate) {
         if (articlesByMember.isEmpty()) {
             return SendOutcome.EMPTY;
         }
@@ -97,22 +94,22 @@ public class NotificationService {
                 List<DigestArticleView> views = buildViews(orderedArticleIds, articleById, keywordsByArticle);
                 String html = digestRenderer.render(member, views, digestDate);
                 String subject = subject(views.size());
-                emailSender.send(new EmailMessage(member.getEmail(), subject, html,
-                        digestRenderer.unsubscribeUrl(member)));
-                emailSendLogService.record(member.getEmail(), RecipientType.MEMBER, views.size(), subject);
-                recorded += notificationSaver.record(member.getId(),
+                String unsubscribeUrl = digestRenderer.unsubscribeUrl(member);
+                recorded += outboxEnqueuer.enqueueForMember(member.getEmail(), views.size(), subject, html,
+                        unsubscribeUrl, member.getId(),
                         matchedKeywordsByArticle(orderedArticleIds, keywordsByArticle));
                 notified++;
             } catch (Exception e) {
                 failed++;
-                log.warn("다이제스트 발송 실패 memberId={} 사유={}", member.getId(), e.getMessage());
+                log.warn("다이제스트 적재 실패 memberId={} 사유={}", member.getId(), e.getMessage());
             }
         }
         return new SendOutcome(notified, recorded, failed);
     }
 
-    private SendOutcome sendToEmailSubscribers(Map<Long, Set<Long>> articlesBySubscriber, Map<Long, Article> articleById,
-                                               Map<Long, List<String>> keywordsByArticle, String digestDate) {
+    private SendOutcome enqueueForEmailSubscribers(Map<Long, Set<Long>> articlesBySubscriber,
+                                                   Map<Long, Article> articleById,
+                                                   Map<Long, List<String>> keywordsByArticle, String digestDate) {
         if (articlesBySubscriber.isEmpty()) {
             return SendOutcome.EMPTY;
         }
@@ -132,14 +129,13 @@ public class NotificationService {
                 String unsubscribeUrl = digestRenderer.unsubscribeUrl(subscriber.getUnsubscribeToken());
                 String subject = subject(views.size());
                 String html = digestRenderer.render(subscriber.getEmail(), views, digestDate, unsubscribeUrl);
-                emailSender.send(new EmailMessage(subscriber.getEmail(), subject, html, unsubscribeUrl));
-                emailSendLogService.record(subscriber.getEmail(), RecipientType.EMAIL_SUBSCRIBER, views.size(), subject);
-                recorded += notificationSaver.recordEmail(subscriber.getId(),
+                recorded += outboxEnqueuer.enqueueForEmailSubscriber(subscriber.getEmail(), views.size(), subject, html,
+                        unsubscribeUrl, subscriber.getId(),
                         matchedKeywordsByArticle(orderedArticleIds, keywordsByArticle));
                 notified++;
             } catch (Exception e) {
                 failed++;
-                log.warn("비회원 다이제스트 발송 실패 emailSubscriberId={} 사유={}", subscriber.getId(), e.getMessage());
+                log.warn("비회원 다이제스트 적재 실패 emailSubscriberId={} 사유={}", subscriber.getId(), e.getMessage());
             }
         }
         return new SendOutcome(notified, recorded, failed);
@@ -195,7 +191,7 @@ public class NotificationService {
     }
 
     private NotificationResult logged(NotificationResult result) {
-        log.info("발송 완료 {}", result);
+        log.info("적재 완료 {}", result);
         return result;
     }
 

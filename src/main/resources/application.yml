@@ -32,6 +32,15 @@ claude:
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
 
+outbox:
+  poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:60000}
+  poll-initial-delay-ms: ${OUTBOX_POLL_INITIAL_DELAY_MS:60000}
+  batch-size: ${OUTBOX_BATCH_SIZE:50}
+  max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
+  retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
+  retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
+  lock-at-most-for: ${OUTBOX_LOCK_AT_MOST_FOR:PT5M}
+
 management:
   endpoints:
     web:
