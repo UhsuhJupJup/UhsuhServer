@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.AdminMember;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.pipeline.notification.application.EmailSendLogService;
+import uhsuhjupjup.backend.pipeline.notification.application.OutboxAdminService;
 import uhsuhjupjup.backend.pipeline.notification.ui.dto.AdminEmailSendLogResponse;
 
 import java.util.List;
@@ -17,12 +17,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminEmailSendLogController {
 
-    private final EmailSendLogService emailSendLogService;
+    private final OutboxAdminService outboxAdminService;
 
     @GetMapping
     public List<AdminEmailSendLogResponse> list(@AdminMember Member admin,
                                                 @RequestParam(defaultValue = "50") int limit) {
-        return emailSendLogService.recentLogs(limit).stream()
+        return outboxAdminService.recentSent(limit).stream()
                 .map(AdminEmailSendLogResponse::from)
                 .toList();
     }
