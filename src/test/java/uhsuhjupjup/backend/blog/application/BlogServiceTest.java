@@ -61,9 +61,10 @@ class BlogServiceTest {
         given(blogRepository.existsByDomain("toss.tech")).willReturn(false);
         given(blogRepository.save(any(Blog.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        Blog saved = blogService.add("토스", "toss.tech", "https://toss.tech/rss");
+        Blog saved = blogService.add("토스", "toss.tech", "https://toss.tech/rss", "https://toss.tech/logo.png");
 
         assertThat(saved.getName()).isEqualTo("토스");
+        assertThat(saved.getLogoUrl()).isEqualTo("https://toss.tech/logo.png");
         assertThat(saved.isActive()).isTrue();
         verify(blogRepository).save(any(Blog.class));
     }
@@ -72,7 +73,7 @@ class BlogServiceTest {
     void add_도메인이_중복이면_예외() {
         given(blogRepository.existsByDomain("toss.tech")).willReturn(true);
 
-        assertThatThrownBy(() -> blogService.add("토스", "toss.tech", "https://toss.tech/rss"))
+        assertThatThrownBy(() -> blogService.add("토스", "toss.tech", "https://toss.tech/rss", null))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.BLOG_ALREADY_EXISTS);
@@ -81,7 +82,7 @@ class BlogServiceTest {
 
     @Test
     void add_빈값이면_검증오류() {
-        assertThatThrownBy(() -> blogService.add("", "toss.tech", "https://toss.tech/rss"))
+        assertThatThrownBy(() -> blogService.add("", "toss.tech", "https://toss.tech/rss", null))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.VALIDATION_ERROR);
@@ -113,15 +114,16 @@ class BlogServiceTest {
         Blog blog = BlogFixture.blog(1L, "토스", "toss.tech");
         given(blogRepository.findById(1L)).willReturn(Optional.of(blog));
 
-        Blog updated = blogService.update(1L, "토스 테크", "https://toss.tech/feed");
+        Blog updated = blogService.update(1L, "토스 테크", "https://toss.tech/feed", "https://toss.tech/logo.png");
 
         assertThat(updated.getName()).isEqualTo("토스 테크");
         assertThat(updated.getRssUrl()).isEqualTo("https://toss.tech/feed");
+        assertThat(updated.getLogoUrl()).isEqualTo("https://toss.tech/logo.png");
     }
 
     @Test
     void update_빈값이면_검증오류() {
-        assertThatThrownBy(() -> blogService.update(1L, "", "https://toss.tech/feed"))
+        assertThatThrownBy(() -> blogService.update(1L, "", "https://toss.tech/feed", null))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.VALIDATION_ERROR);

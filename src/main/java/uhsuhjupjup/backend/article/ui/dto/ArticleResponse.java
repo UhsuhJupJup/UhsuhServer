@@ -15,7 +15,7 @@ public record ArticleResponse(
         List<String> keywords
 ) {
 
-    public record BlogSummary(Long id, String name) {
+    public record BlogSummary(Long id, String name, String domain, String logoUrl) {
     }
 
     public static ArticleResponse from(ArticleSummaryResult result) {
@@ -25,7 +25,7 @@ public record ArticleResponse(
                 article.getTitle(),
                 article.getUrl(),
                 article.getPublishedAt(),
-                new BlogSummary(article.getBlog().getId(), article.getBlog().getName()),
+                new BlogSummary(article.getBlog().getId(), article.getBlog().getName(), article.getBlog().getDomain(), article.getBlog().getLogoUrl()),
                 result.keywordNames()
         );
     }

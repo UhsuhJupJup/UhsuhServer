@@ -32,14 +32,14 @@ public class BlogService {
     }
 
     @Transactional
-    public Blog add(String name, String domain, String rssUrl) {
+    public Blog add(String name, String domain, String rssUrl, String logoUrl) {
         if (!StringUtils.hasText(name) || !StringUtils.hasText(domain) || !StringUtils.hasText(rssUrl)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
         if (blogRepository.existsByDomain(domain)) {
             throw new BusinessException(ErrorCode.BLOG_ALREADY_EXISTS);
         }
-        return blogRepository.save(Blog.create(name, domain, rssUrl));
+        return blogRepository.save(Blog.create(name, domain, rssUrl, normalizeLogoUrl(logoUrl)));
     }
 
     @Transactional
@@ -53,12 +53,16 @@ public class BlogService {
     }
 
     @Transactional
-    public Blog update(Long blogId, String name, String rssUrl) {
+    public Blog update(Long blogId, String name, String rssUrl, String logoUrl) {
         if (!StringUtils.hasText(name) || !StringUtils.hasText(rssUrl)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         }
         Blog blog = getDetail(blogId);
-        blog.update(name, rssUrl);
+        blog.update(name, rssUrl, normalizeLogoUrl(logoUrl));
         return blog;
+    }
+
+    private String normalizeLogoUrl(String logoUrl) {
+        return StringUtils.hasText(logoUrl) ? logoUrl.trim() : null;
     }
 }
