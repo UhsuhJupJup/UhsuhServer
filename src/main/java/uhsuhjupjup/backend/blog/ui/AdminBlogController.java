@@ -36,13 +36,13 @@ public class AdminBlogController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AdminBlogResponse add(@AdminMember Member admin, @RequestBody BlogCreateRequest request) {
-        return AdminBlogResponse.from(blogService.add(request.name(), request.domain(), request.rssUrl()));
+        return AdminBlogResponse.from(blogService.add(request.name(), request.domain(), request.rssUrl(), request.logoUrl()));
     }
 
     @PatchMapping("/{id}")
     public AdminBlogResponse update(@AdminMember Member admin, @PathVariable Long id,
                                     @RequestBody BlogUpdateRequest request) {
-        return AdminBlogResponse.from(blogService.update(id, request.name(), request.rssUrl()));
+        return AdminBlogResponse.from(blogService.update(id, request.name(), request.rssUrl(), request.logoUrl()));
     }
 
     @PatchMapping("/{id}/deactivate")

@@ -1,4 +1,4 @@
 package uhsuhjupjup.backend.blog.ui.dto;
 
-public record BlogUpdateRequest(String name, String rssUrl) {
+public record BlogUpdateRequest(String name, String rssUrl, String logoUrl) {
 }

@@ -1,0 +1,1 @@
+ALTER TABLE blog ADD COLUMN logo_url VARCHAR(500) NULL AFTER rss_url;

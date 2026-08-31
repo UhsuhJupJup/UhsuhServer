@@ -33,15 +33,23 @@ public class Blog extends BaseEntity {
     @Column(name = "active", nullable = false)
     private boolean active;
 
-    private Blog(String name, String domain, String rssUrl) {
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
+    private Blog(String name, String domain, String rssUrl, String logoUrl) {
         this.name = name;
         this.domain = domain;
         this.rssUrl = rssUrl;
+        this.logoUrl = logoUrl;
         this.active = true;
     }
 
     public static Blog create(String name, String domain, String rssUrl) {
-        return new Blog(name, domain, rssUrl);
+        return new Blog(name, domain, rssUrl, null);
+    }
+
+    public static Blog create(String name, String domain, String rssUrl, String logoUrl) {
+        return new Blog(name, domain, rssUrl, logoUrl);
     }
 
     public void deactivate() {
@@ -52,8 +60,9 @@ public class Blog extends BaseEntity {
         this.active = true;
     }
 
-    public void update(String name, String rssUrl) {
+    public void update(String name, String rssUrl, String logoUrl) {
         this.name = name;
         this.rssUrl = rssUrl;
+        this.logoUrl = logoUrl;
     }
 }
