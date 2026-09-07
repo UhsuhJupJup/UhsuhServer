@@ -12,10 +12,11 @@ import uhsuhjupjup.backend.member.domain.Member;
 @RestController
 @RequestMapping("/api/me/notifications")
 @RequiredArgsConstructor
-public class SentArticleController {
+public class SentArticleController implements SentArticleControllerApi {
 
     private final SentArticleService sentArticleService;
 
+    @Override
     @GetMapping
     public SentArticlesResponse mySentArticles(@LoginMember Member member) {
         return SentArticlesResponse.from(sentArticleService.getSentArticles(member.getId()));

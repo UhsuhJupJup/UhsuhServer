@@ -22,10 +22,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/blogs")
 @RequiredArgsConstructor
-public class AdminBlogController {
+public class AdminBlogController implements AdminBlogControllerApi {
 
     private final BlogService blogService;
 
+    @Override
     @GetMapping
     public List<AdminBlogResponse> list(@AdminMember Member admin) {
         return blogService.findAllForAdmin().stream()
@@ -33,24 +34,28 @@ public class AdminBlogController {
                 .toList();
     }
 
+    @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AdminBlogResponse add(@AdminMember Member admin, @RequestBody BlogCreateRequest request) {
         return AdminBlogResponse.from(blogService.add(request.name(), request.domain(), request.rssUrl(), request.logoUrl()));
     }
 
+    @Override
     @PatchMapping("/{id}")
     public AdminBlogResponse update(@AdminMember Member admin, @PathVariable Long id,
                                     @RequestBody BlogUpdateRequest request) {
         return AdminBlogResponse.from(blogService.update(id, request.name(), request.rssUrl(), request.logoUrl()));
     }
 
+    @Override
     @PatchMapping("/{id}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivate(@AdminMember Member admin, @PathVariable Long id) {
         blogService.deactivate(id);
     }
 
+    @Override
     @PatchMapping("/{id}/activate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void activate(@AdminMember Member admin, @PathVariable Long id) {

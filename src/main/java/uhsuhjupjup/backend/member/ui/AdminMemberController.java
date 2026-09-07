@@ -14,10 +14,11 @@ import uhsuhjupjup.backend.member.domain.Member;
 @RestController
 @RequestMapping("/api/admin/members")
 @RequiredArgsConstructor
-public class AdminMemberController {
+public class AdminMemberController implements AdminMemberControllerApi {
 
     private final MemberService memberService;
 
+    @Override
     @DeleteMapping("/{id}/sessions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void forceLogout(@AdminMember Member admin, @PathVariable Long id) {

@@ -18,11 +18,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/runs")
 @RequiredArgsConstructor
-public class AdminRunController {
+public class AdminRunController implements AdminRunControllerApi {
 
     private final PipelineRunService pipelineRunService;
     private final PipelineScheduler pipelineScheduler;
 
+    @Override
     @GetMapping
     public List<PipelineRunResponse> list(@AdminMember Member admin,
                                           @RequestParam(defaultValue = "30") int limit) {
@@ -31,6 +32,7 @@ public class AdminRunController {
                 .toList();
     }
 
+    @Override
     @PostMapping("/notification")
     public NotificationResult triggerNotification(@AdminMember Member admin) {
         return pipelineScheduler.runNotificationNow();

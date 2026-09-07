@@ -12,15 +12,17 @@ import uhsuhjupjup.backend.member.domain.Member;
 @RestController
 @RequestMapping("/api/graph")
 @RequiredArgsConstructor
-public class GraphController {
+public class GraphController implements GraphControllerApi {
 
     private final GlobalGraphService globalGraphService;
 
+    @Override
     @GetMapping
     public NoteGraphResponse global() {
         return NoteGraphResponse.from(globalGraphService.globalGraph());
     }
 
+    @Override
     @GetMapping("/mine")
     public NoteGraphResponse mine(@LoginMember Member member) {
         return NoteGraphResponse.from(globalGraphService.graph(member.getId()));

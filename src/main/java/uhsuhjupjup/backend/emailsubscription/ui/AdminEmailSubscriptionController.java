@@ -14,10 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/email-subscriptions")
 @RequiredArgsConstructor
-public class AdminEmailSubscriptionController {
+public class AdminEmailSubscriptionController implements AdminEmailSubscriptionControllerApi {
 
     private final AdminEmailSubscriptionService adminEmailSubscriptionService;
 
+    @Override
     @GetMapping
     public List<AdminEmailSubscriberResponse> list(@AdminMember Member admin) {
         return adminEmailSubscriptionService.list();

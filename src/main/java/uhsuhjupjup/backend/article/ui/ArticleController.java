@@ -15,10 +15,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/articles")
 @RequiredArgsConstructor
-public class ArticleController {
+public class ArticleController implements ArticleControllerApi {
 
     private final ArticleService articleService;
 
+    @Override
     @GetMapping
     public ArticlePageResponse list(@RequestParam(required = false) List<Long> topicIds,
                                     @RequestParam(required = false) List<Long> keywordIds,
@@ -30,6 +31,7 @@ public class ArticleController {
                 articleService.search(blogId, keywordIds, topicIds, q, page, size));
     }
 
+    @Override
     @GetMapping("/{id}")
     public ArticleDetailResponse detail(@PathVariable Long id) {
         return ArticleDetailResponse.from(articleService.getDetail(id));

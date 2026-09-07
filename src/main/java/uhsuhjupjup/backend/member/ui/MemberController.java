@@ -17,21 +17,24 @@ import uhsuhjupjup.backend.common.auth.LoginMember;
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
-public class MemberController {
+public class MemberController implements MemberControllerApi {
 
     private final MemberService memberService;
 
+    @Override
     @GetMapping("/me")
     public MemberResponse me(@LoginMember Member member) {
         return MemberResponse.from(member);
     }
 
+    @Override
     @PostMapping("/me/consent")
     public ConsentResponse consent(@LoginMember Member member) {
         Member updated = memberService.consent(member.getId());
         return new ConsentResponse(updated.getConsentAt());
     }
 
+    @Override
     @DeleteMapping("/me/sessions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void logoutAll(@LoginMember Member member) {

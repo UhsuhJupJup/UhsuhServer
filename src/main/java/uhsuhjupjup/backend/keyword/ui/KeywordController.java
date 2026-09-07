@@ -15,10 +15,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/keywords")
 @RequiredArgsConstructor
-public class KeywordController {
+public class KeywordController implements KeywordControllerApi {
 
     private final KeywordService keywordService;
 
+    @Override
     @GetMapping
     public List<KeywordResponse> list(@RequestParam(required = false) String q,
                                       @RequestParam(required = false) Long topicId) {
@@ -27,6 +28,7 @@ public class KeywordController {
                 .toList();
     }
 
+    @Override
     @GetMapping("/{id}")
     public KeywordDetailResponse detail(@PathVariable Long id) {
         return KeywordDetailResponse.from(keywordService.getDetail(id));

@@ -15,10 +15,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/email-send-logs")
 @RequiredArgsConstructor
-public class AdminEmailSendLogController {
+public class AdminEmailSendLogController implements AdminEmailSendLogControllerApi {
 
     private final OutboxAdminService outboxAdminService;
 
+    @Override
     @GetMapping
     public List<AdminEmailSendLogResponse> list(@AdminMember Member admin,
                                                 @RequestParam(defaultValue = "50") int limit) {

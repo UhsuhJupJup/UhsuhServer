@@ -18,10 +18,11 @@ import uhsuhjupjup.backend.member.ui.dto.MemberResponse;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class AuthController implements AuthControllerApi {
 
     private final MemberService memberService;
 
+    @Override
     @PostMapping("/login")
     public MemberResponse login(@LoginAuthUser AuthUser authUser,
                                 @RequestBody(required = false) LoginRequest request) {

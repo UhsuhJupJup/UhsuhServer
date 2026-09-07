@@ -14,10 +14,11 @@ import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
-public class UnsubscribeController {
+public class UnsubscribeController implements UnsubscribeControllerApi {
 
     private final SubscriptionService subscriptionService;
 
+    @Override
     @GetMapping("/api/unsubscribe")
     public ResponseEntity<Void> unsubscribe(@RequestParam String token) {
         String redirect = subscriptionService.unsubscribeByTokenForLanding(token);
@@ -26,6 +27,7 @@ public class UnsubscribeController {
                 .build();
     }
 
+    @Override
     @PostMapping("/api/unsubscribe")
     public UnsubscribeResponse unsubscribeOneClick(@RequestParam String token) {
         subscriptionService.unsubscribeByToken(token);

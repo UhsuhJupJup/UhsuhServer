@@ -15,16 +15,18 @@ import uhsuhjupjup.backend.pipeline.notification.ui.dto.AdminOutboxResponse;
 @RestController
 @RequestMapping("/api/admin/outbox")
 @RequiredArgsConstructor
-public class AdminOutboxController {
+public class AdminOutboxController implements AdminOutboxControllerApi {
 
     private final OutboxAdminService outboxAdminService;
 
+    @Override
     @GetMapping
     public AdminOutboxResponse summary(@AdminMember Member admin,
                                        @RequestParam(defaultValue = "50") int failedLimit) {
         return AdminOutboxResponse.from(outboxAdminService.summary(failedLimit));
     }
 
+    @Override
     @PostMapping("/{id}/requeue")
     public void requeue(@AdminMember Member admin, @PathVariable Long id) {
         outboxAdminService.requeue(id);
