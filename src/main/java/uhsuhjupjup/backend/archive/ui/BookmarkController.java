@@ -17,21 +17,24 @@ import uhsuhjupjup.backend.member.domain.Member;
 @RestController
 @RequestMapping("/api/me/bookmarks")
 @RequiredArgsConstructor
-public class BookmarkController {
+public class BookmarkController implements BookmarkControllerApi {
 
     private final BookmarkService bookmarkService;
 
+    @Override
     @GetMapping
     public BookmarkedArticlesResponse myBookmarks(@LoginMember Member member) {
         return BookmarkedArticlesResponse.from(bookmarkService.getBookmarks(member.getId()));
     }
 
+    @Override
     @PostMapping("/{articleId}")
     @ResponseStatus(HttpStatus.CREATED)
     public void addBookmark(@LoginMember Member member, @PathVariable Long articleId) {
         bookmarkService.addBookmark(member, articleId);
     }
 
+    @Override
     @DeleteMapping("/{articleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeBookmark(@LoginMember Member member, @PathVariable Long articleId) {

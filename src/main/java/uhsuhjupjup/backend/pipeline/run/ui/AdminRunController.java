@@ -11,26 +11,25 @@ import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.PipelineScheduler;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
 import uhsuhjupjup.backend.pipeline.run.application.PipelineRunService;
-import uhsuhjupjup.backend.pipeline.run.ui.dto.PipelineRunResponse;
-
-import java.util.List;
+import uhsuhjupjup.backend.pipeline.run.ui.dto.PipelineRunPageResponse;
 
 @RestController
 @RequestMapping("/api/admin/runs")
 @RequiredArgsConstructor
-public class AdminRunController {
+public class AdminRunController implements AdminRunControllerApi {
 
     private final PipelineRunService pipelineRunService;
     private final PipelineScheduler pipelineScheduler;
 
+    @Override
     @GetMapping
-    public List<PipelineRunResponse> list(@AdminMember Member admin,
-                                          @RequestParam(defaultValue = "30") int limit) {
-        return pipelineRunService.recentRuns(limit).stream()
-                .map(PipelineRunResponse::from)
-                .toList();
+    public PipelineRunPageResponse list(@AdminMember Member admin,
+                                        @RequestParam(defaultValue = "0") int page,
+                                        @RequestParam(defaultValue = "20") int size) {
+        return PipelineRunPageResponse.from(pipelineRunService.runs(page, size));
     }
 
+    @Override
     @PostMapping("/notification")
     public NotificationResult triggerNotification(@AdminMember Member admin) {
         return pipelineScheduler.runNotificationNow();

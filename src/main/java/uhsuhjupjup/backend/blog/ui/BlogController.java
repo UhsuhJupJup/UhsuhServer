@@ -14,10 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/blogs")
 @RequiredArgsConstructor
-public class BlogController {
+public class BlogController implements BlogControllerApi {
 
     private final BlogService blogService;
 
+    @Override
     @GetMapping
     public List<BlogResponse> list() {
         return blogService.findActive().stream()
@@ -25,6 +26,7 @@ public class BlogController {
                 .toList();
     }
 
+    @Override
     @GetMapping("/{id}")
     public BlogDetailResponse detail(@PathVariable Long id) {
         return BlogDetailResponse.from(blogService.getDetail(id));

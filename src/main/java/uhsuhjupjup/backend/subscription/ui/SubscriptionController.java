@@ -18,21 +18,24 @@ import uhsuhjupjup.backend.subscription.ui.dto.SubscriptionsResponse;
 @RestController
 @RequestMapping("/api/subscriptions")
 @RequiredArgsConstructor
-public class SubscriptionController {
+public class SubscriptionController implements SubscriptionControllerApi {
 
     private final SubscriptionService subscriptionService;
 
+    @Override
     @GetMapping
     public SubscriptionsResponse mySubscriptions(@LoginMember Member member) {
         return SubscriptionsResponse.from(subscriptionService.getMySubscriptions(member.getId()));
     }
 
+    @Override
     @PutMapping
     public SubscriptionsResponse replace(@LoginMember Member member, @RequestBody SubscriptionUpdateRequest request) {
         return SubscriptionsResponse.from(
                 subscriptionService.replaceSubscriptions(member, request.topicIds(), request.keywordIds()));
     }
 
+    @Override
     @DeleteMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void unsubscribeAll(@LoginMember Member member) {

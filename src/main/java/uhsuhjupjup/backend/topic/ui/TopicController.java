@@ -14,10 +14,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/topics")
 @RequiredArgsConstructor
-public class TopicController {
+public class TopicController implements TopicControllerApi {
 
     private final TopicService topicService;
 
+    @Override
     @GetMapping
     public List<TopicResponse> list() {
         return topicService.findAll().stream()
@@ -25,6 +26,7 @@ public class TopicController {
                 .toList();
     }
 
+    @Override
     @GetMapping("/with-keywords")
     public List<TopicDetailResponse> listWithKeywords() {
         return topicService.findAllWithKeywords().stream()
@@ -32,6 +34,7 @@ public class TopicController {
                 .toList();
     }
 
+    @Override
     @GetMapping("/{id}")
     public TopicDetailResponse detail(@PathVariable Long id) {
         return TopicDetailResponse.from(topicService.getDetail(id));

@@ -27,18 +27,20 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/notes")
 @RequiredArgsConstructor
-public class NoteController {
+public class NoteController implements NoteControllerApi {
 
     private final NoteService noteService;
     private final NoteRecommendationService noteRecommendationService;
     private final NoteGraphService noteGraphService;
 
+    @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public NoteResponse create(@LoginMember Member member, @Valid @RequestBody NoteRequest request) {
         return NoteResponse.from(noteService.create(member, request.title(), request.content()));
     }
 
+    @Override
     @GetMapping
     public List<NoteResponse> list(@LoginMember Member member) {
         return noteService.findSummaries(member.getId()).stream()
@@ -46,28 +48,33 @@ public class NoteController {
                 .toList();
     }
 
+    @Override
     @GetMapping("/{id}")
     public NoteResponse get(@LoginMember Member member, @PathVariable Long id) {
         return NoteResponse.from(noteService.getDetail(id, member.getId()));
     }
 
+    @Override
     @PutMapping("/{id}")
     public NoteResponse update(@LoginMember Member member, @PathVariable Long id,
                                @Valid @RequestBody NoteRequest request) {
         return NoteResponse.from(noteService.update(id, member.getId(), request.title(), request.content()));
     }
 
+    @Override
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@LoginMember Member member, @PathVariable Long id) {
         noteService.delete(id, member.getId());
     }
 
+    @Override
     @GetMapping("/{id}/recommendations")
     public NoteRecommendationResponse recommendations(@LoginMember Member member, @PathVariable Long id) {
         return NoteRecommendationResponse.from(noteRecommendationService.recommend(id, member.getId()));
     }
 
+    @Override
     @GetMapping("/{id}/graph")
     public NoteGraphResponse graph(@LoginMember Member member, @PathVariable Long id) {
         return NoteGraphResponse.from(noteGraphService.graph(id, member.getId()));
