@@ -6,11 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
+import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailSendDailySummary;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.OutboxStatusSummary;
 import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
 import uhsuhjupjup.backend.pipeline.notification.domain.OutboxStatus;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationOutboxRepository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +36,21 @@ public class OutboxAdminService {
     public List<NotificationOutbox> recentSent(int limit) {
         return notificationOutboxRepository.findByStatusOrderBySentAtDesc(
                 OutboxStatus.SENT, PageRequest.of(0, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationOutbox> sentOn(LocalDate date) {
+        LocalDateTime from = date.atStartOfDay();
+        LocalDateTime to = date.plusDays(1).atStartOfDay();
+        return notificationOutboxRepository.findByStatusAndSentAtGreaterThanEqualAndSentAtLessThanOrderBySentAtDesc(
+                OutboxStatus.SENT, from, to);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EmailSendDailySummary> dailySummary() {
+        return notificationOutboxRepository.findDailySentSummary().stream()
+                .map(EmailSendDailySummary::from)
+                .toList();
     }
 
     @Transactional

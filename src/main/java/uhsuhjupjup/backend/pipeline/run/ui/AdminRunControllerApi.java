@@ -10,11 +10,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationResult;
-import uhsuhjupjup.backend.pipeline.run.ui.dto.PipelineRunResponse;
+import uhsuhjupjup.backend.pipeline.run.ui.dto.PipelineRunPageResponse;
 
-import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import uhsuhjupjup.backend.common.exception.ErrorResponse;
 
 @Tag(name = "관리자 - 파이프라인", description = """
@@ -50,7 +48,7 @@ public interface AdminRunControllerApi {
             security = @SecurityRequirement(name = "firebaseIdToken"))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PipelineRunResponse.class)))),
+                    content = @Content(schema = @Schema(implementation = PipelineRunPageResponse.class))),
             @ApiResponse(
                     responseCode = "403",
                     description = "ADMIN 권한 없음",
@@ -66,8 +64,9 @@ public interface AdminRunControllerApi {
                                     }
                                     """)))
     })
-    List<PipelineRunResponse> list(@Parameter(hidden = true) Member admin,
-                                   @Parameter(description = "가져올 최대 건수. 기본 30", example = "30") int limit);
+    PipelineRunPageResponse list(@Parameter(hidden = true) Member admin,
+                                 @Parameter(description = "페이지 번호. 0부터 시작, 기본 0", example = "0") int page,
+                                 @Parameter(description = "페이지 크기. 기본 20", example = "20") int size);
 
     @Operation(
             summary = "알림 발송 즉시 실행",

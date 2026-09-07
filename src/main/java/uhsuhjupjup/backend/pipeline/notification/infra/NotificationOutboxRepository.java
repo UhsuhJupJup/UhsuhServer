@@ -18,6 +18,20 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
 
     List<NotificationOutbox> findByStatusOrderBySentAtDesc(OutboxStatus status, Pageable pageable);
 
+    List<NotificationOutbox> findByStatusAndSentAtGreaterThanEqualAndSentAtLessThanOrderBySentAtDesc(
+            OutboxStatus status, LocalDateTime from, LocalDateTime to);
+
+    @Query(value = "select date_format(sent_at, '%Y-%m-%d') as logDate,"
+            + " min(sent_at) as firstSentAt,"
+            + " count(*) as total,"
+            + " cast(sum(recipient_type = 'MEMBER') as signed) as memberCount,"
+            + " cast(sum(recipient_type = 'EMAIL_SUBSCRIBER') as signed) as subscriberCount"
+            + " from notification_outbox"
+            + " where status = 'SENT'"
+            + " group by date_format(sent_at, '%Y-%m-%d')"
+            + " order by logDate desc", nativeQuery = true)
+    List<NotificationOutboxDailyRow> findDailySentSummary();
+
     @Query("select o from NotificationOutbox o"
             + " where o.status = :status and o.nextAttemptAt <= :now"
             + " order by o.nextAttemptAt asc")
