@@ -42,3 +42,9 @@ mail:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}

@@ -41,6 +41,17 @@ outbox:
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
   lock-at-most-for: ${OUTBOX_LOCK_AT_MOST_FOR:PT5M}
 
+springdoc:
+  default-produces-media-type: application/json
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    doc-expansion: none
+
 management:
   endpoints:
     web:
