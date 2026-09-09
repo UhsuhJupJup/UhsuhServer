@@ -3,16 +3,12 @@ package uhsuhjupjup.backend.pipeline.notification.infra;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.blog.infra.BlogRepository;
-import uhsuhjupjup.backend.config.JpaAuditingConfig;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscription;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
@@ -21,17 +17,15 @@ import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailRecipientPair;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
-class NotificationEmailRecipientQueryTest extends MySqlTestSupport {
+@MySqlDataJpaTest
+class NotificationEmailRecipientQueryTest {
 
     @Autowired
     private NotificationRepository notificationRepository;

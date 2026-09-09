@@ -3,17 +3,13 @@ package uhsuhjupjup.backend.subscription.infra;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
-import uhsuhjupjup.backend.config.JpaAuditingConfig;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
 import uhsuhjupjup.backend.subscription.domain.TopicSubscription;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 import uhsuhjupjup.backend.topic.domain.Topic;
 import uhsuhjupjup.backend.topic.infra.TopicRepository;
 
@@ -21,10 +17,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
-class SubscriptionRepositoryTest extends MySqlTestSupport {
+@MySqlDataJpaTest
+class SubscriptionRepositoryTest {
 
     @Autowired
     private TopicSubscriptionRepository topicSubscriptionRepository;

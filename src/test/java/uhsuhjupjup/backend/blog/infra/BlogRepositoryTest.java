@@ -2,21 +2,15 @@ package uhsuhjupjup.backend.blog.infra;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import uhsuhjupjup.backend.blog.domain.Blog;
-import uhsuhjupjup.backend.config.JpaAuditingConfig;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
-class BlogRepositoryTest extends MySqlTestSupport {
+@MySqlDataJpaTest
+class BlogRepositoryTest {
 
     @Autowired
     private BlogRepository blogRepository;

@@ -3,19 +3,15 @@ package uhsuhjupjup.backend.article.infra;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.blog.infra.BlogRepository;
-import uhsuhjupjup.backend.config.JpaAuditingConfig;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 import uhsuhjupjup.backend.topic.domain.Topic;
 import uhsuhjupjup.backend.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
@@ -26,10 +22,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
-class ArticleRepositoryTest extends MySqlTestSupport {
+@MySqlDataJpaTest
+class ArticleRepositoryTest {
 
     @Autowired
     private ArticleRepository articleRepository;

@@ -7,13 +7,12 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
 import uhsuhjupjup.backend.pipeline.run.application.PipelineRunRecorder;
+import uhsuhjupjup.backend.support.SharedTestContainers;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,12 +25,9 @@ import static org.mockito.Mockito.mock;
  * 분산락이 다중 인스턴스의 스케줄러 중복 실행을 막는지 검증.
  * 실제 Redis(Testcontainers)에 두 개의 RedisLockRegistry(= 두 인스턴스)를 붙여 동시 실행시킨다.
  */
-@Testcontainers
 class PipelineSchedulerLockTest {
 
-    @Container
-    static final GenericContainer<?> REDIS =
-            new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = SharedTestContainers.redis();
 
     static LettuceConnectionFactory connectionFactory;
 
