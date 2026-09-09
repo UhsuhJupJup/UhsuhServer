@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  verify-source-branch:
+  check-source:
     runs-on: ubuntu-latest
     steps:
       - name: 소스 브랜치가 develop 또는 hotfix 인지 확인
