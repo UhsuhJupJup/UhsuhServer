@@ -1,0 +1,21 @@
+name: Guard main branch
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 소스 브랜치가 develop 또는 hotfix 인지 확인
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          echo "PR 소스 브랜치: $HEAD_BRANCH"
+          if [ "$HEAD_BRANCH" = "develop" ] || [ "$HEAD_BRANCH" = "hotfix" ] || [[ "$HEAD_BRANCH" == hotfix/* ]]; then
+            echo "허용된 소스 브랜치입니다: $HEAD_BRANCH"
+          else
+            echo "::error::main 브랜치는 develop 또는 hotfix(/*)에서만 병합할 수 있습니다. 현재 소스: $HEAD_BRANCH"
+            exit 1
+          fi
