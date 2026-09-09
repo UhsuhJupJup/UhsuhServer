@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,7 +19,7 @@ import uhsuhjupjup.backend.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 import uhsuhjupjup.backend.topic.domain.Topic;
 import uhsuhjupjup.backend.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
@@ -34,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class ArticleIntegrationTest extends MySqlTestSupport {
+@Import(SharedMySqlTestConfiguration.class)
+class ArticleIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;

@@ -16,8 +16,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import uhsuhjupjup.backend.support.SharedTestContainers;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -31,12 +30,9 @@ import static org.awaitility.Awaitility.await;
  * 실제 Redis(Testcontainers)에 두 개의 TwoLevelCacheManager(= 두 인스턴스)를 붙여
  * 공유 L2와 Pub/Sub 무효화 전파를 검증한다.
  */
-@Testcontainers
 class TwoLevelCachePropagationTest {
 
-    @Container
-    static final GenericContainer<?> REDIS =
-            new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
+    static final GenericContainer<?> REDIS = SharedTestContainers.redis();
 
     static LettuceConnectionFactory cf;
 

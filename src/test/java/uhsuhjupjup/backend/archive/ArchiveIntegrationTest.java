@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,7 +24,7 @@ import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;
 
@@ -39,7 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class ArchiveIntegrationTest extends MySqlTestSupport {
+@Import(SharedMySqlTestConfiguration.class)
+class ArchiveIntegrationTest {
 
     private static final String BEARER = "Bearer test-token";
 

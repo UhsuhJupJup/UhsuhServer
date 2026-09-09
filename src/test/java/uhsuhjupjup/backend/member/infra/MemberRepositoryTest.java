@@ -2,14 +2,10 @@ package uhsuhjupjup.backend.member.infra;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-import uhsuhjupjup.backend.config.JpaAuditingConfig;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -17,10 +13,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(JpaAuditingConfig.class)
-class MemberRepositoryTest extends MySqlTestSupport {
+@MySqlDataJpaTest
+class MemberRepositoryTest {
 
     @Autowired
     private MemberRepository memberRepository;

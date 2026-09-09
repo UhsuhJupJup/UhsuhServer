@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -25,7 +26,7 @@ import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;
 
@@ -38,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class EmailSubscriptionClaimIntegrationTest extends MySqlTestSupport {
+@Import(SharedMySqlTestConfiguration.class)
+class EmailSubscriptionClaimIntegrationTest {
 
     @Autowired
     private MemberService memberService;

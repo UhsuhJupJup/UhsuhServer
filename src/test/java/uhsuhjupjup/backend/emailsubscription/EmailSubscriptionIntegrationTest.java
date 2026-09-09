@@ -7,14 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.utility.DockerImageName;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
@@ -25,7 +22,7 @@ import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.pipeline.notification.application.EmailSender;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
-import uhsuhjupjup.backend.support.MySqlTestSupport;
+import uhsuhjupjup.backend.support.RedisTestConfiguration;
 
 import java.util.List;
 import java.util.regex.Matcher;
@@ -51,22 +48,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
-class EmailSubscriptionIntegrationTest extends MySqlTestSupport {
+@Import(RedisTestConfiguration.class)
+class EmailSubscriptionIntegrationTest {
 
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("token=([0-9a-fA-F-]{36})");
-
-    private static final GenericContainer<?> REDIS =
-            new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
-
-    static {
-        REDIS.start();
-    }
-
-    @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-    }
 
     @Autowired
     private MockMvc mockMvc;
