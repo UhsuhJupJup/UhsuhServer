@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.subscription.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -50,6 +52,8 @@ public class SubscriptionService {
         requireConsent(member);
         syncTopics(member, loadTopics(topicIds));
         syncKeywords(member, loadKeywords(keywordIds));
+        log.info("회원 구독 교체 memberId={} topics={} keywords={}",
+                member.getId(), topicIds.size(), keywordIds.size());
         return getMySubscriptions(member.getId());
     }
 
@@ -113,6 +117,7 @@ public class SubscriptionService {
     public void unsubscribeAll(Long memberId) {
         topicSubscriptionRepository.deleteByMemberId(memberId);
         keywordSubscriptionRepository.deleteByMemberId(memberId);
+        log.info("회원 구독 전체 해지 memberId={}", memberId);
     }
 
     @Transactional
@@ -133,13 +138,18 @@ public class SubscriptionService {
             Long memberId = member.get().getId();
             topicSubscriptionRepository.deleteByMemberId(memberId);
             keywordSubscriptionRepository.deleteByMemberId(memberId);
+            log.info("메일 링크 구독 해지 대상=회원 memberId={}", memberId);
             return true;
         }
         return emailSubscriberRepository.findByUnsubscribeToken(token)
                 .map(subscriber -> {
                     emailSubscriberRepository.delete(subscriber);
+                    log.info("메일 링크 구독 해지 대상=비회원 subscriberId={}", subscriber.getId());
                     return true;
                 })
-                .orElse(false);
+                .orElseGet(() -> {
+                    log.info("메일 링크 구독 해지 실패 사유=토큰무효");
+                    return false;
+                });
     }
 }

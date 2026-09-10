@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.emailsubscription.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
@@ -10,6 +11,7 @@ import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
 import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailSubscriptionClaimService {
@@ -36,6 +38,7 @@ public class EmailSubscriptionClaimService {
             // 비회원 구독·구독자 삭제(관리 엔티티가 삭제될 구독자를 참조하지 않도록 명시 삭제)
             emailSubscriptionRepository.deleteByEmailSubscriberId(subscriberId);
             emailSubscriberRepository.delete(subscriber);
+            log.info("비회원 구독 흡수 memberId={} subscriberId={}", member.getId(), subscriberId);
         });
     }
 }

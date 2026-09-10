@@ -16,6 +16,7 @@ import uhsuhjupjup.backend.pipeline.notification.application.dto.NotificationRes
 import uhsuhjupjup.backend.pipeline.run.application.PipelineRunRecorder;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 
@@ -89,9 +90,13 @@ public class PipelineScheduler {
             return null;
         }
 
+        log.info("파이프라인 시작 job={}", key);
+        long startedAt = System.nanoTime();
         try {
             return task.get();
         } finally {
+            log.info("파이프라인 종료 job={} 소요={}ms", key,
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
             lock.unlock();
         }
     }

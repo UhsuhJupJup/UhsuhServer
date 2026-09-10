@@ -48,3 +48,16 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
   swagger-ui:
     enabled: ${SWAGGER_ENABLED:false}
+
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: uhsuhjupjup-backend
+        environment: prod
+        node-name: ${INSTANCE_NAME:unknown}
+  level:
+    root: INFO
+    uhsuhjupjup.backend: INFO

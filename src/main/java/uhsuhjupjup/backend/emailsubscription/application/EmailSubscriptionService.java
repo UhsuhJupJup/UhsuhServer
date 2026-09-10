@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.emailsubscription.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailSubscriptionService {
@@ -71,6 +73,8 @@ public class EmailSubscriptionService {
 
         String token = verificationTokens.issue(subscriber.getId(), VERIFY_TTL);
         sendConfirmationEmail(subscriber.getEmail(), token);
+        log.info("비회원 구독 등록, 확인 메일 발송 subscriberId={} keywords={}",
+                subscriber.getId(), keywords.size());
     }
 
     /**
@@ -81,14 +85,19 @@ public class EmailSubscriptionService {
     public String confirm(String token) {
         Optional<Long> subscriberId = verificationTokens.consume(token);
         if (subscriberId.isEmpty()) {
+            log.info("비회원 구독 인증 실패 사유=토큰무효");
             return confirmRedirectUrl + "?verify=failed";
         }
         return emailSubscriberRepository.findById(subscriberId.get())
                 .map(subscriber -> {
                     subscriber.verify(LocalDateTime.now());
+                    log.info("비회원 구독 인증 완료 subscriberId={}", subscriber.getId());
                     return confirmRedirectUrl + "?verify=success";
                 })
-                .orElse(confirmRedirectUrl + "?verify=failed");
+                .orElseGet(() -> {
+                    log.info("비회원 구독 인증 실패 사유=구독자없음 subscriberId={}", subscriberId.get());
+                    return confirmRedirectUrl + "?verify=failed";
+                });
     }
 
     /**
@@ -98,10 +107,11 @@ public class EmailSubscriptionService {
     public void requestManageLink(String email) {
         emailSubscriberRepository.findByEmail(email)
                 .filter(EmailSubscriber::isVerified)
-                .ifPresent(subscriber -> {
+                .ifPresentOrElse(subscriber -> {
                     String token = manageLinkTokens.issue(subscriber.getId(), MANAGE_TTL);
                     sendManageLinkEmail(subscriber.getEmail(), token);
-                });
+                    log.info("관리 링크 발송 subscriberId={}", subscriber.getId());
+                }, () -> log.info("관리 링크 요청, 대상 없음"));
     }
 
     /** 관리 토큰으로 현재 구독 키워드를 조회한다(삭제 없이 peek). */
@@ -122,6 +132,7 @@ public class EmailSubscriptionService {
         EmailSubscriber subscriber = resolveManaged(token);
         List<Keyword> keywords = findKeywordsOrThrow(keywordIds);
         replaceSubscriptions(subscriber, keywords);
+        log.info("비회원 구독 변경 subscriberId={} keywords={}", subscriber.getId(), keywords.size());
     }
 
     private EmailSubscriber resolveManaged(String token) {

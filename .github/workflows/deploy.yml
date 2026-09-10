@@ -72,7 +72,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/deploy/docker-compose.data.yml
+          source: backend/deploy/docker-compose.data.yml,backend/deploy/alloy/config.data.alloy
           target: /opt/uhsuh/
           strip_components: 2
 
@@ -93,6 +93,11 @@ jobs:
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            GRAFANA_CLOUD_LOKI_URL=${{ secrets.GRAFANA_CLOUD_LOKI_URL }}
+            GRAFANA_CLOUD_LOKI_USER=${{ secrets.GRAFANA_CLOUD_LOKI_USER }}
+            GRAFANA_CLOUD_PROM_URL=${{ secrets.GRAFANA_CLOUD_PROM_URL }}
+            GRAFANA_CLOUD_PROM_USER=${{ secrets.GRAFANA_CLOUD_PROM_USER }}
+            GRAFANA_CLOUD_TOKEN=${{ secrets.GRAFANA_CLOUD_TOKEN }}
             EOF
             chmod 600 .env
 
@@ -110,7 +115,11 @@ jobs:
       packages: read
     strategy:
       matrix:
-        host_secret: [APP1_HOST, APP2_HOST]
+        include:
+          - host_secret: APP1_HOST
+            instance_name: app1
+          - host_secret: APP2_HOST
+            instance_name: app2
     steps:
       - uses: actions/checkout@v4
 
@@ -120,7 +129,7 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/deploy/docker-compose.app.yml
+          source: backend/deploy/docker-compose.app.yml,backend/deploy/alloy/config.app.alloy
           target: /opt/uhsuh/
           strip_components: 2
 
@@ -135,12 +144,18 @@ jobs:
 
             cat > .env <<EOF
             DATA_HOST=${{ secrets.DATA_HOST }}
+            INSTANCE_NAME=${{ matrix.instance_name }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            GRAFANA_CLOUD_LOKI_URL=${{ secrets.GRAFANA_CLOUD_LOKI_URL }}
+            GRAFANA_CLOUD_LOKI_USER=${{ secrets.GRAFANA_CLOUD_LOKI_USER }}
+            GRAFANA_CLOUD_PROM_URL=${{ secrets.GRAFANA_CLOUD_PROM_URL }}
+            GRAFANA_CLOUD_PROM_USER=${{ secrets.GRAFANA_CLOUD_PROM_USER }}
+            GRAFANA_CLOUD_TOKEN=${{ secrets.GRAFANA_CLOUD_TOKEN }}
             EOF
             chmod 600 .env
 

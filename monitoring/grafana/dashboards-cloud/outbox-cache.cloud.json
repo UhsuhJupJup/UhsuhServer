@@ -1,0 +1,854 @@
+{
+  "title": "어서줍줍 · 아웃박스 & 캐시",
+  "uid": "uhsuh-outbox-cache",
+  "tags": [
+    "uhsuhjupjup",
+    "outbox",
+    "dlq",
+    "cache"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "refresh": 1,
+        "regex": "",
+        "label": "Data source"
+      },
+      {
+        "name": "instance",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{job=\"uhsuhjupjup-backend\"}, instance)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": null,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0,
+        "sort": 1,
+        "label": "instance"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "📮 아웃박스 / DLQ",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "🔴 DLQ 격리 (FAILED)",
+      "description": "notification_outbox_failed — 최대 재시도 초과로 격리된(dead-letter) 알림 수. 0이 정상. 1 이상이면 조용한 유실 위험 → 관리자에서 requeue 필요.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 100,
+      "targets": [
+        {
+          "expr": "max(notification_outbox_failed{job=\"uhsuhjupjup-backend\"})",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "🟡 발송 대기 (PENDING)",
+      "description": "notification_outbox_pending — 아직 발송 안 된 큐 행. 08:00 버스트 직후 잠깐 오르는 건 정상, 계속 높으면 폴러/발송 정체.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 101,
+      "targets": [
+        {
+          "expr": "max(notification_outbox_pending{job=\"uhsuhjupjup-backend\"})",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "아웃박스 상태 추이 (pending / failed)",
+      "description": "발송 큐(PENDING)와 DLQ(FAILED)의 시간 추이. FAILED가 0에서 올라오면 발송 지속 실패 신호. (DB 기반 게이지라 인스턴스 무관 max)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 102,
+      "targets": [
+        {
+          "expr": "max(notification_outbox_pending{job=\"uhsuhjupjup-backend\"})",
+          "refId": "A",
+          "legendFormat": "대기 (PENDING)"
+        },
+        {
+          "expr": "max(notification_outbox_failed{job=\"uhsuhjupjup-backend\"})",
+          "refId": "B",
+          "legendFormat": "격리 (FAILED)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "대기 (PENDING)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "격리 (FAILED)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "row",
+      "title": "♻️ 2단 캐시 (L1 Caffeine / L2 Redis)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 2,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "keywordArticles 히트율 %",
+      "description": "keywordArticles 캐시 적중률 hit/(hit+miss), 5분. 높을수록 좋음.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 8
+      },
+      "id": 200,
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"}[5m])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "max": 100,
+          "min": 0
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "keywordArticles L1 흡수율 %",
+      "description": "전체 조회 중 L1(Caffeine)에서 바로 해결된 비율. L1이 얼마나 L2/DB 부하를 막아주는지.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 8
+      },
+      "id": 201,
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", tier=\"l1\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"}[5m])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "max": 100,
+          "min": 0
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "keywordArticles 점유 (/ 2000)",
+      "description": "현재 L1 캐시 엔트리 수 cache_size (인스턴스 최대). 상한 2000(maximumSize) 근처면 축출 발생.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 8
+      },
+      "id": 202,
+      "targets": [
+        {
+          "expr": "max(cache_size{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"})",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1600
+              },
+              {
+                "color": "red",
+                "value": 2000
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "keywordArticles 계층별 조회율 (L1 / L2 / origin)",
+      "description": "초당 조회를 L1 적중 / L2 적중 / origin(미스=DB 로드)로 분해. origin이 크면 캐시가 못 막는 것.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 203,
+      "targets": [
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", tier=\"l1\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "L1 적중"
+        },
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", tier=\"l2\"}[5m]))",
+          "refId": "B",
+          "legendFormat": "L2 적중"
+        },
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", tier=\"origin\"}[5m]))",
+          "refId": "C",
+          "legendFormat": "origin (미스)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "L1 적중"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "L2 적중"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "origin (미스)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "stat",
+      "title": "globalGraph 히트율 %",
+      "description": "globalGraph 캐시 적중률 hit/(hit+miss), 5분. 높을수록 좋음.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 8
+      },
+      "id": 210,
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\", result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\"}[5m])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          },
+          "max": 100,
+          "min": 0
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "globalGraph L1 흡수율 %",
+      "description": "전체 조회 중 L1(Caffeine)에서 바로 해결된 비율. L1이 얼마나 L2/DB 부하를 막아주는지.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 8
+      },
+      "id": 211,
+      "targets": [
+        {
+          "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\", tier=\"l1\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\"}[5m])), 0.001)",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "max": 100,
+          "min": 0
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "globalGraph 점유 (/ 4)",
+      "description": "현재 L1 캐시 엔트리 수 cache_size (인스턴스 최대). 상한 4(maximumSize) 근처면 축출 발생.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 8
+      },
+      "id": 212,
+      "targets": [
+        {
+          "expr": "max(cache_size{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\"})",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 4
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "globalGraph 계층별 조회율 (L1 / L2 / origin)",
+      "description": "초당 조회를 L1 적중 / L2 적중 / origin(미스=DB 로드)로 분해. origin이 크면 캐시가 못 막는 것.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 213,
+      "targets": [
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\", tier=\"l1\"}[5m]))",
+          "refId": "A",
+          "legendFormat": "L1 적중"
+        },
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\", tier=\"l2\"}[5m]))",
+          "refId": "B",
+          "legendFormat": "L2 적중"
+        },
+        {
+          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"globalGraph\", tier=\"origin\"}[5m]))",
+          "refId": "C",
+          "legendFormat": "origin (미스)"
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 18,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "L1 적중"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "L2 적중"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "super-light-yellow"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "origin (미스)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
