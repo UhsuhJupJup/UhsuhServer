@@ -32,6 +32,24 @@ jobs:
         working-directory: backend
         run: ./gradlew build --no-daemon
 
+      # 배포되는 관측 설정을 미리 검증한다. 깨진 설정이 프로덕션에 도달하지 않게 막는다.
+      - name: Validate monitoring configs
+        run: |
+          docker run --rm --entrypoint promtool \
+            -v "$PWD/backend/monitoring/prometheus:/w:ro" prom/prometheus:latest \
+            check config /w/prometheus.cloud.yml
+
+          for cfg in config.app.alloy config.data.alloy; do
+            docker run --rm -v "$PWD/backend/deploy/alloy:/etc/alloy:ro" \
+              -e INSTANCE_NAME=ci \
+              -e GRAFANA_CLOUD_LOKI_URL=https://example.invalid/loki/api/v1/push \
+              -e GRAFANA_CLOUD_LOKI_USER=0 \
+              -e GRAFANA_CLOUD_PROM_URL=https://example.invalid/api/prom/push \
+              -e GRAFANA_CLOUD_PROM_USER=0 \
+              -e GRAFANA_CLOUD_TOKEN=ci \
+              grafana/alloy:v1.10.0 validate "/etc/alloy/$cfg"
+          done
+
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
@@ -76,6 +94,18 @@ jobs:
           target: /opt/uhsuh/
           strip_components: 2
 
+      # monitoring/ 은 경로 깊이가 달라 strip_components 를 1로 둔 별도 단계로 보낸다.
+      # .env 와 prometheus/gc_token 은 레포에 없으므로 박스의 기존 파일이 유지된다.
+      - name: Copy monitoring config to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: backend/monitoring/docker-compose.grafana-cloud.yml,backend/monitoring/prometheus/prometheus.cloud.yml
+          target: /opt/uhsuh/
+          strip_components: 1
+
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -105,6 +135,13 @@ jobs:
 
             docker compose -f docker-compose.data.yml pull
             docker compose -f docker-compose.data.yml up -d
+
+            cd /opt/uhsuh/monitoring
+            docker compose -f docker-compose.grafana-cloud.yml up -d
+            # 설정 파일은 바인드 마운트라 컨테이너 재생성으로는 반영되지 않는다. SIGHUP 으로 리로드한다.
+            # 설정이 잘못되면 Prometheus 는 기존 설정을 유지하고 에러만 남긴다(죽지 않는다).
+            docker kill -s HUP uhsuh-prom-agent || true
+
             docker image prune -f
 
   deploy-app:

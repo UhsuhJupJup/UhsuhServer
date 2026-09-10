@@ -40,7 +40,7 @@ Proposed
 - (=) 운영 로그를 구조화(ECS JSON)로 바꾼다. Spring Boot 3.5의 내장 구조화 로깅을 쓰므로 추가 의존성은 없다. 로컬은 평문을 유지한다.
 - (=) **Alloy 파싱 규칙이 Boot의 ECS 출력 모양에 묶인다.** 실측 결과 레벨은 평평한 `"log.level"` 키가 아니라 중첩된 `{"log":{"level":"WARN"}}`이고, MDC 값은 최상위 키로 실린다. Boot가 이 모양을 바꾸면 `level` 라벨이 조용히 비므로 계약 테스트로 고정한다.
 - (=) 에이전트 실제 메모리 사용량은 도입 후 실측해 채운다. 이 문서에는 추정치를 적지 않는다.
-- (=) **모니터링 설정 드리프트는 남는다.** `monitoring/`은 여전히 CI 배포 대상이 아니라 데이터 박스에서 손으로 고쳐야 하고, 레포와 다시 갈라질 수 있다. CI 배포에 포함시키는 것이 근본 해결이다.
+- (=) **모니터링 설정을 CI 배포에 포함시켰다.** 레포와 박스의 드리프트가 이 ADR을 쓸 때 오판의 원인이었으므로, `monitoring/prometheus.cloud.yml`과 `docker-compose.grafana-cloud.yml`을 데이터 박스 배포 단계에서 함께 전송하고 `SIGHUP`으로 리로드한다. `.env`와 `prometheus/gc_token`은 레포에 없어 박스의 기존 파일이 유지된다.
 - 재검토: 무료 티어 한도를 반복해 넘거나, 전문 검색·복잡한 집계가 필요해지면 보존기간 축소 또는 다른 백엔드를 다시 검토한다. 앱 박스를 t3.small로 올리면 힙 320m 제약은 해제한다.
 
 ## Compliance
@@ -49,5 +49,5 @@ Proposed
 - Grafana에서 `{instance="app1"}`과 `{instance="app2"}`가 각각 조회되는지, 같은 `requestId`로 한 요청의 로그가 이어지는지 확인한다.
 - 앱 박스에서 힙 조정 후 `jvm_memory_used_bytes`와 OS 여유 메모리를 관찰한다.
 - `EcsLogFormatContractTest`가 ECS 출력의 `log.level` 중첩 경로와 최상위 MDC 키를 검증한다. 이 테스트가 깨지면 Alloy `stage.json`도 함께 고쳐야 한다.
-- `alloy validate`로 두 설정 파일을 확인했다(`config.app.alloy`, `config.data.alloy`).
+- 배포 파이프라인의 `test` 잡이 `promtool check config`와 `alloy validate`로 관측 설정을 검증한다. 깨진 설정은 배포에 도달하지 못한다.
 - 대시보드의 LogQL은 `| json` 전체 추출이 아니라 **필요 필드만 명시 추출**한다. ECS의 `service.name`이 Loki 내장 `service_name` 라벨과 충돌해 추출 결과가 비결정적으로 손실되는 것을 실측으로 확인했다(전체 추출 8회 중 1회만 정상, 명시 추출 8/8).
