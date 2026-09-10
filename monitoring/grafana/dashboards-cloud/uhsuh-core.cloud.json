@@ -1184,15 +1184,15 @@
     },
     {
       "type": "logs",
-      "title": "ERROR 로그 (5xx, 미처리 예외)",
+      "title": "전체 앱 로그 (필터 없음)",
       "id": 19,
       "datasource": {
         "type": "loki",
         "uid": "${loki}"
       },
-      "description": "requestId 로 같은 요청의 스택트레이스와 상태코드 줄을 묶어 볼 수 있다. 사용자가 알려준 X-Request-Id 를 검색창에 넣으면 바로 찾는다.",
+      "description": "아무것도 거르지 않는다. 수집이 살아있는지 확인하는 기준 패널이다. 다른 패널이 비어 있을 때 여기까지 비면 파이프라인 문제, 여기만 차 있으면 조건에 맞는 로그가 없는 것뿐이다.",
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 24,
         "x": 0,
         "y": 41
@@ -1200,7 +1200,81 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\", level=\"ERROR\"} | json | line_format \"[{{.instance}}] {{.requestId}} {{.message}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} | json msg=\"message\", lvl=\"log.level\" | line_format \"[{{.instance}}] {{.lvl}} {{.msg}}\"",
+          "queryType": "range",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki}"
+          }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "오류 요청 (4xx, 5xx)",
+      "id": 20,
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "description": "요청 로그만 골라 본다. 4xx 는 INFO, 5xx 는 ERROR 라 레벨 필터로는 함께 볼 수 없어 로거로 거른다.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} | json msg=\"message\", rid=\"requestId\", lg=\"log.logger\" | lg = \"uhsuhjupjup.backend.common.logging.RequestLoggingFilter\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
+          "queryType": "range",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki}"
+          }
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "ERROR 로그 (5xx, 미처리 예외)",
+      "id": 21,
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "description": "requestId 로 같은 요청의 스택트레이스와 상태코드 줄을 묶어 볼 수 있다. 사용자가 알려준 X-Request-Id 를 검색창에 넣으면 바로 찾는다.",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\", level=\"ERROR\"} | json msg=\"message\", rid=\"requestId\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1222,7 +1296,7 @@
     {
       "type": "logs",
       "title": "파이프라인 배치",
-      "id": 20,
+      "id": 22,
       "datasource": {
         "type": "loki",
         "uid": "${loki}"
@@ -1232,12 +1306,12 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 50
+        "y": 65
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"파이프라인|수집 완료|매칭 완료|적재 완료|아웃박스\" | json | line_format \"[{{.instance}}] {{.message}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"파이프라인|수집 완료|매칭 완료|적재 완료|아웃박스\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1259,7 +1333,7 @@
     {
       "type": "logs",
       "title": "구독 이벤트 (회원, 비회원)",
-      "id": 21,
+      "id": 23,
       "datasource": {
         "type": "loki",
         "uid": "${loki}"
@@ -1269,12 +1343,12 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 50
+        "y": 65
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"구독|관리 링크\" | json | line_format \"[{{.instance}}] {{.message}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"구독|관리 링크\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
