@@ -16,6 +16,7 @@ ADR은 코드만으로 알기 어려운 **기술 결정의 이유와 감수한 �
 | [0006](0006-dlq-error-classification-retry-horizon.md) | DLQ + 오류 분류 + 재시도 지평 | Accepted | status=FAILED, 영구/일시 분류, ~6h 재시도, Grafana 알림 |
 | [0007](0007-silent-loss-mitigation-loud-over-selfheal.md) | 조용한 유실 대응 B안 채택, A안 보류 | Accepted | 재시도+알림으로 무음 유실 제거, 자가치유(A)는 보류 |
 | [0008](0008-drop-email-send-log-sent-as-history.md) | email_send_log 제거, SENT=이력 | Accepted | 파생 로그를 아웃박스 상태 전이로 흡수 |
+| [0009](0009-centralize-logs-to-grafana-cloud-loki.md) | 로그를 Grafana Cloud Loki로 중앙 수집 | Proposed | 박스마다 Alloy가 json-file을 tail, `docker logs`는 유지 |
 
 ## 작성 후보 (미작성)
 
