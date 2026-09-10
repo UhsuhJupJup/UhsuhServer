@@ -1,0 +1,69 @@
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "30s"
+}
+
+discovery.relabel "logs" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    target_label = "job"
+    replacement  = "uhsuh"
+  }
+  rule {
+    target_label = "env"
+    replacement  = "prod"
+  }
+  rule {
+    target_label = "instance"
+    replacement  = "data"
+  }
+  rule {
+    action = "labeldrop"
+    regex  = "__meta_docker_.*"
+  }
+}
+
+loki.source.docker "containers" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.docker.containers.targets
+  relabel_rules = discovery.relabel.logs.rules
+  forward_to    = [loki.process.ecs.receiver]
+}
+
+loki.process "ecs" {
+  stage.json {
+    expressions = {
+      level = "log.level",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level = "",
+    }
+  }
+
+  forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_LOKI_USER")
+      password = sys.env("GRAFANA_CLOUD_TOKEN")
+    }
+  }
+}

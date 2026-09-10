@@ -32,8 +32,47 @@ services:
 
       UHSUHJUPJUP_FIREBASE_CREDENTIALS_PATH: /app/firebase.json
 
-      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx384m"
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx320m"
+
+      INSTANCE_NAME: ${INSTANCE_NAME:-unknown}
     volumes:
       - /opt/uhsuh/firebase.json:/app/firebase.json:ro
     ports:
       - "8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        mode: "non-blocking"
+        max-buffer-size: "4m"
+
+  alloy:
+    image: grafana/alloy:v1.10.0
+    container_name: uhsuh-alloy
+    restart: unless-stopped
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=127.0.0.1:12345
+      - /etc/alloy/config.alloy
+    environment:
+      INSTANCE_NAME: ${INSTANCE_NAME:-unknown}
+      GRAFANA_CLOUD_LOKI_URL: ${GRAFANA_CLOUD_LOKI_URL}
+      GRAFANA_CLOUD_LOKI_USER: ${GRAFANA_CLOUD_LOKI_USER}
+      GRAFANA_CLOUD_PROM_URL: ${GRAFANA_CLOUD_PROM_URL}
+      GRAFANA_CLOUD_PROM_USER: ${GRAFANA_CLOUD_PROM_USER}
+      GRAFANA_CLOUD_TOKEN: ${GRAFANA_CLOUD_TOKEN}
+    volumes:
+      - ./alloy/config.app.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  alloy_data:
