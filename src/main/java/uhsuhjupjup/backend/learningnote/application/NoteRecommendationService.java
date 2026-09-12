@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
@@ -12,6 +13,7 @@ import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult
 import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
+import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -22,6 +24,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NoteRecommendationService {
@@ -41,7 +44,12 @@ public class NoteRecommendationService {
     public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
         if (note.getAnalyzedAt() == null) {
-            noteAnalyzer.analyze(note);
+            try {
+                noteAnalyzer.analyze(note);
+            } catch (KeywordClassificationException e) {
+                log.warn("노트 분석 실패, 빈 추천 반환 noteId={} 사유={}", noteId, e.toString());
+                return new NoteRecommendationResult(List.of(), List.of());
+            }
         }
         List<String> keywords = noteKeywordRepository.findKeywordNamesByNoteId(noteId);
         List<Long> keywordIds = noteKeywordRepository.findKeywordIdsByNoteId(noteId);

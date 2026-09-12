@@ -25,6 +25,8 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class PipelineScheduler {
 
+    static final String CLASSIFICATION_LOCK = "pipeline:classify";
+
     private final CollectionService collectionService;
     private final MatchingService matchingService;
     private final NotificationService notificationService;
@@ -40,7 +42,8 @@ public class PipelineScheduler {
         runWithLock("pipeline:ingest", () -> {
             LocalDateTime startedAt = LocalDateTime.now();
             CollectionResult collection = runStage("수집", collectionService::collectAll);
-            MatchingResult matching = runStage("매칭", matchingService::matchRecent);
+            MatchingResult matching = runStage("매칭",
+                    () -> runWithLock(CLASSIFICATION_LOCK, matchingService::matchRecent));
             pipelineRunRecorder.recordIngest(startedAt, LocalDateTime.now(), collection, matching);
             runStage("그래프 캐시 선계산", () -> {
                 globalKeywordGraphProvider.refreshGlobalGraph();
