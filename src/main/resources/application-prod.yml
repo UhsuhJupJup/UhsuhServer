@@ -38,6 +38,13 @@ mail:
   enabled: ${MAIL_ENABLED}
   from: ${MAIL_FROM}
   unsubscribe-base-url: ${MAIL_UNSUBSCRIBE_BASE_URL}
+  fallback:
+    enabled: ${MAIL_FALLBACK_ENABLED:true}
+  gmail:
+    host: ${MAIL_GMAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_GMAIL_PORT:587}
+    username: ${MAIL_GMAIL_USERNAME}
+    password: ${MAIL_GMAIL_PASSWORD}
 
 app:
   cors:
