@@ -183,6 +183,7 @@ jobs:
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             GRAFANA_CLOUD_LOKI_URL=${{ secrets.GRAFANA_CLOUD_LOKI_URL }}
             GRAFANA_CLOUD_LOKI_USER=${{ secrets.GRAFANA_CLOUD_LOKI_USER }}

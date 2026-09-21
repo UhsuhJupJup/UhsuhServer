@@ -27,6 +27,8 @@ services:
 
       CLAUDE_ENABLED: "true"
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      GPT_ENABLED: "true"
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
 
       CORS_ALLOWED_ORIGINS: https://uhsuh.com,https://www.uhsuh.com
 
