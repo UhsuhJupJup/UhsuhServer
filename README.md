@@ -6,7 +6,7 @@
 
 기술 블로그 키워드 구독, 알림 서비스
 
-[어서 줍줍하러 가기](https://www.uhsuh.com) , [GitHub](https://github.com/sinequanonn/Uhsuh-JupJup)
+[어서 줍줍하러 가기](https://www.uhsuh.com) , [GitHub](https://github.com/UhsuhJupJup/UhsuhServer)
 
 </div>
 

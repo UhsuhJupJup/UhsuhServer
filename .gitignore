@@ -35,3 +35,18 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# 모노레포 루트에서 이관 (경로를 레포 루트 기준으로 조정)
+.env
+.env*.local
+*firebase-adminsdk*.json
+serviceAccountKey*.json
+monitoring/prometheus/gc_token
+.claude
+.codex
+.agents
+CLAUDE.md
+AGENTS.md
+loadtest/
+src/loadtest/
+**/build.local.gradle

@@ -3,9 +3,6 @@ name: Deploy Backend
 on:
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
 env:
@@ -29,18 +26,17 @@ jobs:
 
       # Testcontainers(MySQL, Redis)는 러너의 Docker 데몬에서 뜬다. 테스트 통과해야 배포한다.
       - name: Build & Test
-        working-directory: backend
         run: ./gradlew build --no-daemon
 
       # 배포되는 관측 설정을 미리 검증한다. 깨진 설정이 프로덕션에 도달하지 않게 막는다.
       - name: Validate monitoring configs
         run: |
           docker run --rm --entrypoint promtool \
-            -v "$PWD/backend/monitoring/prometheus:/w:ro" prom/prometheus:latest \
+            -v "$PWD/monitoring/prometheus:/w:ro" prom/prometheus:latest \
             check config /w/prometheus.cloud.yml
 
           for cfg in config.app.alloy config.data.alloy; do
-            docker run --rm -v "$PWD/backend/deploy/alloy:/etc/alloy:ro" \
+            docker run --rm -v "$PWD/deploy/alloy:/etc/alloy:ro" \
               -e INSTANCE_NAME=ci \
               -e GRAFANA_CLOUD_LOKI_URL=https://example.invalid/loki/api/v1/push \
               -e GRAFANA_CLOUD_LOKI_USER=0 \
@@ -69,7 +65,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -90,9 +86,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/deploy/docker-compose.data.yml,backend/deploy/alloy/config.data.alloy
+          source: deploy/docker-compose.data.yml,deploy/alloy/config.data.alloy
           target: /opt/uhsuh/
-          strip_components: 2
+          strip_components: 1
 
       # monitoring/ 은 경로 깊이가 달라 strip_components 를 1로 둔 별도 단계로 보낸다.
       # .env 와 prometheus/gc_token 은 레포에 없으므로 박스의 기존 파일이 유지된다.
@@ -102,9 +98,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/monitoring/docker-compose.grafana-cloud.yml,backend/monitoring/prometheus/prometheus.cloud.yml
+          source: monitoring/docker-compose.grafana-cloud.yml,monitoring/prometheus/prometheus.cloud.yml
           target: /opt/uhsuh/
-          strip_components: 1
+          strip_components: 0
 
       - name: Deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -166,9 +162,9 @@ jobs:
           host: ${{ secrets[matrix.host_secret] }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/deploy/docker-compose.app.yml,backend/deploy/alloy/config.app.alloy
+          source: deploy/docker-compose.app.yml,deploy/alloy/config.app.alloy
           target: /opt/uhsuh/
-          strip_components: 2
+          strip_components: 1
 
       - name: Deploy app on app box
         uses: appleboy/ssh-action@v1.0.3

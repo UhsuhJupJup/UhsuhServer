@@ -3,14 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main, develop]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci.yml'
   push:
     branches: [develop]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/ci.yml'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -33,7 +27,6 @@ jobs:
 
       # Testcontainers(MySQL, Redis)는 러너의 Docker 데몬에서 뜬다(ubuntu-latest 기본 제공).
       - name: Build & Test
-        working-directory: backend
         run: ./gradlew build --no-daemon
 
       - name: Upload test report
@@ -41,5 +34,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: backend/build/reports/tests/test
+          path: build/reports/tests/test
           if-no-files-found: ignore
