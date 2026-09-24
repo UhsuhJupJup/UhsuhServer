@@ -1055,7 +1055,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (level) (rate({job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\", level=~\"WARN|ERROR\"}[$__interval]))",
+          "expr": "sum by (level) (rate({job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\", level=~\"WARN|ERROR\"}[$__interval]))",
           "datasource": {
             "type": "loki",
             "uid": "${loki}"
@@ -1128,7 +1128,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (instance) (rate({job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\", level=\"ERROR\"}[$__interval]))",
+          "expr": "sum by (instance) (rate({job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\", level=\"ERROR\"}[$__interval]))",
           "datasource": {
             "type": "loki",
             "uid": "${loki}"
@@ -1201,7 +1201,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} | json msg=\"message\", lvl=\"log.level\" | line_format \"[{{.instance}}] {{.lvl}} {{.msg}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\"} | json msg=\"message\", lvl=\"log.level\" | line_format \"[{{.instance}}] {{.lvl}} {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1238,7 +1238,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} | json msg=\"message\", rid=\"requestId\", lg=\"log.logger\" | lg = \"uhsuhjupjup.backend.common.logging.RequestLoggingFilter\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\"} | json msg=\"message\", rid=\"requestId\", lg=\"log.logger\" | lg = \"uhsuhjupjup.backend.common.logging.RequestLoggingFilter\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1275,7 +1275,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\", level=\"ERROR\"} | json msg=\"message\", rid=\"requestId\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\", level=\"ERROR\"} | json msg=\"message\", rid=\"requestId\" | line_format \"[{{.instance}}] {{.rid}} {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1312,7 +1312,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"파이프라인|수집 완료|매칭 완료|적재 완료|아웃박스\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\"} |~ \"파이프라인|수집 완료|매칭 완료|적재 완료|아웃박스\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
@@ -1349,7 +1349,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "{job=\"uhsuh\", container=\"uhsuh-backend\", instance=~\"$instance\"} |~ \"구독|관리 링크\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\"} |~ \"구독|관리 링크\" | json msg=\"message\" | line_format \"[{{.instance}}] {{.msg}}\"",
           "queryType": "range",
           "datasource": {
             "type": "loki",
