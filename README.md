@@ -29,7 +29,7 @@
 <br/>
 
 ## 아키텍처
-![어서줍줍 시스템 구조도](backend/image.png)
+![어서줍줍 시스템 구조도](architecture.png)
 
 <br/>
 
