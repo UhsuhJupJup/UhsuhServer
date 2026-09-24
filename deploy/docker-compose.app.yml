@@ -1,7 +1,7 @@
 services:
   backend:
     image: ${BACKEND_IMAGE}
-    container_name: uhsuh-backend
+    container_name: uhsuh-server
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -22,6 +22,8 @@ services:
       MAIL_PORT: "587"
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_GMAIL_USERNAME: ${MAIL_GMAIL_USERNAME}
+      MAIL_GMAIL_PASSWORD: ${MAIL_GMAIL_PASSWORD}
       MAIL_FROM: "어서줍줍 <noreply@uhsuh.com>"
       MAIL_UNSUBSCRIBE_BASE_URL: https://api.uhsuh.com/api/unsubscribe
 
