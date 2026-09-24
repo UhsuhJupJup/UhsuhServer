@@ -74,6 +74,7 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment: Production
     permissions:
       contents: read
       packages: read
@@ -143,6 +144,7 @@ jobs:
   deploy-app:
     needs: build-and-push
     runs-on: ubuntu-latest
+    environment: Production
     permissions:
       contents: read
       packages: read
