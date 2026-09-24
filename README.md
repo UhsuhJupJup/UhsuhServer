@@ -6,9 +6,10 @@
 
 기술 블로그 키워드 구독, 알림 서비스
 
-[어서 줍줍하러 가기](https://www.uhsuh.com) , [GitHub](https://github.com/sinequanonn/Uhsuh-JupJup)
+[어서 줍줍하러 가기](https://www.uhsuh.com) , [GitHub](https://github.com/UhsuhJupJup/UhsuhServer)
 
 </div>
+
 
 ## 📖 소개
 기술 블로그의 새 글을, 관심 있는 키워드, 토픽만 구독해두면 매일 수집, 분류해서 관심사에 맞는 글만 메일로 보내주는 서비스입니다.
@@ -28,7 +29,7 @@
 <br/>
 
 ## 아키텍처
-- 준비중
+![어서줍줍 시스템 구조도](architecture.png)
 
 <br/>
 

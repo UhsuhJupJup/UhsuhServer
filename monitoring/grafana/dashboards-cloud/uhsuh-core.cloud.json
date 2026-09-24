@@ -1,4 +1,5 @@
 {
+  "uid": "uhsuh-core",
   "title": "어서줍줍 핵심 모니터링",
   "description": "다중 인스턴스(app1, app2) 운영에 필요한 것만 추린 대시보드. 헬스, 응답시간, URL별 지연, 힙, 로그.",
   "tags": [

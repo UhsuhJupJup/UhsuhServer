@@ -4,26 +4,20 @@ import jakarta.mail.Address;
 import jakarta.mail.MessagingException;
 import jakarta.mail.SendFailedException;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Component;
 import uhsuhjupjup.backend.pipeline.notification.application.EmailSendException;
 import uhsuhjupjup.backend.pipeline.notification.application.EmailSender;
 import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
 
-@Component
-@ConditionalOnProperty(name = "mail.enabled", havingValue = "true")
 class JavaMailEmailSender implements EmailSender {
 
     private final JavaMailSender javaMailSender;
     private final String from;
 
-    JavaMailEmailSender(JavaMailSender javaMailSender,
-                        @Value("${mail.from:어서줍줍 <noreply@uhsuh.com>}") String from) {
+    JavaMailEmailSender(JavaMailSender javaMailSender, String from) {
         this.javaMailSender = javaMailSender;
         this.from = from;
     }

@@ -31,6 +31,36 @@ firebase:
 claude:
   enabled: ${CLAUDE_ENABLED:false}
   model: ${CLAUDE_MODEL:claude-haiku-4-5}
+  timeout:
+    connect: ${CLAUDE_TIMEOUT_CONNECT:PT5S}   # 연결 수립 상한
+    call: ${CLAUDE_TIMEOUT_CALL:PT10S}        # 요청 1건 전체(읽기 포함) 상한, 노트추천 요청 스레드가 오래 붙잡히지 않게
+
+gpt:
+  enabled: ${GPT_ENABLED:false}               # Claude 실패/서킷 OPEN 시 폴백, 키 없으면 false 유지
+  model: ${GPT_MODEL:gpt-4o-mini}             # OpenAI 모델, 더 최신 mini급으로 환경변수(GPT_MODEL)로 교체
+  timeout:
+    connect: ${GPT_TIMEOUT_CONNECT:PT5S}      # 연결 수립 상한
+    call: ${GPT_TIMEOUT_CALL:PT10S}           # 요청 1건 전체(읽기 포함) 상한
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      keywordClassifier:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20                                  # 최근 20건으로 실패율 판정
+        minimum-number-of-calls: 10                              # 표본 10건 미만이면 판정 보류, 초기 오탐 방지
+        failure-rate-threshold: 50                               # 실패율 50% 이상이면 OPEN
+        wait-duration-in-open-state: 30s                         # OPEN 후 30초간 Claude 건너뛰고 GPT 폴백, 죽은 API 반복 호출 차단
+        permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
+        automatic-transition-from-open-to-half-open-enabled: true
+      keywordClassifierGpt:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20                                  # GPT 폴백 경로의 실패율 판정
+        minimum-number-of-calls: 10                              # 표본 10건 미만이면 판정 보류
+        failure-rate-threshold: 50                               # 실패율 50% 이상이면 OPEN
+        wait-duration-in-open-state: 30s                         # OPEN 후 30초간 GPT 건너뛰기, Claude, GPT 모두 OPEN이면 분류 예외
+        permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
+        automatic-transition-from-open-to-half-open-enabled: true
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
@@ -43,6 +73,11 @@ outbox:
   retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
   lock-at-most-for: ${OUTBOX_LOCK_AT_MOST_FOR:PT5M}
+
+classification:
+  poll-delay-ms: ${CLASSIFICATION_POLL_DELAY_MS:600000}          # 미분류 글 재분류 폴러 주기(기본 10분)
+  poll-initial-delay-ms: ${CLASSIFICATION_POLL_INITIAL_DELAY_MS:600000}
+  lock-at-most-for: ${CLASSIFICATION_LOCK_AT_MOST_FOR:PT9M}      # 폴러 인스턴스 락 상한(폴 주기보다 짧게)
 
 springdoc:
   default-produces-media-type: application/json
