@@ -70,7 +70,7 @@ loki.write "grafana_cloud" {
 
 prometheus.scrape "backend" {
   targets = [{
-    __address__ = "uhsuh-backend:8080",
+    __address__ = "uhsuh-server:8080",
     job         = "uhsuhjupjup-backend",
     application = "uhsuhjupjup-backend",
     instance    = sys.env("INSTANCE_NAME"),
