@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.ui;
+package uhsuhjupjup.backend.techblog.subscription.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.subscription.application.SubscriptionService;
-import uhsuhjupjup.backend.subscription.ui.dto.SubscriptionUpdateRequest;
-import uhsuhjupjup.backend.subscription.ui.dto.SubscriptionsResponse;
+import uhsuhjupjup.backend.techblog.subscription.application.SubscriptionService;
+import uhsuhjupjup.backend.techblog.subscription.ui.dto.SubscriptionUpdateRequest;
+import uhsuhjupjup.backend.techblog.subscription.ui.dto.SubscriptionsResponse;
 
 @RestController
 @RequestMapping("/api/subscriptions")

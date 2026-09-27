@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.ui;
+package uhsuhjupjup.backend.techblog.subscription.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import uhsuhjupjup.backend.subscription.application.SubscriptionService;
-import uhsuhjupjup.backend.subscription.ui.dto.UnsubscribeResponse;
+import uhsuhjupjup.backend.techblog.subscription.application.SubscriptionService;
+import uhsuhjupjup.backend.techblog.subscription.ui.dto.UnsubscribeResponse;
 
 import java.net.URI;
 

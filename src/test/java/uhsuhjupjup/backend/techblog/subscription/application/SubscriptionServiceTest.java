@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.application;
+package uhsuhjupjup.backend.techblog.subscription.application;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,9 +12,9 @@ import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.subscription.application.dto.SubscriptionsResult;
-import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
-import uhsuhjupjup.backend.subscription.infra.TopicSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.application.dto.SubscriptionsResult;
+import uhsuhjupjup.backend.techblog.subscription.infra.KeywordSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.infra.TopicSubscriptionRepository;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.MemberFixture;
 import uhsuhjupjup.backend.support.TopicFixture;

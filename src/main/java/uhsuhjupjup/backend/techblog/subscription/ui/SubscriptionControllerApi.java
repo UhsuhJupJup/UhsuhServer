@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.ui;
+package uhsuhjupjup.backend.techblog.subscription.ui;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -8,8 +8,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.subscription.ui.dto.SubscriptionUpdateRequest;
-import uhsuhjupjup.backend.subscription.ui.dto.SubscriptionsResponse;
+import uhsuhjupjup.backend.techblog.subscription.ui.dto.SubscriptionUpdateRequest;
+import uhsuhjupjup.backend.techblog.subscription.ui.dto.SubscriptionsResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import uhsuhjupjup.backend.common.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Parameter;

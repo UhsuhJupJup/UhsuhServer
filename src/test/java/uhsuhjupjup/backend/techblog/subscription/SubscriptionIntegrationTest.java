@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription;
+package uhsuhjupjup.backend.techblog.subscription;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

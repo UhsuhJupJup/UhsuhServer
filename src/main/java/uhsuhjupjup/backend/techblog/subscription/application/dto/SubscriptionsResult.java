@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.application.dto;
+package uhsuhjupjup.backend.techblog.subscription.application.dto;
 
 import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;

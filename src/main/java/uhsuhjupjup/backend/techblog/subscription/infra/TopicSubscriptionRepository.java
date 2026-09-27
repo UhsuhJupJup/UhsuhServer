@@ -1,8 +1,8 @@
-package uhsuhjupjup.backend.subscription.infra;
+package uhsuhjupjup.backend.techblog.subscription.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import uhsuhjupjup.backend.subscription.domain.TopicSubscription;
+import uhsuhjupjup.backend.techblog.subscription.domain.TopicSubscription;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 
 import java.util.Collection;

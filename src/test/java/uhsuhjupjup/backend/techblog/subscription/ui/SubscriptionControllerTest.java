@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.ui;
+package uhsuhjupjup.backend.techblog.subscription.ui;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,8 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.subscription.application.SubscriptionService;
-import uhsuhjupjup.backend.subscription.application.dto.SubscriptionsResult;
+import uhsuhjupjup.backend.techblog.subscription.application.SubscriptionService;
+import uhsuhjupjup.backend.techblog.subscription.application.dto.SubscriptionsResult;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.LoginMemberStubResolver;
 import uhsuhjupjup.backend.support.MemberFixture;

@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.domain;
+package uhsuhjupjup.backend.techblog.subscription.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

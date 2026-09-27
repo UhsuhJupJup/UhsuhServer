@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.ui.dto;
+package uhsuhjupjup.backend.techblog.subscription.ui.dto;
 
 import java.util.List;
 

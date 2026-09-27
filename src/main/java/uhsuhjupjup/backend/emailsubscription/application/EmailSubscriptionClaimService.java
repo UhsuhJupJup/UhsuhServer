@@ -8,8 +8,8 @@ import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriptionRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
-import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
-import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.domain.KeywordSubscription;
+import uhsuhjupjup.backend.techblog.subscription.infra.KeywordSubscriptionRepository;
 
 @Slf4j
 @Service

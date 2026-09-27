@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.application;
+package uhsuhjupjup.backend.techblog.subscription.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,11 +13,11 @@ import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.subscription.application.dto.SubscriptionsResult;
-import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
-import uhsuhjupjup.backend.subscription.domain.TopicSubscription;
-import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
-import uhsuhjupjup.backend.subscription.infra.TopicSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.application.dto.SubscriptionsResult;
+import uhsuhjupjup.backend.techblog.subscription.domain.KeywordSubscription;
+import uhsuhjupjup.backend.techblog.subscription.domain.TopicSubscription;
+import uhsuhjupjup.backend.techblog.subscription.infra.KeywordSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.infra.TopicSubscriptionRepository;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 

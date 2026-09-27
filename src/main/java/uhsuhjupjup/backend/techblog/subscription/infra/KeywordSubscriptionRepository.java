@@ -1,9 +1,9 @@
-package uhsuhjupjup.backend.subscription.infra;
+package uhsuhjupjup.backend.techblog.subscription.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
-import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
+import uhsuhjupjup.backend.techblog.subscription.domain.KeywordSubscription;
 
 import java.util.Collection;
 import java.util.List;

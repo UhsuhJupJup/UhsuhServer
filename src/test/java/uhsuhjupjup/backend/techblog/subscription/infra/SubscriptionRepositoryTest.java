@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.subscription.infra;
+package uhsuhjupjup.backend.techblog.subscription.infra;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -7,8 +7,8 @@ import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
-import uhsuhjupjup.backend.subscription.domain.TopicSubscription;
+import uhsuhjupjup.backend.techblog.subscription.domain.KeywordSubscription;
+import uhsuhjupjup.backend.techblog.subscription.domain.TopicSubscription;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;

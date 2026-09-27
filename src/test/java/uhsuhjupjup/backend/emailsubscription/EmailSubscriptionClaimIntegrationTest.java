@@ -25,7 +25,7 @@ import uhsuhjupjup.backend.member.application.MemberService;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
-import uhsuhjupjup.backend.subscription.infra.KeywordSubscriptionRepository;
+import uhsuhjupjup.backend.techblog.subscription.infra.KeywordSubscriptionRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;

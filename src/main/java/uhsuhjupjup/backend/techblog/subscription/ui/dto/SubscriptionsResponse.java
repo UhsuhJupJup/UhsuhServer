@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.subscription.ui.dto;
+package uhsuhjupjup.backend.techblog.subscription.ui.dto;
 
-import uhsuhjupjup.backend.subscription.application.dto.SubscriptionsResult;
+import uhsuhjupjup.backend.techblog.subscription.application.dto.SubscriptionsResult;
 
 import java.util.List;
 
