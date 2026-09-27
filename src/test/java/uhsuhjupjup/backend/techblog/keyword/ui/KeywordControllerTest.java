@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.keyword.ui;
+package uhsuhjupjup.backend.techblog.keyword.ui;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -7,9 +7,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
-import uhsuhjupjup.backend.keyword.application.KeywordService;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.application.dto.KeywordDetailResult;
+import uhsuhjupjup.backend.techblog.keyword.application.KeywordService;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.TopicFixture;
 

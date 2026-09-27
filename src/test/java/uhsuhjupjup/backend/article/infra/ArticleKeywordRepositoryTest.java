@@ -11,8 +11,8 @@ import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.blog.infra.BlogRepository;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;

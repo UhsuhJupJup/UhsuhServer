@@ -16,7 +16,7 @@ import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.ArticleFixture;
 import uhsuhjupjup.backend.support.BlogFixture;
 import uhsuhjupjup.backend.support.KeywordFixture;

@@ -5,8 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscription;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;

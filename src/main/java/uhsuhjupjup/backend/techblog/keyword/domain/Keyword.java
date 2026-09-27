@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.keyword.domain;
+package uhsuhjupjup.backend.techblog.keyword.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

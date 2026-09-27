@@ -2,7 +2,7 @@ package uhsuhjupjup.backend.subscription.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
 
 import java.util.Collection;

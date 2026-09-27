@@ -8,7 +8,7 @@ import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 
 import java.time.LocalDateTime;

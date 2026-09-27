@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.emailsubscription.ui.dto;
 
-import uhsuhjupjup.backend.keyword.ui.dto.KeywordResponse;
+import uhsuhjupjup.backend.techblog.keyword.ui.dto.KeywordResponse;
 
 import java.util.List;
 

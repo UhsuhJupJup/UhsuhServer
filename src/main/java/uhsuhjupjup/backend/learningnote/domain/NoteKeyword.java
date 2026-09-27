@@ -11,7 +11,7 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 
 @Entity
 @Table(name = "note_keyword")

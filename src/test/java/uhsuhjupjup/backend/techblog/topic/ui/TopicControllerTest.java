@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.TopicFixture;
 import uhsuhjupjup.backend.techblog.topic.application.dto.TopicDetailResult;

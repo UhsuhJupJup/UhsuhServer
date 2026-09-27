@@ -3,7 +3,7 @@ package uhsuhjupjup.backend.emailsubscription.infra;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscription;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 
 import java.util.Collection;
 import java.util.List;

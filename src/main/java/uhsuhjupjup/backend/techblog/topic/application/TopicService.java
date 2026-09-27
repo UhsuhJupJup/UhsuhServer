@@ -5,7 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.topic.application.dto.TopicDetailResult;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;

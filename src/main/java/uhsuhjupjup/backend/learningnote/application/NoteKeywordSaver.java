@@ -3,7 +3,7 @@ package uhsuhjupjup.backend.learningnote.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.domain.NoteKeyword;
 import uhsuhjupjup.backend.learningnote.infra.LearningNoteRepository;

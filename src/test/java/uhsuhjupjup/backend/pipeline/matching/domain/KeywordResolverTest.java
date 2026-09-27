@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.pipeline.matching.domain;
 
 import org.junit.jupiter.api.Test;
-import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
+import uhsuhjupjup.backend.techblog.keyword.domain.KeywordAlias;
 import uhsuhjupjup.backend.support.KeywordFixture;
 
 import java.util.Arrays;

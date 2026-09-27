@@ -1,10 +1,10 @@
-package uhsuhjupjup.backend.keyword.infra;
+package uhsuhjupjup.backend.techblog.keyword.infra;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.KeywordAlias;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.util.List;

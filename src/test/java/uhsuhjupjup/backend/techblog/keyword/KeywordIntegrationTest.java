@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.keyword;
+package uhsuhjupjup.backend.techblog.keyword;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,10 +11,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
-import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.KeywordAlias;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordAliasRepository;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;

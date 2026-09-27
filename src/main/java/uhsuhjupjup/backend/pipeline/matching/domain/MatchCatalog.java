@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.pipeline.matching.domain;
 
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.KeywordAlias;
 
 import java.util.List;
 import java.util.Locale;

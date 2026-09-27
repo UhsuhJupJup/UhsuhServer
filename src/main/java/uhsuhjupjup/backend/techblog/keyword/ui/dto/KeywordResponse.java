@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.keyword.ui.dto;
+package uhsuhjupjup.backend.techblog.keyword.ui.dto;
 
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 
 public record KeywordResponse(Long id, String name) {
 

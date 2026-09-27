@@ -9,7 +9,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriptionRepository;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;

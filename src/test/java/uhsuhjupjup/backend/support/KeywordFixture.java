@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.support;
 
 import org.springframework.test.util.ReflectionTestUtils;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 
 public final class KeywordFixture {
 

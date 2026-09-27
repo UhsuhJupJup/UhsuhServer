@@ -9,7 +9,7 @@ import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.subscription.application.dto.SubscriptionsResult;
@@ -41,7 +41,7 @@ class SubscriptionServiceTest {
     @Mock
     private TopicRepository topicRepository;
     @Mock
-    private uhsuhjupjup.backend.keyword.infra.KeywordRepository keywordRepository;
+    private uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository keywordRepository;
     @Mock
     private MemberRepository memberRepository;
     @Mock

@@ -2,8 +2,8 @@ package uhsuhjupjup.backend.learningnote.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordAliasRepository;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;

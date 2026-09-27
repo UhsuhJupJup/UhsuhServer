@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.keyword.application;
+package uhsuhjupjup.backend.techblog.keyword.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -6,9 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
-import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
-import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.application.dto.KeywordDetailResult;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.techblog.topic.infra.TopicKeywordRepository;
