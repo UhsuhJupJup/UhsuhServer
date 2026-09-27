@@ -19,6 +19,7 @@ import uhsuhjupjup.backend.oss.repo.domain.OssRepoStatus;
 import uhsuhjupjup.backend.support.AdminMemberStubResolver;
 import uhsuhjupjup.backend.support.MemberFixture;
 
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -53,7 +54,7 @@ class AdminOssRepoControllerTest {
     void register_validFullName_returns201WithSavedRepo() throws Exception {
         given(ossRepoRegistrationService.register("octocat/Hello-World")).willReturn(new OssRepoResult(
                 10L, 1296269L, "octocat/Hello-World", "My first repository on GitHub!", "Java", 80,
-                OssRepoStatus.ACTIVE));
+                OssRepoStatus.ACTIVE, List.of()));
 
         register("octocat/Hello-World")
                 .andExpect(status().isCreated())
@@ -69,7 +70,7 @@ class AdminOssRepoControllerTest {
     @Test
     void register_repoWithoutDescriptionAndLanguage_returnsThemAsNull() throws Exception {
         given(ossRepoRegistrationService.register("octocat/empty")).willReturn(new OssRepoResult(
-                11L, 7L, "octocat/empty", null, null, 0, OssRepoStatus.ACTIVE));
+                11L, 7L, "octocat/empty", null, null, 0, OssRepoStatus.ACTIVE, List.of()));
 
         register("octocat/empty")
                 .andExpect(status().isCreated())
@@ -159,6 +160,7 @@ class AdminOssRepoControllerTest {
     }
 
     private static OssRepoResult savedRepo() {
-        return new OssRepoResult(10L, 1296269L, "octocat/Hello-World", null, "Java", 80, OssRepoStatus.ACTIVE);
+        return new OssRepoResult(10L, 1296269L, "octocat/Hello-World", null, "Java", 80, OssRepoStatus.ACTIVE,
+                List.of());
     }
 }
