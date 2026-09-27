@@ -89,4 +89,13 @@ class TopicIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TOPIC_NOT_FOUND"));
     }
+
+    @Test
+    void detail_whenIdIsNotNumber_returns400() throws Exception {
+        mockMvc.perform(get("/api/topics/abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("id"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("숫자여야 합니다."));
+    }
 }
