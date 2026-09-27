@@ -20,8 +20,8 @@ import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.techblog.keyword.ui.dto.KeywordResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.notification.application.EmailSender;
-import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
+import uhsuhjupjup.backend.techblog.pipeline.notification.application.EmailSender;
+import uhsuhjupjup.backend.techblog.pipeline.notification.application.dto.EmailMessage;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

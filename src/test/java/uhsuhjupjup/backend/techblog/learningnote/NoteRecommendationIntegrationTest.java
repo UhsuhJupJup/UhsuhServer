@@ -24,9 +24,9 @@ import uhsuhjupjup.backend.techblog.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.techblog.learningnote.infra.LearningNoteRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
-import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
-import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
+import uhsuhjupjup.backend.techblog.pipeline.matching.application.KeywordClassifier;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.KeywordMatch;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.MatchCatalog;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;

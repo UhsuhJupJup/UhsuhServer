@@ -14,7 +14,7 @@ import uhsuhjupjup.backend.techblog.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.techblog.learningnote.application.dto.NoteRecommendationResult;
 import uhsuhjupjup.backend.techblog.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.techblog.learningnote.infra.NoteKeywordRepository;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
+import uhsuhjupjup.backend.techblog.pipeline.matching.application.KeywordClassificationException;
 
 import java.time.LocalDateTime;
 import java.util.List;

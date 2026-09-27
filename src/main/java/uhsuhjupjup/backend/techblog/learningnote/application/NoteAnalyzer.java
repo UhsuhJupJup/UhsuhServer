@@ -5,9 +5,9 @@ import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.techblog.learningnote.domain.LearningNote;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
-import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
-import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
+import uhsuhjupjup.backend.techblog.pipeline.matching.application.KeywordClassifier;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.KeywordMatch;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.MatchCatalog;
 
 import java.time.LocalDateTime;
 import java.util.List;

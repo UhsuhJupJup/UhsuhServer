@@ -23,8 +23,8 @@ import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.application.MemberService;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
-import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
+import uhsuhjupjup.backend.techblog.pipeline.notification.domain.Notification;
+import uhsuhjupjup.backend.techblog.pipeline.notification.infra.NotificationRepository;
 import uhsuhjupjup.backend.techblog.subscription.infra.KeywordSubscriptionRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 

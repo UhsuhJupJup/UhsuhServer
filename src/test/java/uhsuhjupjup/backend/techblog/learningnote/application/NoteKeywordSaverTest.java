@@ -11,7 +11,7 @@ import uhsuhjupjup.backend.techblog.learningnote.infra.LearningNoteRepository;
 import uhsuhjupjup.backend.techblog.learningnote.infra.NoteKeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;

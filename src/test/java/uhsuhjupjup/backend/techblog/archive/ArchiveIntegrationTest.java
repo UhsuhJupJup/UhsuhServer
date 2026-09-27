@@ -22,8 +22,8 @@ import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
-import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
+import uhsuhjupjup.backend.techblog.pipeline.notification.domain.Notification;
+import uhsuhjupjup.backend.techblog.pipeline.notification.infra.NotificationRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;

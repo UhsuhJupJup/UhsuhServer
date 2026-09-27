@@ -8,8 +8,8 @@ import uhsuhjupjup.backend.techblog.archive.application.dto.SentArticleResult;
 import uhsuhjupjup.backend.techblog.archive.application.dto.SentArticlesResult;
 import uhsuhjupjup.backend.techblog.article.application.dto.ArticleSummaryResult;
 import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;
-import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
-import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
+import uhsuhjupjup.backend.techblog.pipeline.notification.domain.Notification;
+import uhsuhjupjup.backend.techblog.pipeline.notification.infra.NotificationRepository;
 
 import java.util.List;
 import java.util.Map;

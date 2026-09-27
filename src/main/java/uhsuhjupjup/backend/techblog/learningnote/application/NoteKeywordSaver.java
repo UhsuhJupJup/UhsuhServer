@@ -8,7 +8,7 @@ import uhsuhjupjup.backend.techblog.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.techblog.learningnote.domain.NoteKeyword;
 import uhsuhjupjup.backend.techblog.learningnote.infra.LearningNoteRepository;
 import uhsuhjupjup.backend.techblog.learningnote.infra.NoteKeywordRepository;
-import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
+import uhsuhjupjup.backend.techblog.pipeline.matching.domain.KeywordMatch;
 
 import java.time.LocalDateTime;
 import java.util.List;

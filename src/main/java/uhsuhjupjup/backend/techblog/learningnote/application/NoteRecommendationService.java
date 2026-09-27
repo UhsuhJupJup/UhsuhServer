@@ -13,7 +13,7 @@ import uhsuhjupjup.backend.techblog.learningnote.application.dto.NoteRecommendat
 import uhsuhjupjup.backend.techblog.learningnote.application.dto.RecommendedArticleResult;
 import uhsuhjupjup.backend.techblog.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.techblog.learningnote.infra.NoteKeywordRepository;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
+import uhsuhjupjup.backend.techblog.pipeline.matching.application.KeywordClassificationException;
 
 import java.util.Comparator;
 import java.util.HashMap;

@@ -20,8 +20,8 @@ import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
-import uhsuhjupjup.backend.pipeline.notification.application.EmailSender;
-import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailMessage;
+import uhsuhjupjup.backend.techblog.pipeline.notification.application.EmailSender;
+import uhsuhjupjup.backend.techblog.pipeline.notification.application.dto.EmailMessage;
 import uhsuhjupjup.backend.support.RedisTestConfiguration;
 
 import java.util.List;
