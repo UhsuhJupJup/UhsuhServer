@@ -82,6 +82,11 @@ classification:
 oss:
   github:
     token: ${OSS_GITHUB_TOKEN:}
+    api-base-url: ${OSS_GITHUB_API_BASE_URL:https://api.github.com}
+    connect-timeout: ${OSS_GITHUB_CONNECT_TIMEOUT:PT3S}
+    read-timeout: ${OSS_GITHUB_READ_TIMEOUT:PT10S}
+    max-attempts: ${OSS_GITHUB_MAX_ATTEMPTS:3}
+    retry-backoff: ${OSS_GITHUB_RETRY_BACKOFF:PT1S}
 
 springdoc:
   default-produces-media-type: application/json
