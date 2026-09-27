@@ -14,7 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import uhsuhjupjup.backend.techblog.article.domain.Article;
-import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
+import uhsuhjupjup.backend.techblog.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.member.domain.Member;
 
 import java.time.LocalDateTime;

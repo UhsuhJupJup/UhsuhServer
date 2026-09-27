@@ -9,7 +9,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import uhsuhjupjup.backend.common.auth.AuthUser;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
-import uhsuhjupjup.backend.emailsubscription.application.EmailSubscriptionClaimService;
+import uhsuhjupjup.backend.techblog.emailsubscription.application.EmailSubscriptionClaimService;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.support.MemberFixture;
