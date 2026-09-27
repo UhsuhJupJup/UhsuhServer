@@ -1,0 +1,63 @@
+package uhsuhjupjup.backend.techblog.learningnote.application;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Component;
+import uhsuhjupjup.backend.config.CacheConfig;
+import uhsuhjupjup.backend.techblog.article.application.dto.KeywordEdge;
+import uhsuhjupjup.backend.techblog.article.application.dto.KeywordFrequency;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.GraphEdge;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.GraphNode;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.NoteGraphResult;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+@Component
+@RequiredArgsConstructor
+public class GlobalKeywordGraphProvider {
+
+    private static final int TOP_EDGES = 10_000_000;
+
+    private final ArticleKeywordRepository articleKeywordRepository;
+    private final KeywordRepository keywordRepository;
+
+    @Cacheable(cacheNames = CacheConfig.GLOBAL_GRAPH, sync = true)
+    public NoteGraphResult globalKeywordGraph() {
+        return computeGraph();
+    }
+
+    @CachePut(cacheNames = CacheConfig.GLOBAL_GRAPH)
+    public NoteGraphResult refreshGlobalGraph() {
+        return computeGraph();
+    }
+
+    private NoteGraphResult computeGraph() {
+        List<KeywordEdge> topEdges = articleKeywordRepository.findTopCooccurrenceEdges(PageRequest.of(0, TOP_EDGES));
+        LinkedHashSet<Long> keywordIds = topEdges.stream()
+                .flatMap(edge -> Stream.of(edge.keywordAId(), edge.keywordBId()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        Map<Long, Long> articleCountByKeyword = articleKeywordRepository.findKeywordFrequencies().stream()
+                .collect(Collectors.toMap(KeywordFrequency::keywordId, KeywordFrequency::articleCount));
+        Map<Long, String> nameByKeyword = keywordRepository.findAllById(keywordIds).stream()
+                .collect(Collectors.toMap(Keyword::getId, Keyword::getName));
+
+        List<GraphNode> nodes = keywordIds.stream()
+                .map(keywordId -> new GraphNode("kw:" + keywordId, "keyword", nameByKeyword.getOrDefault(keywordId, ""),
+                        false, null, articleCountByKeyword.getOrDefault(keywordId, 0L)))
+                .toList();
+        List<GraphEdge> edges = topEdges.stream()
+                .map(edge -> new GraphEdge("kw:" + edge.keywordAId(), "kw:" + edge.keywordBId(), edge.cooccurrence()))
+                .toList();
+        return new NoteGraphResult(nodes, edges);
+    }
+}

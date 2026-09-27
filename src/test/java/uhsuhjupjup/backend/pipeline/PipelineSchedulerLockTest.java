@@ -7,7 +7,7 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.testcontainers.containers.GenericContainer;
-import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
+import uhsuhjupjup.backend.techblog.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;

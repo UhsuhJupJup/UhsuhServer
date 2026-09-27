@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
-import uhsuhjupjup.backend.learningnote.application.dto.GraphEdge;
-import uhsuhjupjup.backend.learningnote.application.dto.GraphNode;
-import uhsuhjupjup.backend.learningnote.application.dto.NoteGraphResult;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.GraphEdge;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.GraphNode;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.NoteGraphResult;
 
 import java.util.List;
 

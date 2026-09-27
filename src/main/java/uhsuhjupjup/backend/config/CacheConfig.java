@@ -15,7 +15,7 @@ import org.springframework.data.redis.serializer.RedisSerializer;
 import uhsuhjupjup.backend.common.cache.CacheEvictBroadcaster;
 import uhsuhjupjup.backend.common.cache.TwoLevelCache;
 import uhsuhjupjup.backend.common.cache.TwoLevelCacheManager;
-import uhsuhjupjup.backend.learningnote.application.dto.NoteGraphResult;
+import uhsuhjupjup.backend.techblog.learningnote.application.dto.NoteGraphResult;
 
 import java.time.Duration;
 import java.util.List;

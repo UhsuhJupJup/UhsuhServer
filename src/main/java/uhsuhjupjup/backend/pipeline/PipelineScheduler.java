@@ -6,7 +6,7 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
+import uhsuhjupjup.backend.techblog.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.CollectionResult;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;

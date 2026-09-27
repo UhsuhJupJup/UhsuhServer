@@ -8,7 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.integration.redis.util.RedisLockRegistry;
-import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
+import uhsuhjupjup.backend.techblog.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
 import uhsuhjupjup.backend.pipeline.notification.application.NotificationService;
