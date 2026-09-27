@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import uhsuhjupjup.backend.article.domain.Article;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.member.domain.Member;
 

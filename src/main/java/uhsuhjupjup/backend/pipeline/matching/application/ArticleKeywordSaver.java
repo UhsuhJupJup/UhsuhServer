@@ -3,11 +3,11 @@ package uhsuhjupjup.backend.pipeline.matching.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
-import uhsuhjupjup.backend.article.domain.Article;
-import uhsuhjupjup.backend.article.domain.ArticleKeyword;
-import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
-import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.techblog.article.application.KeywordArticleQueryService;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
+import uhsuhjupjup.backend.techblog.article.domain.ArticleKeyword;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 

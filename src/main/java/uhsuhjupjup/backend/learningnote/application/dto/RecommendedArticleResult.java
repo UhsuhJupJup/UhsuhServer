@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.learningnote.application.dto;
 
-import uhsuhjupjup.backend.article.domain.Article;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
 
 import java.util.List;
 

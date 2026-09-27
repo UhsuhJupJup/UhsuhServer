@@ -6,8 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.archive.application.dto.SentArticleResult;
 import uhsuhjupjup.backend.archive.application.dto.SentArticlesResult;
-import uhsuhjupjup.backend.article.application.dto.ArticleSummaryResult;
-import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.techblog.article.application.dto.ArticleSummaryResult;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.pipeline.notification.domain.Notification;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationRepository;
 

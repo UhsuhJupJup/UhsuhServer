@@ -3,7 +3,7 @@ package uhsuhjupjup.backend.pipeline.notification.application;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;

@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.archive.ui.dto;
 
 import uhsuhjupjup.backend.archive.application.dto.SentArticlesResult;
-import uhsuhjupjup.backend.article.ui.dto.ArticleResponse;
+import uhsuhjupjup.backend.techblog.article.ui.dto.ArticleResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;

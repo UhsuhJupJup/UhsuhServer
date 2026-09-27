@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.learningnote.ui.dto;
 
-import uhsuhjupjup.backend.article.domain.Article;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
 import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult;
 
 import java.time.LocalDateTime;
