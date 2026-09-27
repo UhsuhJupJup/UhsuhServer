@@ -79,6 +79,10 @@ classification:
   poll-initial-delay-ms: ${CLASSIFICATION_POLL_INITIAL_DELAY_MS:600000}
   lock-at-most-for: ${CLASSIFICATION_LOCK_AT_MOST_FOR:PT9M}      # 폴러 인스턴스 락 상한(폴 주기보다 짧게)
 
+oss:
+  github:
+    token: ${OSS_GITHUB_TOKEN:}
+
 springdoc:
   default-produces-media-type: application/json
   api-docs:
