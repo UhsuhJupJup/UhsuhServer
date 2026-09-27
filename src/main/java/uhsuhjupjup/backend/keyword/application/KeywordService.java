@@ -9,9 +9,9 @@ import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.domain.TopicKeyword;
-import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicKeywordRepository;
 
 import java.util.List;
 

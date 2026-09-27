@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.topic.ui;
+package uhsuhjupjup.backend.techblog.topic.ui;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,9 +10,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.TopicFixture;
-import uhsuhjupjup.backend.topic.application.dto.TopicDetailResult;
-import uhsuhjupjup.backend.topic.application.TopicService;
-import uhsuhjupjup.backend.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.application.dto.TopicDetailResult;
+import uhsuhjupjup.backend.techblog.topic.application.TopicService;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 
 import java.util.List;
 

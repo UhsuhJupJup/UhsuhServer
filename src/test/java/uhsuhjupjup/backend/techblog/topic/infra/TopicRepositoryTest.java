@@ -1,10 +1,10 @@
-package uhsuhjupjup.backend.topic.infra;
+package uhsuhjupjup.backend.techblog.topic.infra;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
-import uhsuhjupjup.backend.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

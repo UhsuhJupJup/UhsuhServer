@@ -13,7 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import uhsuhjupjup.backend.common.domain.BaseEntity;
 import uhsuhjupjup.backend.member.domain.Member;
-import uhsuhjupjup.backend.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 
 @Entity
 @Table(name = "topic_subscription")

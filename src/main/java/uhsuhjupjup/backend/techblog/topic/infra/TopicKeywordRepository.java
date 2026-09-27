@@ -1,8 +1,8 @@
-package uhsuhjupjup.backend.topic.infra;
+package uhsuhjupjup.backend.techblog.topic.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import uhsuhjupjup.backend.topic.domain.TopicKeyword;
+import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
 
 import java.util.List;
 

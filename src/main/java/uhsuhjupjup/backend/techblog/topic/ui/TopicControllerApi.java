@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.topic.ui;
+package uhsuhjupjup.backend.techblog.topic.ui;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -7,8 +7,8 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import uhsuhjupjup.backend.topic.ui.dto.TopicDetailResponse;
-import uhsuhjupjup.backend.topic.ui.dto.TopicResponse;
+import uhsuhjupjup.backend.techblog.topic.ui.dto.TopicDetailResponse;
+import uhsuhjupjup.backend.techblog.topic.ui.dto.TopicResponse;
 
 import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;

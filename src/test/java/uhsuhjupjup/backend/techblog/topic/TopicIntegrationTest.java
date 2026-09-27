@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.topic;
+package uhsuhjupjup.backend.techblog.topic;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,10 +14,10 @@ import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.domain.TopicKeyword;
-import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
-import uhsuhjupjup.backend.topic.infra.TopicRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicKeywordRepository;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

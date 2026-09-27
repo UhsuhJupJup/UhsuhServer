@@ -10,8 +10,8 @@ import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.subscription.domain.KeywordSubscription;
 import uhsuhjupjup.backend.subscription.domain.TopicSubscription;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.infra.TopicRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 
 import java.util.List;
 

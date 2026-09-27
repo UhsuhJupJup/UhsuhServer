@@ -18,8 +18,8 @@ import uhsuhjupjup.backend.subscription.infra.TopicSubscriptionRepository;
 import uhsuhjupjup.backend.support.KeywordFixture;
 import uhsuhjupjup.backend.support.MemberFixture;
 import uhsuhjupjup.backend.support.TopicFixture;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.infra.TopicRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;

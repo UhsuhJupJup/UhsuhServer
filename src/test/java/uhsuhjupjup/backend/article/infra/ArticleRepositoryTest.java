@@ -12,10 +12,10 @@ import uhsuhjupjup.backend.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.domain.TopicKeyword;
-import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
-import uhsuhjupjup.backend.topic.infra.TopicRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicKeywordRepository;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;

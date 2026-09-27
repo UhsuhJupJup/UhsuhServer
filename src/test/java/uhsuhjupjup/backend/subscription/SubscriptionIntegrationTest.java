@@ -18,8 +18,8 @@ import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
-import uhsuhjupjup.backend.topic.domain.Topic;
-import uhsuhjupjup.backend.topic.infra.TopicRepository;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.infra.TopicRepository;
 
 import java.time.LocalDateTime;
 

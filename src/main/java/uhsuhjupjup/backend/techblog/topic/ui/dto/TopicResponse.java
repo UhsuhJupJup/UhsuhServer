@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.topic.ui.dto;
+package uhsuhjupjup.backend.techblog.topic.ui.dto;
 
-import uhsuhjupjup.backend.topic.domain.Topic;
+import uhsuhjupjup.backend.techblog.topic.domain.Topic;
 
 public record TopicResponse(Long id, String name) {
 
