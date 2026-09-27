@@ -1,11 +1,11 @@
-package uhsuhjupjup.backend.blog.application;
+package uhsuhjupjup.backend.techblog.blog.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import uhsuhjupjup.backend.blog.domain.Blog;
-import uhsuhjupjup.backend.blog.infra.BlogRepository;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 

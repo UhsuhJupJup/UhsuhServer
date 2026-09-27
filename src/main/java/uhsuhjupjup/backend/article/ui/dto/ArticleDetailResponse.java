@@ -2,7 +2,7 @@ package uhsuhjupjup.backend.article.ui.dto;
 
 import uhsuhjupjup.backend.article.application.dto.ArticleDetailResult;
 import uhsuhjupjup.backend.article.domain.Article;
-import uhsuhjupjup.backend.blog.ui.dto.BlogResponse;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.BlogResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;

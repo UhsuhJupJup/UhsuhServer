@@ -13,7 +13,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 import java.time.LocalDateTime;
 

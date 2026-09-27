@@ -13,7 +13,7 @@ import uhsuhjupjup.backend.article.application.dto.ArticlePageResult;
 import uhsuhjupjup.backend.article.application.dto.ArticleSummaryResult;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.ArticleFixture;
 import uhsuhjupjup.backend.support.BlogFixture;

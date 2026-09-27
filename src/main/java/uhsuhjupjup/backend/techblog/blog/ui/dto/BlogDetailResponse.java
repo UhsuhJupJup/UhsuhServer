@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.blog.ui.dto;
+package uhsuhjupjup.backend.techblog.blog.ui.dto;
 
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 public record BlogDetailResponse(Long id, String name, String domain, String logoUrl) {
 

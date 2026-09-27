@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.blog.ui;
+package uhsuhjupjup.backend.techblog.blog.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import uhsuhjupjup.backend.blog.application.BlogService;
-import uhsuhjupjup.backend.blog.ui.dto.AdminBlogResponse;
-import uhsuhjupjup.backend.blog.ui.dto.BlogCreateRequest;
-import uhsuhjupjup.backend.blog.ui.dto.BlogUpdateRequest;
+import uhsuhjupjup.backend.techblog.blog.application.BlogService;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.AdminBlogResponse;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.BlogCreateRequest;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.BlogUpdateRequest;
 import uhsuhjupjup.backend.common.auth.AdminMember;
 import uhsuhjupjup.backend.member.domain.Member;
 

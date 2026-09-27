@@ -13,7 +13,7 @@ import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;

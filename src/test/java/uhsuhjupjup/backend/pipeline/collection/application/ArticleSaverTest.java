@@ -9,7 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.pipeline.collection.application.ArticleSaver;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.FetchedArticle;
 import uhsuhjupjup.backend.support.BlogFixture;

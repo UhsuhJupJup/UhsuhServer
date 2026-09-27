@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.blog.domain;
+package uhsuhjupjup.backend.techblog.blog.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.FetchedArticle;
 import uhsuhjupjup.backend.pipeline.collection.domain.ArticleUrl;
 

@@ -1,7 +1,7 @@
-package uhsuhjupjup.backend.blog.infra;
+package uhsuhjupjup.backend.techblog.blog.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 import java.util.List;
 

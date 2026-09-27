@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.blog.ui;
+package uhsuhjupjup.backend.techblog.blog.ui;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -7,7 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import uhsuhjupjup.backend.blog.application.BlogService;
+import uhsuhjupjup.backend.techblog.blog.application.BlogService;
 import uhsuhjupjup.backend.support.BlogFixture;
 
 import java.util.List;

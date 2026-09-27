@@ -3,8 +3,8 @@ package uhsuhjupjup.backend.pipeline.collection.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import uhsuhjupjup.backend.blog.domain.Blog;
-import uhsuhjupjup.backend.blog.infra.BlogRepository;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.CollectionResult;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.FetchedArticle;
 

@@ -1,12 +1,12 @@
-package uhsuhjupjup.backend.blog.application;
+package uhsuhjupjup.backend.techblog.blog.application;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import uhsuhjupjup.backend.blog.domain.Blog;
-import uhsuhjupjup.backend.blog.infra.BlogRepository;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.support.BlogFixture;

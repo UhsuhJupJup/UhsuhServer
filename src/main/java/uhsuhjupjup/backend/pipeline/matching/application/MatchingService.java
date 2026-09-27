@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.techblog.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.collection.application.FeedClient;

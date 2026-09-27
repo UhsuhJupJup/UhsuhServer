@@ -1,13 +1,13 @@
-package uhsuhjupjup.backend.blog.ui;
+package uhsuhjupjup.backend.techblog.blog.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import uhsuhjupjup.backend.blog.application.BlogService;
-import uhsuhjupjup.backend.blog.ui.dto.BlogDetailResponse;
-import uhsuhjupjup.backend.blog.ui.dto.BlogResponse;
+import uhsuhjupjup.backend.techblog.blog.application.BlogService;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.BlogDetailResponse;
+import uhsuhjupjup.backend.techblog.blog.ui.dto.BlogResponse;
 
 import java.util.List;
 

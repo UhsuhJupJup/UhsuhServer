@@ -11,7 +11,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 import uhsuhjupjup.backend.emailsubscription.domain.EmailSubscriber;
 import uhsuhjupjup.backend.emailsubscription.infra.EmailSubscriberRepository;
 import uhsuhjupjup.backend.member.domain.Member;

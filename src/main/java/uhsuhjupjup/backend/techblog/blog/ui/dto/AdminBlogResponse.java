@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.blog.ui.dto;
+package uhsuhjupjup.backend.techblog.blog.ui.dto;
 
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 public record AdminBlogResponse(Long id, String name, String domain, String rssUrl, boolean active, String logoUrl) {
 

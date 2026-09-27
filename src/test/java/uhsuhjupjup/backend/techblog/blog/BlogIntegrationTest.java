@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.blog;
+package uhsuhjupjup.backend.techblog.blog;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +10,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import uhsuhjupjup.backend.blog.domain.Blog;
-import uhsuhjupjup.backend.blog.infra.BlogRepository;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
