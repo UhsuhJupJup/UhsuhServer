@@ -186,6 +186,7 @@ jobs:
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            OSS_GITHUB_TOKEN=${{ secrets.OSS_GITHUB_TOKEN }}
             MAIL_GMAIL_USERNAME=${{ secrets.MAIL_GMAIL_USERNAME }}
             MAIL_GMAIL_PASSWORD=${{ secrets.MAIL_GMAIL_PASSWORD }}
             BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}

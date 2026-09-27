@@ -31,6 +31,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GPT_ENABLED: "true"
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OSS_GITHUB_TOKEN: ${OSS_GITHUB_TOKEN}
 
       CORS_ALLOWED_ORIGINS: https://uhsuh.com,https://www.uhsuh.com
 
