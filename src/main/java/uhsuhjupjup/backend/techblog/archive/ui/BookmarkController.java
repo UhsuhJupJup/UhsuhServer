@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.archive.ui;
+package uhsuhjupjup.backend.techblog.archive.ui;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import uhsuhjupjup.backend.archive.application.BookmarkService;
-import uhsuhjupjup.backend.archive.ui.dto.BookmarkedArticlesResponse;
+import uhsuhjupjup.backend.techblog.archive.application.BookmarkService;
+import uhsuhjupjup.backend.techblog.archive.ui.dto.BookmarkedArticlesResponse;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.member.domain.Member;
 

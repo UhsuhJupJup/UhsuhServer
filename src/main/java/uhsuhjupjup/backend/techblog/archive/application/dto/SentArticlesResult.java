@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.archive.application.dto;
+package uhsuhjupjup.backend.techblog.archive.application.dto;
 
 import java.util.List;
 

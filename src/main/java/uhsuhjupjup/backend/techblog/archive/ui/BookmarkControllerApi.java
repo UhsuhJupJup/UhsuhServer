@@ -1,4 +1,4 @@
-package uhsuhjupjup.backend.archive.ui;
+package uhsuhjupjup.backend.techblog.archive.ui;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -8,7 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import uhsuhjupjup.backend.archive.ui.dto.BookmarkedArticlesResponse;
+import uhsuhjupjup.backend.techblog.archive.ui.dto.BookmarkedArticlesResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 import io.swagger.v3.oas.annotations.media.Schema;
 import uhsuhjupjup.backend.common.exception.ErrorResponse;

@@ -1,9 +1,9 @@
-package uhsuhjupjup.backend.archive.infra;
+package uhsuhjupjup.backend.techblog.archive.infra;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import uhsuhjupjup.backend.archive.domain.Bookmark;
+import uhsuhjupjup.backend.techblog.archive.domain.Bookmark;
 
 import java.util.List;
 

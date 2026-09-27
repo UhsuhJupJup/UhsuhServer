@@ -1,13 +1,13 @@
-package uhsuhjupjup.backend.archive.application;
+package uhsuhjupjup.backend.techblog.archive.application;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import uhsuhjupjup.backend.archive.application.dto.BookmarkedArticleResult;
-import uhsuhjupjup.backend.archive.application.dto.BookmarkedArticlesResult;
-import uhsuhjupjup.backend.archive.domain.Bookmark;
-import uhsuhjupjup.backend.archive.infra.BookmarkRepository;
+import uhsuhjupjup.backend.techblog.archive.application.dto.BookmarkedArticleResult;
+import uhsuhjupjup.backend.techblog.archive.application.dto.BookmarkedArticlesResult;
+import uhsuhjupjup.backend.techblog.archive.domain.Bookmark;
+import uhsuhjupjup.backend.techblog.archive.infra.BookmarkRepository;
 import uhsuhjupjup.backend.techblog.article.application.dto.ArticleSummaryResult;
 import uhsuhjupjup.backend.techblog.article.domain.Article;
 import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;

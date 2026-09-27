@@ -1,6 +1,6 @@
-package uhsuhjupjup.backend.archive.ui.dto;
+package uhsuhjupjup.backend.techblog.archive.ui.dto;
 
-import uhsuhjupjup.backend.archive.application.dto.SentArticlesResult;
+import uhsuhjupjup.backend.techblog.archive.application.dto.SentArticlesResult;
 import uhsuhjupjup.backend.techblog.article.ui.dto.ArticleResponse;
 
 import java.time.LocalDateTime;
