@@ -35,7 +35,15 @@ public enum ErrorCode {
     EMAIL_ALREADY_SUBSCRIBED(HttpStatus.CONFLICT, "이미 구독 중인 이메일입니다. 관리 링크로 변경해 주세요."),
     INVALID_MANAGE_TOKEN(HttpStatus.NOT_FOUND, "유효하지 않거나 만료된 관리 링크입니다."),
 
-    BLOG_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 블로그 도메인입니다.");
+    BLOG_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 블로그 도메인입니다."),
+
+    OSS_REPO_PRIVATE(HttpStatus.BAD_REQUEST, "비공개 레포는 등록할 수 없습니다."),
+    OSS_REPO_ISSUES_DISABLED(HttpStatus.BAD_REQUEST, "이슈를 꺼 둔 레포는 등록할 수 없습니다."),
+    OSS_REPO_ARCHIVED(HttpStatus.BAD_REQUEST, "보관(archived)된 레포는 등록할 수 없습니다."),
+    GITHUB_REPO_NOT_FOUND(HttpStatus.NOT_FOUND, "GitHub에서 레포를 찾을 수 없습니다."),
+    OSS_REPO_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 레포입니다."),
+    GITHUB_TOKEN_REQUIRED(HttpStatus.SERVICE_UNAVAILABLE, "GitHub 토큰이 설정되지 않아 조회할 수 없습니다."),
+    GITHUB_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "GitHub를 지금 조회할 수 없습니다. 잠시 뒤 다시 시도해 주세요.");
 
     private final HttpStatus status;
     private final String message;
