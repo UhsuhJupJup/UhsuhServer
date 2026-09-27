@@ -1,8 +1,8 @@
 package uhsuhjupjup.backend.support;
 
 import org.springframework.test.util.ReflectionTestUtils;
-import uhsuhjupjup.backend.article.domain.Article;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 import java.time.LocalDateTime;
 

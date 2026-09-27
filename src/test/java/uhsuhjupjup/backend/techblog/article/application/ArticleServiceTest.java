@@ -1,0 +1,120 @@
+package uhsuhjupjup.backend.techblog.article.application;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import uhsuhjupjup.backend.techblog.article.application.dto.ArticleDetailResult;
+import uhsuhjupjup.backend.techblog.article.application.dto.ArticlePageResult;
+import uhsuhjupjup.backend.techblog.article.domain.Article;
+import uhsuhjupjup.backend.techblog.article.domain.ArticleKeyword;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.techblog.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
+import uhsuhjupjup.backend.common.exception.BusinessException;
+import uhsuhjupjup.backend.common.exception.ErrorCode;
+import uhsuhjupjup.backend.techblog.keyword.domain.Keyword;
+import uhsuhjupjup.backend.support.ArticleFixture;
+import uhsuhjupjup.backend.support.BlogFixture;
+import uhsuhjupjup.backend.support.KeywordFixture;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.BDDMockito.given;
+
+@ExtendWith(MockitoExtension.class)
+class ArticleServiceTest {
+
+    @Mock
+    private ArticleRepository articleRepository;
+
+    @Mock
+    private ArticleKeywordRepository articleKeywordRepository;
+
+    @InjectMocks
+    private ArticleService articleService;
+
+    private final Blog blog = BlogFixture.blog(1L, "우아한형제들", "techblog.woowahan.com");
+    private final Article article = ArticleFixture.article(
+            1L, blog, "MySQL 데드락 디버깅 회고", "https://techblog.woowahan.com/12345/",
+            LocalDateTime.of(2026, 6, 15, 11, 0));
+
+    @Test
+    void getDetail_returnsArticleWithKeywords() {
+        Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
+        given(articleRepository.findWithBlogById(1L)).willReturn(Optional.of(article));
+        given(articleKeywordRepository.findWithKeywordByArticleId(1L))
+                .willReturn(List.of(ArticleKeyword.of(article, mysql, "title")));
+
+        ArticleDetailResult result = articleService.getDetail(1L);
+
+        assertThat(result.article()).isEqualTo(article);
+        assertThat(result.articleKeywords()).hasSize(1);
+    }
+
+    @Test
+    void getDetail_whenArticleNotFound_throws() {
+        given(articleRepository.findWithBlogById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> articleService.getDetail(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ARTICLE_NOT_FOUND);
+    }
+
+    @Test
+    void search_returnsArticlesWithKeywordNames() {
+        Keyword mysql = KeywordFixture.keyword(3L, "MySQL");
+        given(articleRepository.search(isNull(), anyBoolean(), anyCollection(), anyBoolean(), anyCollection(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(article)));
+        given(articleKeywordRepository.findWithKeywordByArticleIdIn(anyCollection()))
+                .willReturn(List.of(ArticleKeyword.of(article, mysql, "title")));
+
+        ArticlePageResult result = articleService.search(null, null, null, null, null, null);
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).article()).isEqualTo(article);
+        assertThat(result.content().get(0).keywordNames()).containsExactly("MySQL");
+        assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void search_whenNoArticles_returnsEmpty() {
+        given(articleRepository.search(isNull(), anyBoolean(), anyCollection(), anyBoolean(), anyCollection(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        assertThat(articleService.search(null, null, null, null, null, null).content()).isEmpty();
+    }
+
+    @Test
+    void search_withTopicIds_filtersByGivenTopics() {
+        given(articleRepository.search(isNull(), eq(true), anyCollection(), eq(false), eq(List.of(1L, 2L)), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        ArticlePageResult result = articleService.search(null, null, List.of(1L, 2L), null, null, null);
+
+        assertThat(result.content()).isEmpty();
+    }
+
+    @Test
+    void search_withKeywordIds_filtersByGivenKeywords() {
+        given(articleRepository.search(isNull(), eq(false), eq(List.of(3L, 4L)), eq(true), anyCollection(), isNull(), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        ArticlePageResult result = articleService.search(null, List.of(3L, 4L), null, null, null, null);
+
+        assertThat(result.content()).isEmpty();
+    }
+}

@@ -1,0 +1,19 @@
+package uhsuhjupjup.backend.techblog.topic.infra;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import uhsuhjupjup.backend.techblog.topic.domain.TopicKeyword;
+
+import java.util.List;
+
+public interface TopicKeywordRepository extends JpaRepository<TopicKeyword, Long> {
+
+    @Query("select tk from TopicKeyword tk join fetch tk.keyword where tk.topic.id = :topicId order by tk.keyword.name")
+    List<TopicKeyword> findWithKeywordByTopicId(Long topicId);
+
+    @Query("select tk from TopicKeyword tk join fetch tk.topic where tk.keyword.id = :keywordId order by tk.topic.id")
+    List<TopicKeyword> findWithTopicByKeywordId(Long keywordId);
+
+    @Query("select tk from TopicKeyword tk join fetch tk.topic join fetch tk.keyword order by tk.topic.id, tk.keyword.name")
+    List<TopicKeyword> findAllWithTopicAndKeyword();
+}

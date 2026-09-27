@@ -1,0 +1,42 @@
+package uhsuhjupjup.backend.techblog.topic.ui;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import uhsuhjupjup.backend.techblog.topic.application.TopicService;
+import uhsuhjupjup.backend.techblog.topic.ui.dto.TopicDetailResponse;
+import uhsuhjupjup.backend.techblog.topic.ui.dto.TopicResponse;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/topics")
+@RequiredArgsConstructor
+public class TopicController implements TopicControllerApi {
+
+    private final TopicService topicService;
+
+    @Override
+    @GetMapping
+    public List<TopicResponse> list() {
+        return topicService.findAll().stream()
+                .map(TopicResponse::from)
+                .toList();
+    }
+
+    @Override
+    @GetMapping("/with-keywords")
+    public List<TopicDetailResponse> listWithKeywords() {
+        return topicService.findAllWithKeywords().stream()
+                .map(TopicDetailResponse::from)
+                .toList();
+    }
+
+    @Override
+    @GetMapping("/{id}")
+    public TopicDetailResponse detail(@PathVariable Long id) {
+        return TopicDetailResponse.from(topicService.getDetail(id));
+    }
+}

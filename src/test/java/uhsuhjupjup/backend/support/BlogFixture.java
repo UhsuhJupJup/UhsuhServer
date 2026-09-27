@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.support;
 
 import org.springframework.test.util.ReflectionTestUtils;
-import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.techblog.blog.domain.Blog;
 
 public final class BlogFixture {
 
