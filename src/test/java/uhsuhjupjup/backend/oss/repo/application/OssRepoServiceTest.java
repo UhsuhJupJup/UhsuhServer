@@ -27,6 +27,7 @@ import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -272,14 +273,50 @@ class OssRepoServiceTest {
                 .containsExactly("ai-ml");
     }
 
+    @Test
+    void getDetail_activeRepo_returnsItWithCategoriesInQueryOrder() {
+        given(ossRepoRepository.findByIdAndStatus(1L, ACTIVE)).willReturn(Optional.of(springBoot));
+        given(ossRepoCategoryRepository.findWithCategoryByRepoIdIn(List.of(1L)))
+                .willReturn(springBoot.linkCategories(List.of(devtools, backend)));
+
+        OssRepoResult result = ossRepoService.getDetail(1L);
+
+        assertThat(result).isEqualTo(
+                new OssRepoResult(1L, 1L, "spring-projects/spring-boot", null, "Java", 80_000, ACTIVE, List.of(
+                        new OssCategoryResult("devtools", "개발 도구", "Developer Tools"),
+                        new OssCategoryResult("backend", "백엔드와 API", "Backend & APIs"))));
+        then(ossCategoryRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void getDetail_repoWithoutCategories_returnsEmptyCategories() {
+        given(ossRepoRepository.findByIdAndStatus(2L, ACTIVE)).willReturn(Optional.of(react));
+        given(ossRepoCategoryRepository.findWithCategoryByRepoIdIn(List.of(2L))).willReturn(List.of());
+
+        OssRepoResult result = ossRepoService.getDetail(2L);
+
+        assertThat(result.fullName()).isEqualTo("facebook/react");
+        assertThat(result.categories()).isEmpty();
+    }
+
+    @Test
+    void getDetail_missingOrSuspendedRepo_throwsRepoNotFoundWithoutReadingCategories() {
+        given(ossRepoRepository.findByIdAndStatus(99L, ACTIVE)).willReturn(Optional.empty());
+
+        assertFailsWith(ErrorCode.OSS_REPO_NOT_FOUND, () -> ossRepoService.getDetail(99L));
+
+        then(ossRepoCategoryRepository).shouldHaveNoInteractions();
+        then(ossCategoryRepository).shouldHaveNoInteractions();
+    }
+
     private void thenNothingWasRead() {
         then(ossRepoRepository).shouldHaveNoInteractions();
         then(ossCategoryRepository).shouldHaveNoInteractions();
         then(ossRepoCategoryRepository).shouldHaveNoInteractions();
     }
 
-    private static void assertFailsWith(ErrorCode expected, ThrowingCallable explore) {
-        assertThatThrownBy(explore)
+    private static void assertFailsWith(ErrorCode expected, ThrowingCallable call) {
+        assertThatThrownBy(call)
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(expected);
     }
