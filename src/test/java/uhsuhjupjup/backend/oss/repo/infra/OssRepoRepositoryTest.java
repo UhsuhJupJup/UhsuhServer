@@ -41,6 +41,17 @@ class OssRepoRepositoryTest {
     }
 
     @Test
+    void findForUpdateById_returnsSavedRepoOrNothing() {
+        Long id = ossRepoRepository.saveAndFlush(repo(1L, "spring-projects/spring-boot")).getId();
+        entityManager.clear();
+
+        assertThat(ossRepoRepository.findForUpdateById(id))
+                .map(OssRepo::getFullName)
+                .hasValue("spring-projects/spring-boot");
+        assertThat(ossRepoRepository.findForUpdateById(id + 1)).isEmpty();
+    }
+
+    @Test
     void create_lowercasesFullNameKeyAndStartsActive() {
         Long id = ossRepoRepository.saveAndFlush(repo(1L, "Spring-Projects/Spring-Boot")).getId();
         entityManager.clear();

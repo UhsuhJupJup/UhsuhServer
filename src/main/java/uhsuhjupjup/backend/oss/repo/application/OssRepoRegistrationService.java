@@ -14,6 +14,7 @@ import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoResult;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 
+import java.util.List;
 import java.util.OptionalInt;
 
 @Slf4j
@@ -36,7 +37,7 @@ public class OssRepoRegistrationService {
         if (isRegistered(repo)) {
             throw new BusinessException(ErrorCode.OSS_REPO_ALREADY_EXISTS);
         }
-        return OssRepoResult.from(saveNew(repo));
+        return OssRepoResult.of(saveNew(repo), List.of());
     }
 
     private GitHubRepo findOnGitHub(String fullName) {

@@ -6,6 +6,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import uhsuhjupjup.backend.oss.repo.domain.OssCategory;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
@@ -34,6 +36,25 @@ class OssCategoryRepositoryTest {
                         tuple("languages", "언어와 런타임", "Languages & Runtimes"),
                         tuple("docs", "문서와 학습 자료", "Docs & Learning"),
                         tuple("games-media", "게임과 미디어", "Games & Media"));
+    }
+
+    @Test
+    void findAllByCodeInOrderByIdAsc_returnsFoundCategoriesInIdOrder() {
+        assertThat(ossCategoryRepository.findAllByCodeInOrderByIdAsc(List.of("backend", "nothing", "ai-ml")))
+                .extracting(OssCategory::getCode)
+                .containsExactly("ai-ml", "backend");
+    }
+
+    @Test
+    void findAllByCodeInOrderByIdAsc_noCodes_returnsNothing() {
+        assertThat(ossCategoryRepository.findAllByCodeInOrderByIdAsc(List.of())).isEmpty();
+    }
+
+    @Test
+    void findAllByCodeInOrderByIdAsc_matchesCodeIgnoringCaseByColumnCollation() {
+        assertThat(ossCategoryRepository.findAllByCodeInOrderByIdAsc(List.of("AI-ML")))
+                .extracting(OssCategory::getCode)
+                .containsExactly("ai-ml");
     }
 
     @Test

@@ -43,7 +43,10 @@ public enum ErrorCode {
     GITHUB_REPO_NOT_FOUND(HttpStatus.NOT_FOUND, "GitHub에서 레포를 찾을 수 없습니다."),
     OSS_REPO_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 레포입니다."),
     GITHUB_TOKEN_REQUIRED(HttpStatus.SERVICE_UNAVAILABLE, "GitHub 토큰이 설정되지 않아 조회할 수 없습니다."),
-    GITHUB_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "GitHub를 지금 조회할 수 없습니다. 잠시 뒤 다시 시도해 주세요.");
+    GITHUB_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "GitHub를 지금 조회할 수 없습니다. 잠시 뒤 다시 시도해 주세요."),
+
+    OSS_CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "없는 카테고리 코드가 있습니다."),
+    OSS_REPO_NOT_FOUND(HttpStatus.NOT_FOUND, "레포를 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

@@ -30,6 +30,7 @@ import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepoStatus;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,7 +83,8 @@ class OssRepoRegistrationServiceTest {
         OssRepoResult result = ossRepoRegistrationService.register("OCTOCAT/hello-world");
 
         assertThat(result).isEqualTo(new OssRepoResult(
-                10L, GITHUB_ID, CANONICAL_NAME, "My first repository on GitHub!", "Java", 80, OssRepoStatus.ACTIVE));
+                10L, GITHUB_ID, CANONICAL_NAME, "My first repository on GitHub!", "Java", 80, OssRepoStatus.ACTIVE,
+                List.of()));
         ArgumentCaptor<OssRepo> saved = ArgumentCaptor.forClass(OssRepo.class);
         then(ossRepoSaver).should().save(saved.capture());
         assertThat(saved.getValue().getFullName()).isEqualTo(CANONICAL_NAME);

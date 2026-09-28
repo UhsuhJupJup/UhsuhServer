@@ -12,14 +12,22 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import uhsuhjupjup.backend.common.domain.BaseEntity;
+import uhsuhjupjup.backend.common.exception.BusinessException;
+import uhsuhjupjup.backend.common.exception.ErrorCode;
 
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Entity
 @Table(name = "oss_repo")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OssRepo extends BaseEntity {
+
+    private static final int MAX_CATEGORIES = 2;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,5 +74,21 @@ public class OssRepo extends BaseEntity {
     public static OssRepo create(Long githubId, String fullName, String description, String primaryLanguage,
                                  int stars) {
         return new OssRepo(githubId, fullName, description, primaryLanguage, stars);
+    }
+
+    public List<OssRepoCategory> linkCategories(Collection<OssCategory> categories) {
+        Collection<OssCategory> distinct = distinctByCode(categories);
+        if (distinct.size() > MAX_CATEGORIES) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR);
+        }
+        return distinct.stream()
+                .map(category -> OssRepoCategory.of(this, category))
+                .toList();
+    }
+
+    private static Collection<OssCategory> distinctByCode(Collection<OssCategory> categories) {
+        Map<String, OssCategory> byCode = new LinkedHashMap<>();
+        categories.forEach(category -> byCode.putIfAbsent(category.getCode(), category));
+        return byCode.values();
     }
 }
