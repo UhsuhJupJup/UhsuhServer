@@ -53,6 +53,16 @@ public class OssRepoService {
         return new OssRepoPageResult(withCategories(page), OssRepoCursor.after(order, page.getLast()));
     }
 
+    public OssRepoResult getDetail(Long repoId) {
+        OssRepo repo = ossRepoRepository.findByIdAndStatus(repoId, OssRepoStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.OSS_REPO_NOT_FOUND));
+        List<OssCategory> categories = ossRepoCategoryRepository.findWithCategoryByRepoIdIn(List.of(repo.getId()))
+                .stream()
+                .map(OssRepoCategory::getCategory)
+                .toList();
+        return OssRepoResult.of(repo, categories);
+    }
+
     private Long findCategoryId(String code) {
         if (code == null) {
             return null;
