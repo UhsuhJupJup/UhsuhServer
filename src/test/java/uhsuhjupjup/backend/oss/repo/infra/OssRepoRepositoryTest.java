@@ -70,6 +70,23 @@ class OssRepoRepositoryTest {
     }
 
     @Test
+    void findByIdAndStatus_returnsRepoOnlyWhenIdAndStatusBothMatch() {
+        Long active = saveWith("spring-projects/spring-boot", null, "Java", 80_000);
+        Long suspended = saveSuspended("octocat/suspended", 90_000);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(ossRepoRepository.findByIdAndStatus(active, OssRepoStatus.ACTIVE))
+                .map(OssRepo::getFullName)
+                .hasValue("spring-projects/spring-boot");
+        assertThat(ossRepoRepository.findByIdAndStatus(suspended, OssRepoStatus.ACTIVE)).isEmpty();
+        assertThat(ossRepoRepository.findByIdAndStatus(suspended, OssRepoStatus.SUSPENDED))
+                .map(OssRepo::getFullName)
+                .hasValue("octocat/suspended");
+        assertThat(ossRepoRepository.findByIdAndStatus(suspended + 1, OssRepoStatus.ACTIVE)).isEmpty();
+    }
+
+    @Test
     void create_lowercasesFullNameKeyAndStartsActive() {
         Long id = ossRepoRepository.saveAndFlush(repo(1L, "Spring-Projects/Spring-Boot")).getId();
         entityManager.clear();
@@ -263,10 +280,10 @@ class OssRepoRepositoryTest {
         return ossRepoRepository.save(OssRepo.create(nextGithubId++, fullName, description, language, stars)).getId();
     }
 
-    private void saveSuspended(String fullName, int stars) {
+    private Long saveSuspended(String fullName, int stars) {
         OssRepo repo = OssRepo.create(nextGithubId++, fullName, null, "Java", stars);
         ReflectionTestUtils.setField(repo, "status", OssRepoStatus.SUSPENDED);
-        ossRepoRepository.save(repo);
+        return ossRepoRepository.save(repo).getId();
     }
 
     private List<Long> idsByStars(Long categoryId, String language, String pattern, Integer afterStars,

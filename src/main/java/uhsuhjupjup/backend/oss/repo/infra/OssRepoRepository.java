@@ -20,6 +20,8 @@ public interface OssRepoRepository extends JpaRepository<OssRepo, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OssRepo> findForUpdateById(Long id);
 
+    Optional<OssRepo> findByIdAndStatus(Long id, OssRepoStatus status);
+
     @Query("""
             select r from OssRepo r
             where r.status = :status

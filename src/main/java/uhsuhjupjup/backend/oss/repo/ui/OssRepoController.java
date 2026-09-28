@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.oss.repo.application.OssRepoService;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoCursor;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoSort;
+import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoDetailResponse;
 import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoPageResponse;
 
 import java.beans.PropertyEditor;
@@ -38,6 +40,12 @@ public class OssRepoController implements OssRepoControllerApi {
                                        @RequestParam(required = false) OssRepoCursor cursor,
                                        @RequestParam(required = false) Integer size) {
         return OssRepoPageResponse.from(ossRepoService.explore(category, language, q, sort, cursor, size));
+    }
+
+    @Override
+    @GetMapping("/{repoId}")
+    public OssRepoDetailResponse detail(@PathVariable Long repoId) {
+        return OssRepoDetailResponse.from(ossRepoService.getDetail(repoId));
     }
 
     private static PropertyEditor parsedBy(Function<String, ?> parser) {

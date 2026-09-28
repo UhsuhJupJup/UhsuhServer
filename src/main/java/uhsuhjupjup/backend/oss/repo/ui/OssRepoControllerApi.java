@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import uhsuhjupjup.backend.common.exception.ErrorResponse;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoCursor;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoSort;
+import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoDetailResponse;
 import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoPageResponse;
 
 @Tag(name = "오픈소스 - 레포", description = "오픈소스 레포 카탈로그를 탐색하는 API")
@@ -156,4 +157,90 @@ public interface OssRepoControllerApi {
             @Parameter(description = "이전 응답의 nextCursor. 첫 페이지는 보내지 않는다", schema = @Schema(type = "string"))
             OssRepoCursor cursor,
             @Parameter(description = "페이지 크기. 기본 20, 최대 50", example = "20") Integer size);
+
+    @Operation(
+            summary = "레포 상세 조회",
+            description = """
+                    ### 인증
+
+                    - 로그인 없이 호출할 수 있습니다.
+
+                    ### 응답
+
+                    - 레포 정보와 카테고리를 함께 반환합니다.
+                    - `categories`는 카테고리 목록 조회(`GET /api/oss/categories`)와 같은 순서입니다. 카테고리가 없으면 빈 배열입니다.
+                    - `description`과 `primaryLanguage`는 GitHub에 값이 없으면 null입니다.
+                    - `githubUrl`은 GitHub의 레포 페이지 주소로, `https://github.com/` 뒤에 `fullName`을 붙인 값입니다.
+
+                    ### 에러
+
+                    - 없는 레포와 정지된 레포는 `OSS_REPO_NOT_FOUND`로 404를 반환합니다. 두 경우의 응답은 같습니다.
+                    - `repoId`를 정수(Long 범위)로 읽을 수 없으면 `VALIDATION_ERROR`로 400을 반환하고, `fieldErrors`에 `repoId`를 담습니다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(
+                            schema = @Schema(implementation = OssRepoDetailResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "id": 10,
+                                      "fullName": "spring-projects/spring-boot",
+                                      "description": "Spring Boot helps you to create Spring-powered, production-grade applications and services with absolute minimum fuss.",
+                                      "primaryLanguage": "Java",
+                                      "stars": 80000,
+                                      "categories": [
+                                        {
+                                          "code": "backend",
+                                          "nameKo": "백엔드와 API",
+                                          "nameEn": "Backend & APIs"
+                                        },
+                                        {
+                                          "code": "devtools",
+                                          "nameKo": "개발 도구",
+                                          "nameEn": "Developer Tools"
+                                        }
+                                      ],
+                                      "githubUrl": "https://github.com/spring-projects/spring-boot"
+                                    }
+                                    """))),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "정수(Long 범위)로 읽을 수 없는 레포 ID",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "VALIDATION_ERROR",
+                                      "message": "요청 값이 올바르지 않습니다.",
+                                      "status": 400,
+                                      "path": "/api/oss/repos/abc",
+                                      "timestamp": "2026-09-28T14:20:11.482",
+                                      "fieldErrors": [
+                                        {
+                                          "field": "repoId",
+                                          "reason": "숫자여야 합니다."
+                                        }
+                                      ]
+                                    }
+                                    """))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "없는 레포, 또는 정지된 레포",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "OSS_REPO_NOT_FOUND",
+                                      "message": "레포를 찾을 수 없습니다.",
+                                      "status": 404,
+                                      "path": "/api/oss/repos/10",
+                                      "timestamp": "2026-09-28T14:20:11.482"
+                                    }
+                                    """)))
+    })
+    OssRepoDetailResponse detail(
+            @Parameter(description = "레포 ID. 탐색 응답의 `id`(GitHub id가 아님)", example = "10", required = true)
+            Long repoId);
 }

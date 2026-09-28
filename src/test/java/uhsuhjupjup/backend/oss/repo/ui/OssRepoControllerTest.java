@@ -10,6 +10,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uhsuhjupjup.backend.common.exception.BusinessException;
+import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.common.exception.GlobalExceptionHandler;
 import uhsuhjupjup.backend.oss.repo.application.OssRepoService;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssCategoryResult;
@@ -182,5 +184,69 @@ class OssRepoControllerTest {
         mockMvc.perform(get(URL).param("cursor", cursor))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("cursor"));
+    }
+
+    @Test
+    void detail_returnsPublicFieldsCategoriesAndGithubUrl() throws Exception {
+        given(ossRepoService.getDetail(10L)).willReturn(new OssRepoResult(10L, 1296269L,
+                "spring-projects/spring-boot", "Spring Boot", "Java", 80_000, OssRepoStatus.ACTIVE, List.of(
+                new OssCategoryResult("backend", "백엔드와 API", "Backend & APIs"),
+                new OssCategoryResult("devtools", "개발 도구", "Developer Tools"))));
+
+        mockMvc.perform(get(URL + "/10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(10))
+                .andExpect(jsonPath("$.fullName").value("spring-projects/spring-boot"))
+                .andExpect(jsonPath("$.description").value("Spring Boot"))
+                .andExpect(jsonPath("$.primaryLanguage").value("Java"))
+                .andExpect(jsonPath("$.stars").value(80_000))
+                .andExpect(jsonPath("$.categories.length()").value(2))
+                .andExpect(jsonPath("$.categories[0].code").value("backend"))
+                .andExpect(jsonPath("$.categories[0].nameKo").value("백엔드와 API"))
+                .andExpect(jsonPath("$.categories[0].nameEn").value("Backend & APIs"))
+                .andExpect(jsonPath("$.categories[1].code").value("devtools"))
+                .andExpect(jsonPath("$.githubUrl").value("https://github.com/spring-projects/spring-boot"))
+                .andExpect(jsonPath("$.githubId").doesNotExist())
+                .andExpect(jsonPath("$.status").doesNotExist());
+    }
+
+    @Test
+    void detail_repoWithoutOptionalValues_returnsNullsEmptyCategoriesAndGithubUrlOfStoredName() throws Exception {
+        given(ossRepoService.getDetail(11L)).willReturn(new OssRepoResult(11L, 1L, "octocat/Hello-World", null,
+                null, 80, OssRepoStatus.ACTIVE, List.of()));
+
+        mockMvc.perform(get(URL + "/11"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasKey("description")))
+                .andExpect(jsonPath("$.description").value(nullValue()))
+                .andExpect(jsonPath("$", hasKey("primaryLanguage")))
+                .andExpect(jsonPath("$.primaryLanguage").value(nullValue()))
+                .andExpect(jsonPath("$.categories").isArray())
+                .andExpect(jsonPath("$.categories").isEmpty())
+                .andExpect(jsonPath("$.githubUrl").value("https://github.com/octocat/Hello-World"));
+    }
+
+    @Test
+    void detail_repoNotFound_returns404RepoNotFound() throws Exception {
+        given(ossRepoService.getDetail(99L)).willThrow(new BusinessException(ErrorCode.OSS_REPO_NOT_FOUND));
+
+        mockMvc.perform(get(URL + "/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("OSS_REPO_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("레포를 찾을 수 없습니다."))
+                .andExpect(jsonPath("$.path").value("/api/oss/repos/99"));
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\"")
+    @ValueSource(strings = {"abc", "1.5", "99999999999999999999"})
+    void detail_repoIdNotALong_returns400WithRepoIdFieldError(String repoId) throws Exception {
+        mockMvc.perform(get(URL + "/" + repoId))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("repoId"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("숫자여야 합니다."));
+
+        then(ossRepoService).shouldHaveNoInteractions();
     }
 }
