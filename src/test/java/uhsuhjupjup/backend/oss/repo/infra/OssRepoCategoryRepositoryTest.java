@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.oss.repo.infra;
 
+import org.hibernate.Hibernate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
@@ -10,9 +11,11 @@ import uhsuhjupjup.backend.oss.repo.domain.OssRepoCategory;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 @MySqlDataJpaTest
 class OssRepoCategoryRepositoryTest {
@@ -87,8 +90,37 @@ class OssRepoCategoryRepositoryTest {
                 .containsExactly("backend");
     }
 
+    @Test
+    void findWithCategoryByRepoIdIn_returnsGivenReposLinksInCategoryOrderWithCategoriesLoaded() {
+        OssRepo springBoot = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssRepo react = ossRepoRepository.save(repo(2L, "facebook/react"));
+        OssRepo kafka = ossRepoRepository.save(repo(3L, "apache/kafka"));
+        ossRepoCategoryRepository.saveAll(springBoot.linkCategories(inGivenOrder("devtools", "backend")));
+        ossRepoCategoryRepository.saveAll(react.linkCategories(categories("web-frontend")));
+        ossRepoCategoryRepository.saveAll(kafka.linkCategories(categories("data")));
+        entityManager.flush();
+        entityManager.clear();
+
+        List<OssRepoCategory> links =
+                ossRepoCategoryRepository.findWithCategoryByRepoIdIn(List.of(springBoot.getId(), react.getId()));
+
+        assertThat(links).allSatisfy(link -> assertThat(Hibernate.isInitialized(link.getCategory())).isTrue());
+        assertThat(links)
+                .extracting(link -> link.getRepo().getId(), link -> link.getCategory().getCode())
+                .containsExactly(
+                        tuple(react.getId(), "web-frontend"),
+                        tuple(springBoot.getId(), "backend"),
+                        tuple(springBoot.getId(), "devtools"));
+    }
+
     private List<OssCategory> categories(String... codes) {
         return ossCategoryRepository.findAllByCodeInOrderByIdAsc(List.of(codes));
+    }
+
+    private List<OssCategory> inGivenOrder(String... codes) {
+        return Stream.of(codes)
+                .map(code -> categories(code).get(0))
+                .toList();
     }
 
     private OssRepoCategory onlyLink(OssRepo repo, String code) {
