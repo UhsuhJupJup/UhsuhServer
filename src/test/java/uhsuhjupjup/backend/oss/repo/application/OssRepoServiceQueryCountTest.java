@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssCategoryResult;
 import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoPageResult;
+import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoResult;
+import uhsuhjupjup.backend.oss.repo.domain.OssCategory;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 import uhsuhjupjup.backend.oss.repo.infra.OssCategoryRepository;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoCategoryRepository;
@@ -87,5 +89,25 @@ class OssRepoServiceQueryCountTest {
 
         assertThat(result.items()).hasSize(REPO_COUNT);
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(3);
+    }
+
+    @Test
+    void getDetail_readsRepoAndItsCategoriesInCatalogOrderInTwoStatements() {
+        OssRepo nextJs = ossRepoRepository.save(OssRepo.create(100L, "vercel/next.js", null, "JavaScript", 7));
+        ossRepoCategoryRepository.saveAll(nextJs.linkCategories(List.of(category("backend"), category("web-frontend"))));
+        entityManager.flush();
+        entityManager.clear();
+        statistics.clear();
+
+        OssRepoResult result = ossRepoService.getDetail(nextJs.getId());
+
+        assertThat(result.fullName()).isEqualTo("vercel/next.js");
+        assertThat(result.categories()).extracting(OssCategoryResult::code)
+                .containsExactly("web-frontend", "backend");
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+    }
+
+    private OssCategory category(String code) {
+        return ossCategoryRepository.findAllByCodeInOrderByIdAsc(List.of(code)).get(0);
     }
 }
