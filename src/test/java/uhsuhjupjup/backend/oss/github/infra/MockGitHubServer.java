@@ -9,12 +9,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 final class MockGitHubServer {
 
@@ -31,7 +35,9 @@ final class MockGitHubServer {
         this.server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(host), 0), 0);
         server.createContext("/", exchange -> {
             requests.add(new ReceivedRequest(
-                    exchange.getRequestURI().getRawPath(), new Headers(exchange.getRequestHeaders())));
+                    exchange.getRequestURI().getRawPath(),
+                    exchange.getRequestURI().getRawQuery(),
+                    new Headers(exchange.getRequestHeaders())));
             handler.handle(exchange);
         });
         server.setExecutor(executor);
@@ -79,10 +85,25 @@ final class MockGitHubServer {
         exchange.close();
     }
 
-    record ReceivedRequest(String rawPath, Headers headers) {
+    static Map<String, String> queryParams(String rawQuery) {
+        if (rawQuery == null || rawQuery.isEmpty()) {
+            return Map.of();
+        }
+        return Arrays.stream(rawQuery.split("&"))
+                .map(pair -> pair.split("=", 2))
+                .collect(Collectors.toMap(
+                        pair -> URLDecoder.decode(pair[0], StandardCharsets.UTF_8),
+                        pair -> pair.length == 2 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8) : ""));
+    }
+
+    record ReceivedRequest(String rawPath, String rawQuery, Headers headers) {
 
         String header(String name) {
             return headers.getFirst(name);
+        }
+
+        Map<String, String> queryParams() {
+            return MockGitHubServer.queryParams(rawQuery);
         }
     }
 }
