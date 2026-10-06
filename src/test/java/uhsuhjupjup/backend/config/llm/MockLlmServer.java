@@ -1,5 +1,7 @@
 package uhsuhjupjup.backend.config.llm;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -18,9 +20,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-final class MockLlmServer {
+public final class MockLlmServer {
 
     private static final Duration STALL = Duration.ofSeconds(5);
+    private static final String API_KEY = "test-key";
 
     private final HttpServer server;
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -28,13 +31,14 @@ final class MockLlmServer {
     private final List<ReceivedRequest> requests = new CopyOnWriteArrayList<>();
     private volatile List<HttpHandler> responses = List.of(exchange -> json(exchange, 500, "{}", Map.of()));
 
-    MockLlmServer() throws IOException {
+    public MockLlmServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", exchange -> {
             long receivedAtNanos = System.nanoTime();
             int order = received.incrementAndGet();
-            requests.add(new ReceivedRequest(receivedAtNanos, new Headers(exchange.getRequestHeaders())));
-            exchange.getRequestBody().readAllBytes();
+            Headers headers = new Headers(exchange.getRequestHeaders());
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            requests.add(new ReceivedRequest(receivedAtNanos, headers, body));
             List<HttpHandler> script = responses;
             script.get(Math.min(order, script.size()) - 1).handle(exchange);
         });
@@ -42,16 +46,25 @@ final class MockLlmServer {
         server.start();
     }
 
-    void respondInOrder(HttpHandler... handlers) {
+    public AnthropicClient anthropicClient(LlmCallLimits limits) {
+        return LlmClients.withLimits(AnthropicOkHttpClient.builder().baseUrl(baseUrl()).apiKey(API_KEY), limits)
+                .build();
+    }
+
+    public void respondInOrder(HttpHandler... handlers) {
         this.responses = List.of(handlers);
     }
 
-    String baseUrl() {
+    public String baseUrl() {
         return "http://" + server.getAddress().getAddress().getHostAddress() + ":" + server.getAddress().getPort();
     }
 
-    int requestCount() {
+    public int requestCount() {
         return requests.size();
+    }
+
+    public String requestBody(int request) {
+        return requests.get(request).body();
     }
 
     String header(int request, String name) {
@@ -62,24 +75,24 @@ final class MockLlmServer {
         return Duration.ofNanos(requests.get(later).receivedAtNanos() - requests.get(earlier).receivedAtNanos());
     }
 
-    Duration sinceFirstRequest() {
+    public Duration sinceFirstRequest() {
         return Duration.ofNanos(System.nanoTime() - requests.get(0).receivedAtNanos());
     }
 
-    void stop() {
+    public void stop() {
         server.stop(0);
         executor.shutdownNow();
     }
 
-    static HttpHandler status(int status, String body) {
+    public static HttpHandler status(int status, String body) {
         return status(status, body, Map.of());
     }
 
-    static HttpHandler status(int status, String body, Map<String, String> headers) {
+    public static HttpHandler status(int status, String body, Map<String, String> headers) {
         return exchange -> json(exchange, status, body, headers);
     }
 
-    static HttpHandler stall() {
+    public static HttpHandler stall() {
         return exchange -> {
             try {
                 Thread.sleep(STALL);
@@ -90,7 +103,7 @@ final class MockLlmServer {
         };
     }
 
-    static HttpHandler trickle(int status, String body, Duration interval, Duration total) {
+    public static HttpHandler trickle(int status, String body, Duration interval, Duration total) {
         return exchange -> {
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, 0);
@@ -118,6 +131,6 @@ final class MockLlmServer {
         }
     }
 
-    private record ReceivedRequest(long receivedAtNanos, Headers headers) {
+    private record ReceivedRequest(long receivedAtNanos, Headers headers, String body) {
     }
 }
