@@ -8,6 +8,7 @@ import com.anthropic.models.messages.StructuredMessageCreateParams;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Usage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -29,7 +30,7 @@ class ClaudeKeywordClassifier implements KeywordClassifier {
     private final AnthropicClient anthropicClient;
     private final String model;
 
-    ClaudeKeywordClassifier(AnthropicClient anthropicClient,
+    ClaudeKeywordClassifier(@Qualifier(AnthropicConfig.KEYWORD_CLASSIFIER_CLIENT) AnthropicClient anthropicClient,
                             @Value("${claude.model:claude-haiku-4-5}") String model) {
         this.anthropicClient = anthropicClient;
         this.model = model;
