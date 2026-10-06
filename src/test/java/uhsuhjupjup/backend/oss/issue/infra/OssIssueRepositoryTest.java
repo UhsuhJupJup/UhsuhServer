@@ -76,6 +76,21 @@ class OssIssueRepositoryTest {
     }
 
     @Test
+    void findAllByGithubIssueIdIn_returnsOnlyIssuesWithThoseIdsAcrossRepos() {
+        OssRepo springBoot = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssRepo react = ossRepoRepository.save(repo(2L, "facebook/react"));
+        ossIssueRepository.save(issue(springBoot, 10L, 1));
+        ossIssueRepository.save(issue(react, 20L, 1));
+        ossIssueRepository.save(issue(react, 30L, 2));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(ossIssueRepository.findAllByGithubIssueIdIn(List.of(10L, 30L, 99L)))
+                .extracting(OssIssue::getGithubIssueId)
+                .containsExactlyInAnyOrder(10L, 30L);
+    }
+
+    @Test
     void duplicateGithubIssueId_violatesUniqueConstraintAcrossRepos() {
         OssRepo springBoot = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
         OssRepo react = ossRepoRepository.save(repo(2L, "facebook/react"));
