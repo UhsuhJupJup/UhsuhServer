@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import uhsuhjupjup.backend.common.domain.BaseEntity;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,6 +23,9 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OssRepoSyncState extends BaseEntity {
+
+    private static final Duration FIRST_SYNC_WINDOW = Duration.ofDays(7);
+    private static final Duration RESYNC_OVERLAP = Duration.ofMinutes(5);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -50,5 +54,47 @@ public class OssRepoSyncState extends BaseEntity {
 
     public static OssRepoSyncState create(OssRepo repo) {
         return new OssRepoSyncState(repo);
+    }
+
+    public LocalDateTime issuesUpdatedSince(LocalDateTime now) {
+        if (lastIssueUpdatedAt == null) {
+            return now.minus(FIRST_SYNC_WINDOW);
+        }
+        if (etag == null) {
+            return lastIssueUpdatedAt;
+        }
+        return lastIssueUpdatedAt.minus(RESYNC_OVERLAP);
+    }
+
+    public void recordRead(LocalDateTime latestIssueUpdatedAt, String etag, LocalDateTime syncedAt) {
+        advanceLastIssueUpdatedAt(latestIssueUpdatedAt);
+        this.etag = etag;
+        this.lastSyncedAt = syncedAt;
+        this.consecutiveFailures = 0;
+    }
+
+    public void recordReadCutByFailure(LocalDateTime latestIssueUpdatedAt, LocalDateTime syncedAt) {
+        advanceLastIssueUpdatedAt(latestIssueUpdatedAt);
+        this.etag = null;
+        this.lastSyncedAt = syncedAt;
+        this.consecutiveFailures++;
+    }
+
+    public void recordNotModified(LocalDateTime syncedAt) {
+        this.lastSyncedAt = syncedAt;
+        this.consecutiveFailures = 0;
+    }
+
+    public void recordFailure() {
+        this.consecutiveFailures++;
+    }
+
+    private void advanceLastIssueUpdatedAt(LocalDateTime latestIssueUpdatedAt) {
+        if (latestIssueUpdatedAt == null) {
+            return;
+        }
+        if (lastIssueUpdatedAt == null || latestIssueUpdatedAt.isAfter(lastIssueUpdatedAt)) {
+            lastIssueUpdatedAt = latestIssueUpdatedAt;
+        }
     }
 }
