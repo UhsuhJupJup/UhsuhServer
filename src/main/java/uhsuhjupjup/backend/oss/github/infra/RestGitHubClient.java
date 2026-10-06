@@ -23,6 +23,7 @@ import uhsuhjupjup.backend.oss.github.application.GitHubCredentials;
 import uhsuhjupjup.backend.oss.github.application.GitHubCredentialsMissingException;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssue;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult;
+import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult.IncompleteReason;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubRepo;
 
 import java.io.IOException;
@@ -53,6 +54,7 @@ class RestGitHubClient implements GitHubClient {
 
     static final int MAX_REDIRECTS = 3;
     static final int MAX_ISSUE_PAGES = 10;
+    static final int ISSUES_PER_PAGE = 100;
 
     private static final String GITHUB_JSON = "application/vnd.github+json";
     private static final String API_VERSION_HEADER = "X-GitHub-Api-Version";
@@ -69,7 +71,6 @@ class RestGitHubClient implements GitHubClient {
             HttpStatus.TOO_MANY_REQUESTS.value());
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final int ISSUES_PER_PAGE = 100;
     private static final Pattern LINK_ENTRY = Pattern.compile("<([^>]*)>\\s*;\\s*rel=\"([^\"]*)\"");
     private static final String NEXT_PAGE_RELATION = "next";
     private static final String RATE_LIMIT_LIMIT_HEADER = "X-RateLimit-Limit";
@@ -170,15 +171,17 @@ class RestGitHubClient implements GitHubClient {
         Map<Long, GitHubIssue> issues = new LinkedHashMap<>();
         GitHubResponse page = firstPage;
         for (int pageNumber = 1; ; pageNumber++) {
-            readIssues(page).forEach(issue -> keepLatest(issues, issue));
+            List<GitHubIssue> pageIssues = readIssues(page);
+            pageIssues.forEach(issue -> keepLatest(issues, issue));
             Optional<URI> nextPage = nextPageUri(page);
             if (nextPage.isEmpty()) {
-                return GitHubIssueListResult.changed(firstPage.etag(), List.copyOf(issues.values()));
+                return GitHubIssueListResult.changed(etagCoveringWholeList(firstPage, pageNumber, pageIssues.size()),
+                        List.copyOf(issues.values()));
             }
             if (pageNumber == MAX_ISSUE_PAGES) {
                 log.warn("GitHub 이슈 목록이 {}페이지를 넘어 이번에는 {}건까지만 읽었습니다: {}",
                         MAX_ISSUE_PAGES, issues.size(), firstPageUri.getPath());
-                return GitHubIssueListResult.partial(List.copyOf(issues.values()));
+                return GitHubIssueListResult.partial(List.copyOf(issues.values()), IncompleteReason.PAGE_LIMIT);
             }
             try {
                 page = sendFollowingRedirects(nextPage.get(), null, received);
@@ -188,9 +191,16 @@ class RestGitHubClient implements GitHubClient {
                 }
                 log.warn("GitHub 이슈 목록 {}페이지를 끝내 받지 못해 앞의 {}건만 돌려줍니다: {} ({})",
                         pageNumber + 1, issues.size(), firstPageUri.getPath(), e.getMessage());
-                return GitHubIssueListResult.partial(List.copyOf(issues.values()));
+                return GitHubIssueListResult.partial(List.copyOf(issues.values()), IncompleteReason.PAGE_UNAVAILABLE);
             }
         }
+    }
+
+    private static String etagCoveringWholeList(GitHubResponse firstPage, int pages, int issuesOnLastPage) {
+        if (pages == 1 && issuesOnLastPage < ISSUES_PER_PAGE) {
+            return firstPage.etag();
+        }
+        return null;
     }
 
     private static boolean gaveUpRetrying(GitHubClientException e) {
@@ -347,10 +357,12 @@ class RestGitHubClient implements GitHubClient {
         return Optional.of(parseRepo(response));
     }
 
-    private static Reason reasonFor(HttpStatusCode status) {
+    private static Reason reasonFor(GitHubResponse response) {
+        HttpStatusCode status = response.status();
         return switch (status.value()) {
             case 401 -> Reason.UNAUTHORIZED;
-            case 403, 429 -> Reason.RATE_LIMITED;
+            case 403 -> response.showsRateLimit() ? Reason.RATE_LIMITED : Reason.REJECTED;
+            case 429 -> Reason.RATE_LIMITED;
             default -> status.is4xxClientError() ? Reason.REJECTED : Reason.INVALID_RESPONSE;
         };
     }
@@ -431,7 +443,7 @@ class RestGitHubClient implements GitHubClient {
 
     private static GitHubClientException requestFailed(GitHubResponse response) {
         HttpStatusCode status = response.status();
-        return new GitHubClientException(reasonFor(status), status.value(),
+        return new GitHubClientException(reasonFor(response), status.value(),
                 "GitHub 요청 실패(상태 " + status.value() + "): " + response.path(), null);
     }
 
@@ -467,6 +479,15 @@ class RestGitHubClient implements GitHubClient {
                 return null;
             }
             return retryAfter.strip();
+        }
+
+        boolean showsRateLimit() {
+            return retryAfter() != null || rateLimitExhausted();
+        }
+
+        private boolean rateLimitExhausted() {
+            String remaining = headers.getFirst(RATE_LIMIT_REMAINING_HEADER);
+            return remaining != null && remaining.strip().equals("0");
         }
 
         String path() {
