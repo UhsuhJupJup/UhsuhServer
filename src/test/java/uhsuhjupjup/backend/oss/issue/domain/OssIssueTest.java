@@ -3,6 +3,7 @@ package uhsuhjupjup.backend.oss.issue.domain;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 
 import java.time.LocalDateTime;
@@ -34,9 +35,53 @@ class OssIssueTest {
     }
 
     @Test
-    void create_hashesBodyAsUtf8BytesWithoutNormalizingLineBreaks() {
+    void create_hashesBodyAsUtf8BytesAfterTurningCrLfIntoLf() {
         assertThat(issueWithBody("재현 방법\r\n1. 설정 파일을 읽는다").getBodyHash())
-                .isEqualTo("50628277c49c449f2952684d99502d5188aa93b3b0e10d63361101ca5ebd931e");
+                .isEqualTo("446646d1c572903a4d2425019239923efecd39ce64e1403262d17758a4fae961");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Steps\r\n1. run it\r\n2. see it fail", "Steps\r1. run it\r2. see it fail",
+            "Steps\r\n1. run it\r2. see it fail"})
+    void create_crLfAndLoneCrLineBreaks_hashLikeLf(String body) {
+        assertThat(issueWithBody(body).getBodyHash())
+                .isEqualTo(issueWithBody("Steps\n1. run it\n2. see it fail").getBodyHash());
+    }
+
+    @Test
+    void create_spacesAndTabsAtLineEnds_areIgnored() {
+        assertThat(issueWithBody("Steps \t\n1. run it  \n2. see it fail\t").getBodyHash())
+                .isEqualTo(issueWithBody("Steps\n1. run it\n2. see it fail").getBodyHash());
+    }
+
+    @Test
+    void create_blankLinesBeforeAndAfterBody_areIgnored() {
+        assertThat(issueWithBody("\n  \n\t\r\nSteps\n1. run it\n\n \t\n").getBodyHash())
+                .isEqualTo(issueWithBody("Steps\n1. run it").getBodyHash());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" ", "\n", "\r\n\t \r", "  \n\t\n"})
+    void create_bodyOfOnlySpacesTabsAndLineBreaks_hashesAsEmptyBody(String body) {
+        assertThat(issueWithBody(body).getBodyHash()).isEqualTo(EMPTY_BODY_SHA256);
+    }
+
+    @Test
+    void create_indentationAtLineStart_isKept() {
+        assertThat(issueWithBody("```\n    int retries = 3;\n```").getBodyHash())
+                .isNotEqualTo(issueWithBody("```\nint retries = 3;\n```").getBodyHash());
+    }
+
+    @Test
+    void create_blankLineInsideBody_isKept() {
+        assertThat(issueWithBody("Steps\n\n1. run it").getBodyHash())
+                .isNotEqualTo(issueWithBody("Steps\n1. run it").getBodyHash());
+    }
+
+    @Test
+    void create_whitespaceOtherThanSpaceOrTabAtLineEnd_isKept() {
+        assertThat(issueWithBody("Steps\u00A0").getBodyHash())
+                .isNotEqualTo(issueWithBody("Steps").getBodyHash());
     }
 
     @ParameterizedTest
@@ -75,6 +120,39 @@ class OssIssueTest {
 
         assertThat(title).isEqualTo("a".repeat(255) + "🐛");
         assertThat(title.codePointCount(0, title.length())).isEqualTo(256);
+    }
+
+    @Test
+    void refresh_cutsTitleAndHashesBodyByTheSameRulesAsCreate() {
+        OssIssue issue = issueWithBody("abc");
+
+        issue.refresh(repo, 51_878, "a".repeat(255) + "🐛🐛", "재현 방법\r\n1. 설정 파일을 읽는다  \r\n");
+
+        assertThat(issue.getTitle()).isEqualTo("a".repeat(255) + "🐛");
+        assertThat(issue.getBodyHash()).isEqualTo("446646d1c572903a4d2425019239923efecd39ce64e1403262d17758a4fae961");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void refresh_missingOrEmptyBody_hashesAsEmptyBody(String body) {
+        OssIssue issue = issueWithBody("abc");
+
+        issue.refresh(repo, 51_878, "Retry interval is ignored", body);
+
+        assertThat(issue.getBodyHash()).isEqualTo(EMPTY_BODY_SHA256);
+    }
+
+    @Test
+    void refresh_movesIssueToGivenRepoAndNumberKeepingGithubIdAndOpenedAt() {
+        OssRepo transferredTo = OssRepo.create(1296269L, "octocat/Hello-World", null, "Java", 80);
+        OssIssue issue = issueWithBody("abc");
+
+        issue.refresh(transferredTo, 7, "Retry interval is ignored", "abc");
+
+        assertThat(issue.getRepo()).isSameAs(transferredTo);
+        assertThat(issue.getNumber()).isEqualTo(7);
+        assertThat(issue.getGithubIssueId()).isEqualTo(5_611_425_470L);
+        assertThat(issue.getGithubCreatedAt()).isEqualTo(OPENED_AT);
     }
 
     private OssIssue issueWithBody(String body) {
