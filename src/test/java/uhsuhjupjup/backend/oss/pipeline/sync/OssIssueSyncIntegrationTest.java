@@ -36,6 +36,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -79,6 +80,7 @@ class OssIssueSyncIntegrationTest {
     private static final String OTHER_NAME = "Spoon-Knife";
     private static final String ETAG = "W/\"a1b2c3\"";
     private static final String NEW_ETAG = "W/\"d4e5f6\"";
+    private static final String SYNC_LOCK_PREFIX = "ossIssueSync-";
 
     @Autowired
     private OssIssueSyncService ossIssueSyncService;
@@ -378,34 +380,106 @@ class OssIssueSyncIntegrationTest {
 
         then(gitHubClient).shouldHaveNoInteractions();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oss_repo_sync_state", Long.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM shedlock WHERE name IN (?, ?)", Long.class,
+                SYNC_LOCK_PREFIX + suspended, SYNC_LOCK_PREFIX + (suspended + 1000))).isZero();
     }
 
     @Test
-    void syncRepo_sameRepoTwiceAtOnceForTheFirstTime_bothFinishWithOneStateAndEachIssueOnce() throws Exception {
+    void syncRepo_sameRepoTwiceAtOnce_oneSyncsAndTheOtherIsRefusedAsInProgress() throws Exception {
         Long repoId = saveRepo(NAME);
-        CyclicBarrier bothFoundNoState = new CyclicBarrier(2);
-        willAnswer(invocation -> {
-            bothFoundNoState.await(10, TimeUnit.SECONDS);
-            return invocation.callRealMethod();
-        }).given(ossIssueSyncSaver).register(repoId);
-        CyclicBarrier bothRead = new CyclicBarrier(2);
+        CountDownLatch refused = new CountDownLatch(1);
         given(gitHubClient.listOpenIssues(any(), any(), any(), any())).willAnswer(invocation -> {
-            bothRead.await(10, TimeUnit.SECONDS);
+            refused.await(10, TimeUnit.SECONDS);
             return changed(
                     issue(801, 1, "One", "body one", today(10, 0)),
                     issue(802, 2, "Two", "body two", today(11, 0)));
         });
 
-        List<OssIssueSyncResult> results = syncTogether(repoId, repoId);
+        List<Object> outcomes = syncSameRepoTogether(repoId, refused);
 
-        then(ossIssueSyncSaver).should(times(2)).register(repoId);
-        then(ossIssueSyncSaver).should(times(2)).save(eq(repoId), any(), any());
-        assertThat(results).extracting(OssIssueSyncResult::created).containsExactlyInAnyOrder(2, 0);
-        assertThat(results).extracting(OssIssueSyncResult::bodyUnchanged).containsExactlyInAnyOrder(0, 2);
+        assertThat(outcomes).filteredOn(OssIssueSyncResult.class::isInstance).singleElement()
+                .isEqualTo(new OssIssueSyncResult(false, null, 2, Map.of(), 2, 0, 0));
+        assertThat(outcomes).filteredOn(BusinessException.class::isInstance).singleElement()
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.OSS_ISSUE_SYNC_IN_PROGRESS));
+        then(gitHubClient).should(times(1)).listOpenIssues(any(), any(), any(), any());
+        then(ossIssueSyncSaver).should(times(1)).register(repoId);
+        then(ossIssueSyncSaver).should(times(1)).save(eq(repoId), any(), any());
         assertThat(storedGithubIssueIds()).containsExactly(801L, 802L);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM oss_repo_sync_state WHERE repo_id = ?", Long.class, repoId)).isEqualTo(1);
         assertThat(storedState(repoId)).isEqualTo(new StoredState(NEW_ETAG, today(11, 0), NOW, 0));
+    }
+
+    @Test
+    void syncRepo_whileRunning_holdsRepoLockRowForTwentyMinutesAtMostAndReleasesItWhenDone() throws Exception {
+        Long repoId = saveRepo(NAME);
+        CountDownLatch reading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        given(gitHubClient.listOpenIssues(any(), any(), any(), any())).willAnswer(invocation -> {
+            reading.countDown();
+            release.await(10, TimeUnit.SECONDS);
+            return changed(issue(1101, 1, "One", "body one", today(10, 0)));
+        });
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<OssIssueSyncResult> sync = executor.submit(() -> ossIssueSyncService.syncRepo(repoId));
+            assertThat(reading.await(10, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(syncLock(repoId)).isEqualTo(new SyncLock(Duration.ofMinutes(20), true));
+
+            release.countDown();
+            assertThat(sync.get(10, TimeUnit.SECONDS).created()).isEqualTo(1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+        assertThat(syncLock(repoId).held()).isFalse();
+    }
+
+    @Test
+    void syncRepo_otherRepoWhileOneSyncRuns_runsWithoutWaiting() throws Exception {
+        Long helloWorld = saveRepo(NAME);
+        Long spoonKnife = saveRepo(OTHER_NAME);
+        CountDownLatch reading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        given(gitHubClient.listOpenIssues(eq(OWNER), eq(NAME), any(), any())).willAnswer(invocation -> {
+            reading.countDown();
+            release.await(10, TimeUnit.SECONDS);
+            return changed(issue(1201, 1, "One", "body one", today(10, 0)));
+        });
+        given(gitHubClient.listOpenIssues(eq(OWNER), eq(OTHER_NAME), any(), any()))
+                .willReturn(changed(issue(1202, 1, "Two", "body two", today(10, 0))));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<OssIssueSyncResult> holding = executor.submit(() -> ossIssueSyncService.syncRepo(helloWorld));
+            assertThat(reading.await(10, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(ossIssueSyncService.syncRepo(spoonKnife).created()).isEqualTo(1);
+
+            release.countDown();
+            assertThat(holding.get(10, TimeUnit.SECONDS).created()).isEqualTo(1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+        assertThat(storedGithubIssueIds()).containsExactly(1201L, 1202L);
+    }
+
+    @Test
+    void syncRepo_afterGitHubFailure_releasesRepoLockSoNextSyncRuns() {
+        Long repoId = saveRepo(NAME);
+        GitHubClientException unavailable = new GitHubClientException(
+                Reason.UNAVAILABLE, "GitHub가 응답하지 않습니다(시도 3번, 마지막 상태 502)", null);
+        given(gitHubClient.listOpenIssues(any(), any(), any(), any()))
+                .willThrow(unavailable)
+                .willReturn(changed(issue(1301, 1, "One", "body one", today(10, 0))));
+        assertThatThrownBy(() -> ossIssueSyncService.syncRepo(repoId)).isSameAs(unavailable);
+
+        OssIssueSyncResult next = ossIssueSyncService.syncRepo(repoId);
+
+        assertThat(next.created()).isEqualTo(1);
+        assertThat(syncLock(repoId).held()).isFalse();
     }
 
     @Test
@@ -564,6 +638,40 @@ class OssIssueSyncIntegrationTest {
         }
     }
 
+    private List<Object> syncSameRepoTogether(Long repoId, CountDownLatch refused) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CyclicBarrier start = new CyclicBarrier(2);
+        Callable<Object> sync = () -> {
+            start.await(10, TimeUnit.SECONDS);
+            try {
+                return ossIssueSyncService.syncRepo(repoId);
+            } catch (BusinessException e) {
+                refused.countDown();
+                return e;
+            }
+        };
+        try {
+            List<Object> outcomes = new ArrayList<>();
+            for (Future<Object> outcome : executor.invokeAll(List.of(sync, sync), 30, TimeUnit.SECONDS)) {
+                outcomes.add(outcome.get());
+            }
+            return outcomes;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private SyncLock syncLock(Long repoId) {
+        return jdbcTemplate.queryForObject("""
+                SELECT TIMESTAMPDIFF(SECOND, locked_at, lock_until) AS lock_seconds,
+                       lock_until > UTC_TIMESTAMP(3) AS held
+                FROM shedlock
+                WHERE name = ?
+                """, (row, rowNumber) -> new SyncLock(
+                Duration.ofSeconds(row.getLong("lock_seconds")),
+                row.getBoolean("held")), SYNC_LOCK_PREFIX + repoId);
+    }
+
     private static void awaitRelease(CountDownLatch release) {
         try {
             release.await(10, TimeUnit.SECONDS);
@@ -613,5 +721,8 @@ class OssIssueSyncIntegrationTest {
 
     private record StoredState(String etag, LocalDateTime lastIssueUpdatedAt, LocalDateTime lastSyncedAt,
                                int consecutiveFailures) {
+    }
+
+    private record SyncLock(Duration lockAtMostFor, boolean held) {
     }
 }

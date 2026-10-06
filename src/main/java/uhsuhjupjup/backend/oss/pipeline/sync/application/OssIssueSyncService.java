@@ -2,6 +2,9 @@ package uhsuhjupjup.backend.oss.pipeline.sync.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockProvider;
+import net.javacrumbs.shedlock.core.SimpleLock;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ import uhsuhjupjup.backend.oss.repo.domain.OssRepoStatus;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.Set;
@@ -29,6 +33,8 @@ import java.util.Set;
 public class OssIssueSyncService {
 
     private static final char OWNER_NAME_SEPARATOR = '/';
+    private static final String SYNC_LOCK_NAME_PREFIX = "ossIssueSync-";
+    private static final Duration SYNC_LOCK_AT_MOST_FOR = Duration.ofMinutes(20);
     private static final Set<Reason> FAILURES_BEYOND_REPO =
             EnumSet.of(Reason.NOT_CONFIGURED, Reason.UNAUTHORIZED, Reason.RATE_LIMITED);
 
@@ -36,11 +42,40 @@ public class OssIssueSyncService {
     private final OssRepoRepository ossRepoRepository;
     private final OssRepoSyncStateRepository ossRepoSyncStateRepository;
     private final OssIssueSyncSaver ossIssueSyncSaver;
+    private final LockProvider lockProvider;
     private final Clock clock;
 
     public OssIssueSyncResult syncRepo(Long repoId) {
         OssRepo repo = ossRepoRepository.findByIdAndStatus(repoId, OssRepoStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.OSS_REPO_NOT_FOUND));
+        SimpleLock syncLock = acquireSyncLock(repo);
+        try {
+            return syncHoldingLock(repo);
+        } finally {
+            releaseSyncLock(syncLock, repo);
+        }
+    }
+
+    private SimpleLock acquireSyncLock(OssRepo repo) {
+        LockConfiguration lockConfiguration = new LockConfiguration(clock.instant(),
+                SYNC_LOCK_NAME_PREFIX + repo.getId(), SYNC_LOCK_AT_MOST_FOR, Duration.ZERO);
+        return lockProvider.lock(lockConfiguration).orElseThrow(() -> {
+            log.info("오픈소스 레포 {} 이슈 수집이 이미 진행 중이라 시작하지 않음", repo.getFullName());
+            return new BusinessException(ErrorCode.OSS_ISSUE_SYNC_IN_PROGRESS);
+        });
+    }
+
+    private void releaseSyncLock(SimpleLock lock, OssRepo repo) {
+        try {
+            lock.unlock();
+        } catch (RuntimeException e) {
+            log.warn("오픈소스 레포 {} 이슈 수집 잠금을 풀지 못함, 잡은 지 {}분 뒤 저절로 풀림",
+                    repo.getFullName(), SYNC_LOCK_AT_MOST_FOR.toMinutes(), e);
+        }
+    }
+
+    private OssIssueSyncResult syncHoldingLock(OssRepo repo) {
+        Long repoId = repo.getId();
         OssRepoSyncState state = ossRepoSyncStateRepository.findByRepoId(repoId)
                 .orElseGet(() -> register(repoId));
         LocalDateTime now = LocalDateTime.now(clock);
