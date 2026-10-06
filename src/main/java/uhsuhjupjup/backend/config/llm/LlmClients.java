@@ -26,7 +26,8 @@ public final class LlmClients {
                         .request(limits.callTimeout())
                         .build())
                 .maxRetries(limits.maxRetries())
-                .sleeper(new CappedRetrySleeper(limits.maxRetryWait()));
+                .sleeper(new CappedRetrySleeper(limits.maxRetryWait()))
+                .logLevel(com.anthropic.core.LogLevel.OFF);
     }
 
     static OpenAIOkHttpClient.Builder withLimits(OpenAIOkHttpClient.Builder builder, LlmCallLimits limits) {
@@ -37,6 +38,7 @@ public final class LlmClients {
                         .request(limits.callTimeout())
                         .build())
                 .maxRetries(limits.maxRetries())
-                .sleeper(new CappedRetrySleeper(limits.maxRetryWait()));
+                .sleeper(new CappedRetrySleeper(limits.maxRetryWait()))
+                .logLevel(com.openai.core.LogLevel.OFF);
     }
 }
