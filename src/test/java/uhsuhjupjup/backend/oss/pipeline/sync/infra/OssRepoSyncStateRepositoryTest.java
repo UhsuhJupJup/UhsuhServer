@@ -48,6 +48,20 @@ class OssRepoSyncStateRepositoryTest {
     }
 
     @Test
+    void findForUpdateByRepoId_returnsThatReposStateOrNothing() {
+        OssRepo springBoot = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssRepo react = ossRepoRepository.save(repo(2L, "facebook/react"));
+        Long springBootState = ossRepoSyncStateRepository.save(OssRepoSyncState.create(springBoot)).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(ossRepoSyncStateRepository.findForUpdateByRepoId(springBoot.getId()))
+                .map(OssRepoSyncState::getId)
+                .hasValue(springBootState);
+        assertThat(ossRepoSyncStateRepository.findForUpdateByRepoId(react.getId())).isEmpty();
+    }
+
+    @Test
     void create_startsWithoutEtagOrSyncTimesAndWithNoFailures() {
         OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
         Long id = ossRepoSyncStateRepository.saveAndFlush(OssRepoSyncState.create(repo)).getId();

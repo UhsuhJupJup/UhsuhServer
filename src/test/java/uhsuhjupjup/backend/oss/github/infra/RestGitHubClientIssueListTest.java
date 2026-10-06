@@ -21,6 +21,7 @@ import uhsuhjupjup.backend.oss.github.application.GitHubCredentials;
 import uhsuhjupjup.backend.oss.github.application.GitHubCredentialsMissingException;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssue;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult;
+import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult.IncompleteReason;
 import uhsuhjupjup.backend.oss.github.infra.MockGitHubServer.ReceivedRequest;
 
 import java.io.IOException;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -226,7 +228,38 @@ class RestGitHubClientIssueListTest {
     }
 
     @Test
-    void listOpenIssues_notModifiedWithNextPage_rereadsFirstPageWithoutEtagToTheLastPage() {
+    void listOpenIssues_onePageShorterThanPageSize_keepsEtagOfThatPage() {
+        givenToken();
+        github.respond(exchange -> {
+            etag(exchange, NEW_ETAG);
+            json(exchange, 200, issuesNumberedUpTo(RestGitHubClient.ISSUES_PER_PAGE - 1));
+        });
+
+        GitHubIssueListResult listed = client.listOpenIssues(OWNER, NAME, ETAG, null);
+
+        assertThat(listed.complete()).isTrue();
+        assertThat(listed.etag()).isEqualTo(NEW_ETAG);
+        assertThat(listed.issues()).hasSize(RestGitHubClient.ISSUES_PER_PAGE - 1);
+    }
+
+    @Test
+    void listOpenIssues_onePageFilledToPageSize_keepsNoEtagSinceTheNextChangeMayLandOnPageTwo() {
+        givenToken();
+        github.respond(exchange -> {
+            etag(exchange, NEW_ETAG);
+            json(exchange, 200, issuesNumberedUpTo(RestGitHubClient.ISSUES_PER_PAGE));
+        });
+
+        GitHubIssueListResult listed = client.listOpenIssues(OWNER, NAME, ETAG, null);
+
+        assertThat(listed.complete()).isTrue();
+        assertThat(listed.etag()).isNull();
+        assertThat(listed.issues()).hasSize(RestGitHubClient.ISSUES_PER_PAGE);
+        assertThat(github.requests()).hasSize(1);
+    }
+
+    @Test
+    void listOpenIssues_notModifiedWithNextPage_rereadsFirstPageWithoutEtagToTheLastPageAndKeepsNoEtag() {
         givenToken();
         github.respond(exchange -> {
             int page = pageOf(exchange);
@@ -243,7 +276,7 @@ class RestGitHubClientIssueListTest {
 
         assertThat(listed.notModified()).isFalse();
         assertThat(listed.complete()).isTrue();
-        assertThat(listed.etag()).isEqualTo(NEW_ETAG);
+        assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).extracting(GitHubIssue::githubId).containsExactly(1L, 2L);
         assertThat(github.requests())
                 .extracting(ReceivedRequest::rawPath, request -> request.header("If-None-Match"))
@@ -295,7 +328,7 @@ class RestGitHubClientIssueListTest {
     }
 
     @Test
-    void listOpenIssues_severalPages_followsNextLinksToTheLastPage() {
+    void listOpenIssues_severalPages_followsNextLinksToTheLastPageAndKeepsNoEtag() {
         givenToken();
         github.respond(exchange -> {
             int page = pageOf(exchange);
@@ -312,7 +345,7 @@ class RestGitHubClientIssueListTest {
 
         assertThat(listed.notModified()).isFalse();
         assertThat(listed.complete()).isTrue();
-        assertThat(listed.etag()).isEqualTo(NEW_ETAG);
+        assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).extracting(GitHubIssue::githubId).containsExactly(11L, 12L, 13L, 14L, 15L);
         assertThat(github.requests())
                 .extracting(ReceivedRequest::rawPath)
@@ -356,7 +389,7 @@ class RestGitHubClientIssueListTest {
     }
 
     @Test
-    void listOpenIssues_exactlyPageLimitPages_readsToTheEndAsComplete(CapturedOutput output) {
+    void listOpenIssues_exactlyPageLimitPages_readsToTheEndAsCompleteWithoutEtag(CapturedOutput output) {
         givenToken();
         github.respond(exchange -> {
             int page = pageOf(exchange);
@@ -368,14 +401,15 @@ class RestGitHubClientIssueListTest {
         GitHubIssueListResult listed = client.listOpenIssues(OWNER, NAME, null, null);
 
         assertThat(listed.complete()).isTrue();
-        assertThat(listed.etag()).isEqualTo(NEW_ETAG);
+        assertThat(listed.incompleteReason()).isNull();
+        assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).hasSize(RestGitHubClient.MAX_ISSUE_PAGES);
         assertThat(github.requests()).hasSize(RestGitHubClient.MAX_ISSUE_PAGES);
         assertThat(output.getAll()).doesNotContain("이슈 목록이");
     }
 
     @Test
-    void listOpenIssues_morePagesThanLimit_stopsAtLimitAsPartialWithoutEtag(CapturedOutput output) {
+    void listOpenIssues_morePagesThanLimit_stopsAtLimitAsPartialForPageLimitWithoutEtag(CapturedOutput output) {
         givenToken();
         github.respond(exchange -> {
             int page = pageOf(exchange);
@@ -388,6 +422,7 @@ class RestGitHubClientIssueListTest {
 
         assertThat(listed.notModified()).isFalse();
         assertThat(listed.complete()).isFalse();
+        assertThat(listed.incompleteReason()).isEqualTo(IncompleteReason.PAGE_LIMIT);
         assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).hasSize(RestGitHubClient.MAX_ISSUE_PAGES);
         assertThat(github.requests()).hasSize(RestGitHubClient.MAX_ISSUE_PAGES);
@@ -646,6 +681,7 @@ class RestGitHubClientIssueListTest {
     @ParameterizedTest
     @CsvSource({
             "401, UNAUTHORIZED",
+            "403, REJECTED",
             "404, REJECTED",
             "422, REJECTED"
     })
@@ -721,7 +757,8 @@ class RestGitHubClientIssueListTest {
     }
 
     @Test
-    void listOpenIssues_laterPageKeepsFailingWithServerError_returnsPagesReadSoFarAsPartial(CapturedOutput output) {
+    void listOpenIssues_laterPageKeepsFailingWithServerError_returnsPagesReadSoFarAsPartialForUnavailablePage(
+            CapturedOutput output) {
         givenToken();
         github.respond(exchange -> {
             int page = pageOf(exchange);
@@ -738,6 +775,7 @@ class RestGitHubClientIssueListTest {
 
         assertThat(listed.notModified()).isFalse();
         assertThat(listed.complete()).isFalse();
+        assertThat(listed.incompleteReason()).isEqualTo(IncompleteReason.PAGE_UNAVAILABLE);
         assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).extracting(GitHubIssue::githubId).containsExactly(1L);
         assertThat(github.requests()).hasSize(1 + MAX_ATTEMPTS);
@@ -748,7 +786,7 @@ class RestGitHubClientIssueListTest {
     }
 
     @Test
-    void listOpenIssues_laterPageKeepsTimingOut_returnsPagesReadSoFarAsPartial() {
+    void listOpenIssues_laterPageKeepsTimingOut_returnsPagesReadSoFarAsPartialForUnavailablePage() {
         givenToken();
         RestGitHubClient impatientClient = clientWithReadTimeout(SHORT_READ_TIMEOUT);
         github.respond(exchange -> {
@@ -764,6 +802,7 @@ class RestGitHubClientIssueListTest {
         GitHubIssueListResult listed = impatientClient.listOpenIssues(OWNER, NAME, null, null);
 
         assertThat(listed.complete()).isFalse();
+        assertThat(listed.incompleteReason()).isEqualTo(IncompleteReason.PAGE_UNAVAILABLE);
         assertThat(listed.etag()).isNull();
         assertThat(listed.issues()).extracting(GitHubIssue::githubId).containsExactly(1L);
         assertThat(github.requests()).hasSize(1 + MAX_ATTEMPTS);
@@ -772,7 +811,7 @@ class RestGitHubClientIssueListTest {
     @ParameterizedTest
     @CsvSource({
             "401, UNAUTHORIZED",
-            "403, RATE_LIMITED",
+            "403, REJECTED",
             "429, RATE_LIMITED",
             "404, REJECTED",
             "422, REJECTED"
@@ -984,6 +1023,12 @@ class RestGitHubClientIssueListTest {
 
     private static String issues(String... issues) {
         return "[" + String.join(",", issues) + "]";
+    }
+
+    private static String issuesNumberedUpTo(int count) {
+        return issues(IntStream.rangeClosed(1, count)
+                .mapToObj(id -> issue(id, "2026-09-28T01:00:00Z"))
+                .toArray(String[]::new));
     }
 
     private static String issue(long id, String updatedAt) {

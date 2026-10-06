@@ -2,8 +2,10 @@ package uhsuhjupjup.backend.oss.github.application.dto;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult.IncompleteReason;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ class GitHubIssueListResultTest {
         assertThat(result.etag()).isEqualTo(ETAG);
         assertThat(result.issues()).isEmpty();
         assertThat(result.complete()).isTrue();
+        assertThat(result.incompleteReason()).isNull();
     }
 
     @Test
@@ -36,6 +39,7 @@ class GitHubIssueListResultTest {
         assertThat(result.etag()).isEqualTo(ETAG);
         assertThat(result.issues()).containsExactly(ISSUE);
         assertThat(result.complete()).isTrue();
+        assertThat(result.incompleteReason()).isNull();
     }
 
     @Test
@@ -43,14 +47,22 @@ class GitHubIssueListResultTest {
         assertThat(GitHubIssueListResult.changed(null, List.of(ISSUE)).etag()).isNull();
     }
 
-    @Test
-    void partial_hasNoEtagAndIsIncomplete() {
-        GitHubIssueListResult result = GitHubIssueListResult.partial(List.of(ISSUE));
+    @ParameterizedTest
+    @EnumSource(IncompleteReason.class)
+    void partial_keepsReasonWithoutEtagAsIncomplete(IncompleteReason reason) {
+        GitHubIssueListResult result = GitHubIssueListResult.partial(List.of(ISSUE), reason);
 
         assertThat(result.notModified()).isFalse();
         assertThat(result.etag()).isNull();
         assertThat(result.issues()).containsExactly(ISSUE);
         assertThat(result.complete()).isFalse();
+        assertThat(result.incompleteReason()).isEqualTo(reason);
+    }
+
+    @Test
+    void partial_withoutReason_isRejected() {
+        assertThatThrownBy(() -> GitHubIssueListResult.partial(List.of(ISSUE), null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -74,19 +86,21 @@ class GitHubIssueListResultTest {
 
     @Test
     void notModifiedWithIssues_isRejected() {
-        assertThatThrownBy(() -> new GitHubIssueListResult(true, ETAG, List.of(ISSUE), true))
+        assertThatThrownBy(() -> new GitHubIssueListResult(true, ETAG, List.of(ISSUE), null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void notModifiedButIncomplete_isRejected() {
-        assertThatThrownBy(() -> new GitHubIssueListResult(true, ETAG, List.of(), false))
+    @ParameterizedTest
+    @EnumSource(IncompleteReason.class)
+    void notModifiedButIncomplete_isRejected(IncompleteReason reason) {
+        assertThatThrownBy(() -> new GitHubIssueListResult(true, ETAG, List.of(), reason))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Test
-    void incompleteWithEtag_isRejected() {
-        assertThatThrownBy(() -> new GitHubIssueListResult(false, ETAG, List.of(ISSUE), false))
+    @ParameterizedTest
+    @EnumSource(IncompleteReason.class)
+    void incompleteWithEtag_isRejected(IncompleteReason reason) {
+        assertThatThrownBy(() -> new GitHubIssueListResult(false, ETAG, List.of(ISSUE), reason))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

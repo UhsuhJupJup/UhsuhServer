@@ -257,7 +257,7 @@ class RestGitHubClientTest {
     @ParameterizedTest
     @CsvSource({
             "401, UNAUTHORIZED",
-            "403, RATE_LIMITED",
+            "403, REJECTED",
             "429, RATE_LIMITED",
             "400, REJECTED",
             "422, REJECTED"
@@ -273,6 +273,44 @@ class RestGitHubClientTest {
                     assertNoTokenIn(e);
                 });
         assertThat(github.requests()).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {
+            "0,    NONE",
+            "4000, 60"
+    }, nullValues = "NONE")
+    void findRepo_forbiddenWithExhaustedLimitOrRetryAfter_failsAsRateLimited(String remaining, String retryAfter) {
+        givenToken();
+        github.respond(exchange -> {
+            exchange.getResponseHeaders().set("X-RateLimit-Remaining", remaining);
+            if (retryAfter != null) {
+                exchange.getResponseHeaders().set("Retry-After", retryAfter);
+            }
+            json(exchange, 403, "{\"message\":\"API rate limit exceeded\"}");
+        });
+
+        assertThatThrownBy(() -> client.findRepo("octocat", "Hello-World"))
+                .isInstanceOfSatisfying(GitHubClientException.class, e -> {
+                    assertThat(e.getReason()).isEqualTo(Reason.RATE_LIMITED);
+                    assertThat(e.getStatusCode()).hasValue(403);
+                });
+        assertThat(github.requests()).hasSize(1);
+    }
+
+    @Test
+    void findRepo_forbiddenWithLimitLeftAndNoRetryAfter_failsAsRejected() {
+        givenToken();
+        github.respond(exchange -> {
+            exchange.getResponseHeaders().set("X-RateLimit-Remaining", "4999");
+            json(exchange, 403, "{\"message\":\"Repository access blocked\",\"block\":{\"reason\":\"tos\"}}");
+        });
+
+        assertThatThrownBy(() -> client.findRepo("octocat", "Hello-World"))
+                .isInstanceOfSatisfying(GitHubClientException.class, e -> {
+                    assertThat(e.getReason()).isEqualTo(Reason.REJECTED);
+                    assertThat(e.getStatusCode()).hasValue(403);
+                });
     }
 
     @ParameterizedTest

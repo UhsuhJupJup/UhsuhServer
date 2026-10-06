@@ -189,6 +189,7 @@ class OssRepoRegistrationServiceTest {
             "UNAUTHORIZED,     401",
             "RATE_LIMITED,     403",
             "RATE_LIMITED,     429",
+            "REJECTED,         403",
             "REJECTED,         451",
             "REDIRECT_REFUSED, 301",
             "INVALID_RESPONSE, 200"
