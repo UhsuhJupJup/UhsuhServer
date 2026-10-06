@@ -4,6 +4,7 @@ import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,7 @@ class GptKeywordClassifier implements KeywordClassifier {
     private final OpenAIClient openAiClient;
     private final String model;
 
-    GptKeywordClassifier(OpenAIClient openAiClient,
+    GptKeywordClassifier(@Qualifier(OpenAiConfig.KEYWORD_CLASSIFIER_CLIENT) OpenAIClient openAiClient,
                          @Value("${gpt.model:gpt-4o-mini}") String model) {
         this.openAiClient = openAiClient;
         this.model = model;
