@@ -21,7 +21,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.List;
 
 @Entity
 @Table(name = "oss_issue")
@@ -31,6 +33,10 @@ public class OssIssue extends BaseEntity {
 
     private static final String BODY_HASH_ALGORITHM = "SHA-256";
     private static final int MAX_TITLE_LENGTH = 256;
+    private static final String CRLF = "\r\n";
+    private static final char CR = '\r';
+    private static final char LF = '\n';
+    private static final String LINE_BREAK = String.valueOf(LF);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -70,6 +76,13 @@ public class OssIssue extends BaseEntity {
         return new OssIssue(repo, githubIssueId, number, title, body, githubCreatedAt);
     }
 
+    public void refresh(OssRepo repo, int number, String title, String body) {
+        this.repo = repo;
+        this.number = number;
+        this.title = truncateTitle(title);
+        this.bodyHash = hashOf(body);
+    }
+
     private static String truncateTitle(String title) {
         if (title.codePointCount(0, title.length()) <= MAX_TITLE_LENGTH) {
             return title;
@@ -78,8 +91,38 @@ public class OssIssue extends BaseEntity {
     }
 
     private static String hashOf(String body) {
-        byte[] bytes = (body == null ? "" : body).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = normalizeBody(body).getBytes(StandardCharsets.UTF_8);
         return HexFormat.of().formatHex(sha256().digest(bytes));
+    }
+
+    private static String normalizeBody(String body) {
+        if (body == null) {
+            return "";
+        }
+        List<String> lines = Arrays.stream(body.replace(CRLF, LINE_BREAK).replace(CR, LF).split(LINE_BREAK, -1))
+                .map(OssIssue::stripTrailingSpacesAndTabs)
+                .toList();
+        int first = 0;
+        int end = lines.size();
+        while (first < end && lines.get(first).isEmpty()) {
+            first++;
+        }
+        while (end > first && lines.get(end - 1).isEmpty()) {
+            end--;
+        }
+        return String.join(LINE_BREAK, lines.subList(first, end));
+    }
+
+    private static String stripTrailingSpacesAndTabs(String line) {
+        int end = line.length();
+        while (end > 0 && isSpaceOrTab(line.charAt(end - 1))) {
+            end--;
+        }
+        return line.substring(0, end);
+    }
+
+    private static boolean isSpaceOrTab(char character) {
+        return character == ' ' || character == '\t';
     }
 
     private static MessageDigest sha256() {
