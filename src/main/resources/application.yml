@@ -93,6 +93,17 @@ oss:
     read-timeout: ${OSS_GITHUB_READ_TIMEOUT:PT10S}
     max-attempts: ${OSS_GITHUB_MAX_ATTEMPTS:3}
     retry-backoff: ${OSS_GITHUB_RETRY_BACKOFF:PT1S}
+  grading:
+    claude:
+      enabled: ${OSS_GRADING_CLAUDE_ENABLED:false}
+      model: ${OSS_GRADING_CLAUDE_MODEL:claude-haiku-4-5}
+      temperature: ${OSS_GRADING_CLAUDE_TEMPERATURE:0}
+      timeout:
+        connect: ${OSS_GRADING_CLAUDE_TIMEOUT_CONNECT:PT5S}
+        call: ${OSS_GRADING_CLAUDE_TIMEOUT_CALL:PT30S}
+      retry:
+        max-retries: ${OSS_GRADING_CLAUDE_RETRY_MAX_RETRIES:1}
+        max-wait: ${OSS_GRADING_CLAUDE_RETRY_MAX_WAIT:PT2S}
 
 springdoc:
   default-produces-media-type: application/json
