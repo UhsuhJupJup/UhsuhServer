@@ -7,6 +7,7 @@ import com.anthropic.core.JsonValue;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.models.messages.CacheControlEphemeral;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.anthropic.models.messages.Model;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.StructuredMessage;
 import com.anthropic.models.messages.StructuredMessageCreateParams;
@@ -17,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Component;
 import uhsuhjupjup.backend.config.llm.LlmRetryAbortedException;
 import uhsuhjupjup.backend.oss.pipeline.grading.application.IssueGrader;
@@ -39,9 +39,8 @@ import java.util.stream.Collectors;
 class ClaudeIssueGrader implements IssueGrader {
 
     private static final long MAX_TOKENS = 2_048L;
-    private static final String INVALID_TEMPERATURE = "이슈 판정 temperature는 비우거나 0 이상 1 이하의 숫자여야 합니다: ";
+    private static final BigDecimal MAX_TEMPERATURE = BigDecimal.ONE;
     private static final Set<Integer> RETRYABLE_CLIENT_ERRORS = Set.of(408, 409, 429);
-    private static final int MAX_API_MESSAGE_CODE_POINTS = 200;
     private static final String CALL_FAILED = "Claude 판정 호출이 실패했습니다";
     private static final String REQUEST_REJECTED = "Claude 판정 요청이 거절됐습니다";
 
@@ -54,26 +53,28 @@ class ClaudeIssueGrader implements IssueGrader {
                       @Value("${oss.grading.claude.temperature:0}") String temperature) {
         this.anthropicClient = anthropicClient;
         this.model = model;
-        this.temperature = temperatureOf(temperature);
+        this.temperature = TemperatureSetting.parse(temperature, MAX_TEMPERATURE);
     }
 
     @Override
     public IssueGradingResult grade(String title, String body, List<String> labels) {
-        StructuredMessage<IssueGradingOutput> message = send(title, body, labels);
+        StructuredMessage<IssueGradingOutput> message = send(userMessageOf(title, body, labels));
+        logUsage(message);
+        String answeredModel = answeredModelOf(message);
+        requireCompleteAnswer(message);
+        return new IssueGradingResult(verdictOf(textBlockOf(message)), answeredModel);
+    }
+
+    private static String userMessageOf(String title, String body, List<String> labels) {
         try {
-            String answeredModel = message.model().asString();
-            logUsage(answeredModel, message);
-            requireCompleteAnswer(message);
-            return new IssueGradingResult(verdictOf(message), answeredModel);
-        } catch (IssueGradingException e) {
-            throw e;
+            return IssueGradingPrompt.user(title, body, labels);
         } catch (RuntimeException e) {
-            throw new IssueGradingException(Reason.INVALID_OUTPUT,
-                    "Claude 판정 응답을 읽지 못했습니다(" + classNamesOf(e) + ")");
+            throw new IssueGradingException(Reason.INVALID_INPUT,
+                    "Claude 판정 입력을 만들지 못했습니다(" + SafeFailureText.classNamesOf(e) + ")");
         }
     }
 
-    private StructuredMessageCreateParams<IssueGradingOutput> request(String title, String body, List<String> labels) {
+    private StructuredMessageCreateParams<IssueGradingOutput> request(String userMessage) {
         MessageCreateParams.Builder builder = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(MAX_TOKENS)
@@ -81,7 +82,7 @@ class ClaudeIssueGrader implements IssueGrader {
                         .text(IssueGradingPrompt.system())
                         .cacheControl(CacheControlEphemeral.builder().build())
                         .build()))
-                .addUserMessage(IssueGradingPrompt.user(title, body, labels));
+                .addUserMessage(userMessage);
         applyTemperature(builder);
         return builder.outputConfig(IssueGradingOutput.class).build();
     }
@@ -93,31 +94,40 @@ class ClaudeIssueGrader implements IssueGrader {
         }
     }
 
-    private StructuredMessage<IssueGradingOutput> send(String title, String body, List<String> labels) {
+    private StructuredMessage<IssueGradingOutput> send(String userMessage) {
         try {
-            return anthropicClient.messages().create(request(title, body, labels));
+            return anthropicClient.messages().create(request(userMessage));
         } catch (AnthropicServiceException e) {
             throw failureOf(e);
         } catch (LlmRetryAbortedException e) {
             throw new IssueGradingException(Reason.UNAVAILABLE, "Claude 판정 호출을 그만뒀습니다: " + e.getMessage(), e);
         } catch (RuntimeException e) {
-            throw new IssueGradingException(Reason.UNAVAILABLE, CALL_FAILED + "(" + classNamesOf(e) + ")");
+            throw new IssueGradingException(Reason.UNAVAILABLE,
+                    CALL_FAILED + "(" + SafeFailureText.classNamesOf(e) + ")");
         }
     }
 
-    private static void logUsage(String answeredModel, StructuredMessage<IssueGradingOutput> message) {
-        Usage usage = message.usage();
+    private static void logUsage(StructuredMessage<IssueGradingOutput> message) {
+        Optional<Usage> usage = message._usage().asKnown();
         log.info("이슈 판정 응답 model={} stopReason={} input={} output={} cacheWrite={} cacheRead={}",
-                answeredModel,
-                message.stopReason().map(StopReason::toString).orElse("none"),
-                usage.inputTokens(),
-                usage.outputTokens(),
-                usage.cacheCreationInputTokens().orElse(0L),
-                usage.cacheReadInputTokens().orElse(0L));
+                message._model().asKnown().map(Model::toString).orElse("none"),
+                message._stopReason().asKnown().map(StopReason::toString).orElse("none"),
+                usage.flatMap(known -> known._inputTokens().asKnown()).orElse(0L),
+                usage.flatMap(known -> known._outputTokens().asKnown()).orElse(0L),
+                usage.flatMap(known -> known._cacheCreationInputTokens().asKnown()).orElse(0L),
+                usage.flatMap(known -> known._cacheReadInputTokens().asKnown()).orElse(0L));
+    }
+
+    private static String answeredModelOf(StructuredMessage<IssueGradingOutput> message) {
+        try {
+            return message.model().asString();
+        } catch (RuntimeException e) {
+            throw unreadableAnswer(e);
+        }
     }
 
     private static void requireCompleteAnswer(StructuredMessage<IssueGradingOutput> message) {
-        Optional<StopReason> stopReason = message.stopReason();
+        Optional<StopReason> stopReason = message._stopReason().asKnown();
         if (stopReason.filter(StopReason.REFUSAL::equals).isPresent()) {
             throw new IssueGradingException(Reason.REFUSED, "Claude가 판정을 거절했습니다(stop_reason=refusal)");
         }
@@ -127,17 +137,37 @@ class ClaudeIssueGrader implements IssueGrader {
         }
     }
 
-    private static OssIssueVerdict verdictOf(StructuredMessage<IssueGradingOutput> message) {
-        IssueGradingOutput output = message.content().stream()
-                .flatMap(block -> block.text().stream())
-                .findFirst()
-                .map(StructuredTextBlock::text)
-                .orElseThrow(() -> new IssueGradingException(Reason.INVALID_OUTPUT, "Claude 응답에 판정 출력이 없습니다"));
+    private static StructuredTextBlock<IssueGradingOutput> textBlockOf(StructuredMessage<IssueGradingOutput> message) {
+        try {
+            return message.content().stream()
+                    .flatMap(block -> block.text().stream())
+                    .filter(text -> text.rawTextBlock()._text().asKnown().isPresent())
+                    .findFirst()
+                    .orElseThrow(() -> new IssueGradingException(Reason.UNAVAILABLE, "Claude 응답에 판정 출력이 없습니다"));
+        } catch (IssueGradingException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw unreadableAnswer(e);
+        }
+    }
+
+    private static OssIssueVerdict verdictOf(StructuredTextBlock<IssueGradingOutput> text) {
+        IssueGradingOutput output = outputOf(text);
         try {
             return IssueGradingOutputValidator.validate(output);
         } catch (InvalidIssueGradingOutputException e) {
             throw new IssueGradingException(Reason.INVALID_OUTPUT,
                     "Claude 판정 출력이 규칙을 어겼습니다: " + describe(e.violations()), e);
+        } catch (RuntimeException e) {
+            throw unreadableOutput(e);
+        }
+    }
+
+    private static IssueGradingOutput outputOf(StructuredTextBlock<IssueGradingOutput> text) {
+        try {
+            return text.text();
+        } catch (RuntimeException e) {
+            throw unreadableOutput(e);
         }
     }
 
@@ -145,10 +175,21 @@ class ClaudeIssueGrader implements IssueGrader {
         return violations.stream().map(Violation::toString).collect(Collectors.joining(", "));
     }
 
+    private static IssueGradingException unreadableAnswer(RuntimeException e) {
+        return new IssueGradingException(Reason.UNAVAILABLE,
+                "Claude 응답을 읽지 못했습니다(" + SafeFailureText.classNamesOf(e) + ")");
+    }
+
+    private static IssueGradingException unreadableOutput(RuntimeException e) {
+        return new IssueGradingException(Reason.INVALID_OUTPUT,
+                "Claude 판정 출력을 읽지 못했습니다(" + SafeFailureText.classNamesOf(e) + ")");
+    }
+
     private static IssueGradingException failureOf(AnthropicServiceException e) {
         int status = e.statusCode();
         boolean clientError = status >= 400 && status < 500;
-        String detail = "(상태 " + status + errorTypeOf(e) + ")" + (clientError ? apiMessageOf(e.body()) : "");
+        String detail = "(상태 " + status + errorTypeOf(e) + ")"
+                + (SafeFailureText.showsApiMessage(status) ? apiMessageOf(e.body()) : "");
         if (clientError && !RETRYABLE_CLIENT_ERRORS.contains(status)) {
             return new IssueGradingException(Reason.REJECTED, REQUEST_REJECTED + detail);
         }
@@ -164,50 +205,8 @@ class ClaudeIssueGrader implements IssueGrader {
                 && fields.values().get("error") instanceof JsonObject error
                 && error.values().get("message") instanceof JsonString message
                 && !message.value().isBlank()) {
-            return ": " + excerptOf(message.value());
+            return ": " + SafeFailureText.excerptOf(message.value());
         }
         return "";
-    }
-
-    private static String excerptOf(String message) {
-        StringBuilder excerpt = new StringBuilder();
-        message.codePoints()
-                .limit(MAX_API_MESSAGE_CODE_POINTS)
-                .map(codePoint -> isLineBreakOrControl(codePoint) ? ' ' : codePoint)
-                .forEach(excerpt::appendCodePoint);
-        return excerpt.toString();
-    }
-
-    private static boolean isLineBreakOrControl(int codePoint) {
-        int type = Character.getType(codePoint);
-        return type == Character.CONTROL
-                || type == Character.FORMAT
-                || type == Character.LINE_SEPARATOR
-                || type == Character.PARAGRAPH_SEPARATOR;
-    }
-
-    private static String classNamesOf(Throwable failure) {
-        Throwable root = NestedExceptionUtils.getMostSpecificCause(failure);
-        String name = failure.getClass().getSimpleName();
-        return root == failure ? name : name + ", " + root.getClass().getSimpleName();
-    }
-
-    private static Double temperatureOf(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        BigDecimal temperature = parseTemperature(value);
-        if (temperature.compareTo(BigDecimal.ZERO) < 0 || temperature.compareTo(BigDecimal.ONE) > 0) {
-            throw new IllegalArgumentException(INVALID_TEMPERATURE + value);
-        }
-        return temperature.doubleValue();
-    }
-
-    private static BigDecimal parseTemperature(String value) {
-        try {
-            return new BigDecimal(value.strip());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(INVALID_TEMPERATURE + value, e);
-        }
     }
 }
