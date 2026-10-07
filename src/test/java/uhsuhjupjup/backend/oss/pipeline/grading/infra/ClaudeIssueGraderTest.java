@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import uhsuhjupjup.backend.config.llm.LlmCallLimits;
@@ -39,6 +40,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
 import static uhsuhjupjup.backend.config.llm.MockLlmServer.stall;
 import static uhsuhjupjup.backend.config.llm.MockLlmServer.status;
 import static uhsuhjupjup.backend.config.llm.MockLlmServer.trickle;
@@ -246,13 +249,63 @@ class ClaudeIssueGraderTest {
                 Arguments.of("잘린 JSON", "{\"level\": \"EASY\", \"reasonEn\": \"" + OUTPUT_MARKER));
     }
 
-    @Test
-    void grade_answerWithoutText_failsAsInvalidOutput() {
-        server.respondInOrder(status(200, answerWithoutText("end_turn")));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("answersWithABrokenEnvelope")
+    void grade_answerWithABrokenEnvelope_failsAsUnavailable(String broken, String answer) {
+        server.respondInOrder(status(200, answer));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
-                .isInstanceOfSatisfying(IssueGradingException.class,
-                        e -> assertThat(e.getReason()).isEqualTo(Reason.INVALID_OUTPUT));
+                .isInstanceOfSatisfying(IssueGradingException.class, e -> {
+                    assertThat(e.getReason()).isEqualTo(Reason.UNAVAILABLE);
+                    assertThat(e).hasNoCause();
+                });
+    }
+
+    static Stream<Arguments> answersWithABrokenEnvelope() {
+        return Stream.of(
+                Arguments.of("텍스트 블록 없음", answerWithoutText("end_turn")),
+                Arguments.of("텍스트 값 없음", answerWithEmptyTextBlock()),
+                Arguments.of("content 없음", answerWithout("content")),
+                Arguments.of("model 없음", answerWithout("model")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("answersWithUnreadableUsage")
+    void grade_unreadableUsage_stillGradesAndLogsZeros(String broken, String answer, CapturedOutput logs) {
+        server.respondInOrder(status(200, answer));
+
+        IssueGradingResult result = grader(LIMITS).grade(TITLE, BODY, LABELS);
+
+        assertThat(result.model()).isEqualTo(ANSWERED_MODEL);
+        assertThat(logs).contains("이슈 판정 응답 model=" + ANSWERED_MODEL
+                + " stopReason=end_turn input=0 output=0 cacheWrite=0 cacheRead=0");
+    }
+
+    static Stream<Arguments> answersWithUnreadableUsage() {
+        ObjectNode brokenTokens = answerNode("end_turn", validOutput().toString());
+        brokenTokens.putObject("usage").put("input_tokens", "many").put("output_tokens", "few");
+        return Stream.of(
+                Arguments.of("usage 없음", answerWithout("usage")),
+                Arguments.of("usage가 객체가 아님", answerNode("end_turn", validOutput().toString())
+                        .put("usage", "broken").toString()),
+                Arguments.of("토큰 수가 숫자가 아님", brokenTokens.toString()));
+    }
+
+    @Test
+    void grade_inputThatCannotBeBuilt_failsAsInvalidInputWithoutCallingTheApi() {
+        try (MockedStatic<IssueGradingPrompt> prompt = mockStatic(IssueGradingPrompt.class)) {
+            prompt.when(() -> IssueGradingPrompt.user(any(), any(), any()))
+                    .thenThrow(new IllegalStateException("broken " + ISSUE_BODY_MARKER));
+
+            Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
+
+            assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
+                assertThat(e.getReason()).isEqualTo(Reason.INVALID_INPUT);
+                assertThat(e.getMessage()).contains("IllegalStateException").doesNotContain(ISSUE_BODY_MARKER);
+                assertThat(e).hasNoCause();
+            });
+        }
+        assertThat(server.requestCount()).isZero();
     }
 
     @Test
@@ -334,6 +387,23 @@ class ClaudeIssueGraderTest {
             assertThat(e).hasNoCause();
         });
         assertThat(textsOf(failure)).noneMatch(text -> text.contains(OTHER_FIELD_MARKER));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "401, authentication_error, AUTHENTICATION_ERROR",
+            "403, permission_error, PERMISSION_ERROR"})
+    void grade_credentialFailure_leavesTheApiMessageOut(int statusCode, String errorType, String shownErrorType) {
+        server.respondInOrder(status(statusCode, errorBody(errorType, "invalid x-api-key " + API_MESSAGE_MARKER)));
+
+        Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
+
+        assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
+            assertThat(e.getReason()).isEqualTo(Reason.REJECTED);
+            assertThat(e.getMessage()).endsWith("(상태 " + statusCode + ", " + shownErrorType + ")");
+        });
+        assertThat(textsOf(failure))
+                .noneMatch(text -> text.contains(API_MESSAGE_MARKER) || text.contains(OTHER_FIELD_MARKER));
     }
 
     @Test
@@ -445,14 +515,30 @@ class ClaudeIssueGraderTest {
     }
 
     private static String answer(String stopReason, String text) {
+        return answerNode(stopReason, text).toString();
+    }
+
+    private static ObjectNode answerNode(String stopReason, String text) {
         ObjectNode answer = envelope(stopReason);
         answer.putArray("content").addObject().put("type", "text").put("text", text);
+        return answer;
+    }
+
+    private static String answerWithout(String field) {
+        ObjectNode answer = answerNode("end_turn", validOutput().toString());
+        answer.remove(field);
         return answer.toString();
     }
 
     private static String answerWithoutText(String stopReason) {
         ObjectNode answer = envelope(stopReason);
         answer.putArray("content");
+        return answer.toString();
+    }
+
+    private static String answerWithEmptyTextBlock() {
+        ObjectNode answer = envelope("end_turn");
+        answer.putArray("content").addObject().put("type", "text");
         return answer.toString();
     }
 
