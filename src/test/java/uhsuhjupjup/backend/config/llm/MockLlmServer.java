@@ -2,6 +2,8 @@ package uhsuhjupjup.backend.config.llm;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -48,6 +50,11 @@ public final class MockLlmServer {
 
     public AnthropicClient anthropicClient(LlmCallLimits limits) {
         return LlmClients.withLimits(AnthropicOkHttpClient.builder().baseUrl(baseUrl()).apiKey(API_KEY), limits)
+                .build();
+    }
+
+    public OpenAIClient openAiClient(LlmCallLimits limits) {
+        return LlmClients.withLimits(OpenAIOkHttpClient.builder().baseUrl(baseUrl()).apiKey(API_KEY), limits)
                 .build();
     }
 
