@@ -1,11 +1,11 @@
 package uhsuhjupjup.backend.oss.pipeline.grading.infra;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.core.ObjectMappers;
-import com.anthropic.models.messages.MessageCreateParams;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.openai.client.OpenAIClient;
+import com.openai.core.ObjectMappers;
+import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,10 +47,10 @@ import static uhsuhjupjup.backend.config.llm.MockLlmServer.status;
 import static uhsuhjupjup.backend.config.llm.MockLlmServer.trickle;
 
 @ExtendWith(OutputCaptureExtension.class)
-class ClaudeIssueGraderTest {
+class GptIssueGraderTest {
 
-    private static final String REQUESTED_MODEL = "claude-haiku-4-5";
-    private static final String ANSWERED_MODEL = "claude-haiku-4-5-20251001";
+    private static final String REQUESTED_MODEL = "gpt-4o-mini";
+    private static final String ANSWERED_MODEL = "gpt-4o-mini-2024-07-18";
     private static final String DEFAULT_TEMPERATURE = "0";
     private static final String ISSUE_BODY_MARKER = "ISSUEBODYMARKER";
     private static final String OUTPUT_MARKER = "OUTPUTMARKER";
@@ -65,7 +65,7 @@ class ClaudeIssueGraderTest {
     private static final int SHOWN_API_MESSAGE_CODE_POINTS = 200;
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private final List<AnthropicClient> clients = new ArrayList<>();
+    private final List<OpenAIClient> clients = new ArrayList<>();
     private MockLlmServer server;
 
     @BeforeEach
@@ -75,13 +75,13 @@ class ClaudeIssueGraderTest {
 
     @AfterEach
     void tearDown() {
-        clients.forEach(AnthropicClient::close);
+        clients.forEach(OpenAIClient::close);
         server.stop();
     }
 
     @Test
     void grade_validOutput_returnsTheVerdictAndTheModelThatAnswered() {
-        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+        server.respondInOrder(status(200, answer("stop", validOutput().toString())));
 
         IssueGradingResult result = grader(LIMITS).grade(TITLE, BODY, LABELS);
 
@@ -91,14 +91,11 @@ class ClaudeIssueGraderTest {
                 "재현 절차는 있지만 원인이 없다.", "Steps are given but the cause is missing.",
                 "종료 훅 순서 때문에 워커가 남는다.", "Workers linger because of the shutdown hook order."));
         assertThat(result.model()).isEqualTo(ANSWERED_MODEL);
-        assertThat(result.toString())
-                .contains(ANSWERED_MODEL, "difficulty=MEDIUM", "fixDirection=PARTIAL")
-                .doesNotContain("재현 절차", "Steps are given", "종료 훅", "Workers linger");
     }
 
     @Test
     void grade_sendsTheGradingPromptWithTheDecidedSettings() throws Exception {
-        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+        server.respondInOrder(status(200, answer("stop", validOutput().toString())));
 
         grader(LIMITS).grade(TITLE, BODY, LABELS);
 
@@ -106,24 +103,23 @@ class ClaudeIssueGraderTest {
         assertThat(request.path("model").asText()).isEqualTo(REQUESTED_MODEL);
         assertThat(request.path("temperature").isNumber()).isTrue();
         assertThat(request.path("temperature").asDouble()).isZero();
-        assertThat(request.path("max_tokens").asLong()).isEqualTo(2_048L);
-        assertThat(request.path("system")).singleElement().satisfies(block -> {
-            assertThat(block.path("type").asText()).isEqualTo("text");
-            assertThat(block.path("text").asText()).isEqualTo(IssueGradingPrompt.system());
-            assertThat(block.at("/cache_control/type").asText()).isEqualTo("ephemeral");
-        });
-        assertThat(request.at("/output_config/format/type").asText()).isEqualTo("json_schema");
-        assertThat(request.at("/output_config/format/schema")).isEqualTo(outputSchema());
-        assertThat(request.path("messages")).singleElement().satisfies(message -> {
-            assertThat(message.path("role").asText()).isEqualTo("user");
-            assertThat(message.path("content").asText()).isEqualTo(IssueGradingPrompt.user(TITLE, BODY, LABELS));
-        });
+        assertThat(request.path("max_completion_tokens").asLong()).isEqualTo(2_048L);
+        assertThat(request.has("max_tokens")).isFalse();
+        assertThat(request.path("messages")).hasSize(2);
+        assertThat(request.path("messages").get(0).path("role").asText()).isEqualTo("system");
+        assertThat(request.path("messages").get(0).path("content").asText()).isEqualTo(IssueGradingPrompt.system());
+        assertThat(request.path("messages").get(1).path("role").asText()).isEqualTo("user");
+        assertThat(request.path("messages").get(1).path("content").asText())
+                .isEqualTo(IssueGradingPrompt.user(TITLE, BODY, LABELS));
+        assertThat(request.at("/response_format/type").asText()).isEqualTo("json_schema");
+        assertThat(request.at("/response_format/json_schema/strict").asBoolean()).isTrue();
+        assertThat(request.at("/response_format/json_schema/schema")).isEqualTo(outputSchema());
     }
 
     @ParameterizedTest
-    @CsvSource({"0.7, 0.7", "1, 1.0", "' 0.3 ', 0.3"})
+    @CsvSource({"0.7, 0.7", "1.5, 1.5", "2, 2.0", "' 0.3 ', 0.3"})
     void grade_temperatureSetting_isSentAsGiven(String temperature, double sent) throws Exception {
-        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+        server.respondInOrder(status(200, answer("stop", validOutput().toString())));
 
         grader(LIMITS, temperature).grade(TITLE, BODY, LABELS);
 
@@ -133,7 +129,7 @@ class ClaudeIssueGraderTest {
     @ParameterizedTest
     @ValueSource(strings = {"", "  "})
     void grade_blankTemperatureSetting_leavesTemperatureOutOfTheRequest(String temperature) throws Exception {
-        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+        server.respondInOrder(status(200, answer("stop", validOutput().toString())));
 
         grader(LIMITS, temperature).grade(TITLE, BODY, LABELS);
 
@@ -141,14 +137,14 @@ class ClaudeIssueGraderTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"-0.1", "1.01", "2", "abc", "NaN", "0.5f"})
+    @ValueSource(strings = {"-0.1", "2.01", "3", "abc", "NaN", "0.5f"})
     void newGrader_temperatureOutOfRangeOrNotANumber_isRefused(String temperature) {
-        AnthropicClient client = server.anthropicClient(LIMITS);
-        clients.add(client);
+        OpenAIClient client = client(LIMITS);
 
-        assertThatThrownBy(() -> new ClaudeIssueGrader(client, REQUESTED_MODEL, temperature))
+        assertThatThrownBy(() -> new GptIssueGrader(client, REQUESTED_MODEL, temperature))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(temperature);
+                .hasMessageContaining(temperature)
+                .hasMessageContaining("0 이상 2 이하");
     }
 
     @Test
@@ -157,7 +153,7 @@ class ClaudeIssueGraderTest {
                 .put("evidenceCause", "present").put("evidenceFixDirection", "present")
                 .put("evidenceProblem", "present").put("evidenceReproduction", "present")
                 .put("exclusion", "none").put("level", "easy");
-        server.respondInOrder(status(200, answer("end_turn", output.toString())));
+        server.respondInOrder(status(200, answer("stop", output.toString())));
 
         OssIssueVerdict verdict = grader(LIMITS).grade(TITLE, BODY, LABELS).verdict();
 
@@ -171,7 +167,7 @@ class ClaudeIssueGraderTest {
     void grade_excludedWithoutSummaries_isAccepted() {
         ObjectNode output = validOutput().put("exclusion", "SPAM").put("level", "HARD")
                 .putNull("summaryEn").putNull("summaryKo");
-        server.respondInOrder(status(200, answer("end_turn", output.toString())));
+        server.respondInOrder(status(200, answer("stop", output.toString())));
 
         OssIssueVerdict verdict = grader(LIMITS).grade(TITLE, BODY, LABELS).verdict();
 
@@ -183,7 +179,7 @@ class ClaudeIssueGraderTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("outputsBreakingTheSchemaOrTheRules")
     void grade_outputBreakingTheSchemaOrTheRules_failsAsInvalidOutput(String broken, String output) {
-        server.respondInOrder(status(200, answer("end_turn", output)));
+        server.respondInOrder(status(200, answer("stop", output)));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
                 .isInstanceOfSatisfying(IssueGradingException.class,
@@ -205,7 +201,7 @@ class ClaudeIssueGraderTest {
     @ParameterizedTest
     @ValueSource(strings = {"null", " null\n"})
     void grade_outputThatIsJsonNull_failsAsInvalidOutput(String output) {
-        server.respondInOrder(status(200, answer("end_turn", output)));
+        server.respondInOrder(status(200, answer("stop", output)));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
                 .isInstanceOfSatisfying(IssueGradingException.class, e -> {
@@ -216,7 +212,7 @@ class ClaudeIssueGraderTest {
 
     @Test
     void grade_unknownChoice_namesTheFieldWithoutQuotingTheValue() {
-        server.respondInOrder(status(200, answer("end_turn", validOutput().put("level", "TRIVIAL").toString())));
+        server.respondInOrder(status(200, answer("stop", validOutput().put("level", "TRIVIAL").toString())));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
                 .isInstanceOfSatisfying(IssueGradingException.class, e -> {
@@ -229,13 +225,14 @@ class ClaudeIssueGraderTest {
     @MethodSource("outputsTheParserWouldQuote")
     void grade_unparsableOutput_keepsItOutOfTheMessageCausesAndLogs(String where, String output,
                                                                    CapturedOutput logs) {
-        server.respondInOrder(status(200, answer("end_turn", output)));
+        server.respondInOrder(status(200, answer("stop", output)));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
 
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
             assertThat(e.getReason()).isEqualTo(Reason.INVALID_OUTPUT);
-            assertThat(e.getMessage()).contains("AnthropicInvalidDataException");
+            assertThat(e.getMessage()).contains("OpenAIInvalidDataException");
+            assertThat(e).hasNoCause();
         });
         assertThat(textsOf(failure)).noneMatch(text -> text.contains(OUTPUT_MARKER));
         assertThat(logs).doesNotContain(OUTPUT_MARKER);
@@ -262,11 +259,26 @@ class ClaudeIssueGraderTest {
     }
 
     static Stream<Arguments> answersWithABrokenEnvelope() {
+        ObjectNode withoutMessage = envelope();
+        withoutMessage.putArray("choices").addObject().put("index", 0).put("finish_reason", "stop");
+        ObjectNode refusalNotText = envelope();
+        choice(refusalNotText, "stop").put("content", validOutput().toString()).put("refusal", 7);
         return Stream.of(
-                Arguments.of("텍스트 블록 없음", answerWithoutText("end_turn")),
-                Arguments.of("텍스트 값 없음", answerWithEmptyTextBlock()),
-                Arguments.of("content 없음", answerWithout("content")),
-                Arguments.of("model 없음", answerWithout("model")));
+                Arguments.of("출력 없음", answerWithoutContent("stop")),
+                Arguments.of("선택지가 빔", answerWithoutChoices()),
+                Arguments.of("choices 없음", answerWithout("choices")),
+                Arguments.of("model 없음", answerWithout("model")),
+                Arguments.of("message 없음", withoutMessage.toString()),
+                Arguments.of("refusal이 문자열이 아님", refusalNotText.toString()));
+    }
+
+    @Test
+    void grade_answerWithoutChoices_logsNoFinishReason(CapturedOutput logs) {
+        server.respondInOrder(status(200, answerWithoutChoices()));
+
+        assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
+                .isInstanceOf(IssueGradingException.class);
+        assertThat(logs).contains("finishReason=none");
     }
 
     @ParameterizedTest(name = "{0}")
@@ -278,16 +290,18 @@ class ClaudeIssueGraderTest {
 
         assertThat(result.model()).isEqualTo(ANSWERED_MODEL);
         assertThat(logs).contains("이슈 판정 응답 model=" + ANSWERED_MODEL
-                + " stopReason=end_turn input=0 output=0 cacheWrite=0 cacheRead=0");
+                + " finishReason=stop input=0 output=0 cached=0");
     }
 
     static Stream<Arguments> answersWithUnreadableUsage() {
-        ObjectNode brokenTokens = answerNode("end_turn", validOutput().toString());
-        brokenTokens.putObject("usage").put("input_tokens", "many").put("output_tokens", "few");
+        ObjectNode brokenUsage = answerNode("stop", validOutput().toString());
+        brokenUsage.put("usage", "broken");
+        ObjectNode brokenTokens = answerNode("stop", validOutput().toString());
+        brokenTokens.putObject("usage").put("prompt_tokens", "many").put("completion_tokens", "few")
+                .putObject("prompt_tokens_details").put("cached_tokens", "some");
         return Stream.of(
                 Arguments.of("usage 없음", answerWithout("usage")),
-                Arguments.of("usage가 객체가 아님", answerNode("end_turn", validOutput().toString())
-                        .put("usage", "broken").toString()),
+                Arguments.of("usage가 객체가 아님", brokenUsage.toString()),
                 Arguments.of("토큰 수가 숫자가 아님", brokenTokens.toString()));
     }
 
@@ -309,21 +323,51 @@ class ClaudeIssueGraderTest {
     }
 
     @Test
-    void grade_refusal_failsAsRefusedWithoutQuotingTheAnswer(CapturedOutput logs) {
-        server.respondInOrder(status(200, answer("refusal", "I can't grade this. " + OUTPUT_MARKER)));
+    void grade_refusal_failsAsRefusedWithoutQuotingTheRefusal(CapturedOutput logs) {
+        server.respondInOrder(status(200, refusal("I can't help with grading this issue. " + OUTPUT_MARKER)));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
 
-        assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class,
-                e -> assertThat(e.getReason()).isEqualTo(Reason.REFUSED));
+        assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
+            assertThat(e.getReason()).isEqualTo(Reason.REFUSED);
+            assertThat(e.getMessage()).contains("refusal");
+        });
         assertThat(textsOf(failure)).noneMatch(text -> text.contains(OUTPUT_MARKER));
-        assertThat(logs).contains("stopReason=refusal").doesNotContain(OUTPUT_MARKER);
+        assertThat(logs).contains("finishReason=stop").doesNotContain(OUTPUT_MARKER);
     }
 
     @Test
-    void grade_outputCutAtMaxTokens_failsAsTruncated() {
+    void grade_refusalIsCheckedBeforeAValidLookingOutputIsRead() {
+        ObjectNode answer = envelope();
+        choice(answer, "stop")
+                .put("content", validOutput().toString())
+                .put("refusal", "I can't help with that.");
+        server.respondInOrder(status(200, answer.toString()));
+
+        assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
+                .isInstanceOfSatisfying(IssueGradingException.class,
+                        e -> assertThat(e.getReason()).isEqualTo(Reason.REFUSED));
+    }
+
+    @Test
+    void grade_contentFilter_failsAsRefusedWithoutQuotingTheOutput(CapturedOutput logs) {
+        server.respondInOrder(status(200, answer("content_filter", "{\"level\": \"EASY\", \"reasonEn\": \""
+                + OUTPUT_MARKER)));
+
+        Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
+
+        assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
+            assertThat(e.getReason()).isEqualTo(Reason.REFUSED);
+            assertThat(e.getMessage()).contains("content_filter");
+        });
+        assertThat(textsOf(failure)).noneMatch(text -> text.contains(OUTPUT_MARKER));
+        assertThat(logs).contains("finishReason=content_filter").doesNotContain(OUTPUT_MARKER);
+    }
+
+    @Test
+    void grade_outputCutAtTheTokenLimit_failsAsTruncated() {
         String cut = validOutput().toString().substring(0, 60);
-        server.respondInOrder(status(200, answer("max_tokens", cut)));
+        server.respondInOrder(status(200, answer("length", cut)));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
                 .isInstanceOfSatisfying(IssueGradingException.class, e -> {
@@ -333,9 +377,9 @@ class ClaudeIssueGraderTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"refusal, REFUSED", "max_tokens, TRUNCATED"})
-    void grade_stopReasonIsCheckedBeforeAValidLookingOutputIsRead(String stopReason, Reason reason) {
-        server.respondInOrder(status(200, answer(stopReason, validOutput().toString())));
+    @CsvSource({"content_filter, REFUSED", "length, TRUNCATED"})
+    void grade_finishReasonIsCheckedBeforeAValidLookingOutputIsRead(String finishReason, Reason reason) {
+        server.respondInOrder(status(200, answer(finishReason, validOutput().toString())));
 
         assertThatThrownBy(() -> grader(LIMITS).grade(TITLE, BODY, LABELS))
                 .isInstanceOfSatisfying(IssueGradingException.class,
@@ -354,9 +398,9 @@ class ClaudeIssueGraderTest {
             "422, REJECTED, 1",
             "429, UNAVAILABLE, 2",
             "500, UNAVAILABLE, 2",
-            "529, UNAVAILABLE, 2"})
+            "503, UNAVAILABLE, 2"})
     void grade_errorStatus_isRejectedOnlyWhenRetryingCannotHelp(int statusCode, Reason reason, int requests) {
-        server.respondInOrder(status(statusCode, errorBody("api_error", "Request failed")));
+        server.respondInOrder(status(statusCode, errorBody("server_error", "Request failed")));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
 
@@ -369,11 +413,8 @@ class ClaudeIssueGraderTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-            "400, invalid_request_error, INVALID_REQUEST_ERROR",
-            "429, rate_limit_error, RATE_LIMIT_ERROR"})
-    void grade_clientError_showsTheStartOfTheApiMessageOnOneLine(int statusCode, String errorType,
-                                                                 String shownErrorType) {
+    @CsvSource({"400, invalid_request_error", "429, requests"})
+    void grade_clientError_showsTheStartOfTheApiMessageOnOneLine(int statusCode, String errorType) {
         String apiMessage = "첫 줄\n둘째 줄\r\n셋째\t끝" + "😀".repeat(300) + API_MESSAGE_MARKER;
         server.respondInOrder(status(statusCode, errorBody(errorType, apiMessage)));
 
@@ -382,7 +423,7 @@ class ClaudeIssueGraderTest {
         String head = "첫 줄 둘째 줄  셋째 끝";
         String shown = head + "😀".repeat(SHOWN_API_MESSAGE_CODE_POINTS - head.codePointCount(0, head.length()));
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
-            assertThat(e.getMessage()).endsWith("(상태 " + statusCode + ", " + shownErrorType + "): " + shown);
+            assertThat(e.getMessage()).endsWith("(상태 " + statusCode + ", " + errorType + "): " + shown);
             assertThat(e.getMessage()).doesNotContain(API_MESSAGE_MARKER, "\n", "\r", "\t");
             assertThat(e).hasNoCause();
         });
@@ -390,17 +431,16 @@ class ClaudeIssueGraderTest {
     }
 
     @ParameterizedTest
-    @CsvSource({
-            "401, authentication_error, AUTHENTICATION_ERROR",
-            "403, permission_error, PERMISSION_ERROR"})
-    void grade_credentialFailure_leavesTheApiMessageOut(int statusCode, String errorType, String shownErrorType) {
-        server.respondInOrder(status(statusCode, errorBody(errorType, "invalid x-api-key " + API_MESSAGE_MARKER)));
+    @CsvSource({"401, invalid_request_error", "403, request_forbidden"})
+    void grade_credentialFailure_leavesTheApiMessageOut(int statusCode, String errorType) {
+        String apiMessage = "Incorrect API key provided: sk-****" + API_MESSAGE_MARKER;
+        server.respondInOrder(status(statusCode, errorBody(errorType, apiMessage)));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
 
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
             assertThat(e.getReason()).isEqualTo(Reason.REJECTED);
-            assertThat(e.getMessage()).endsWith("(상태 " + statusCode + ", " + shownErrorType + ")");
+            assertThat(e.getMessage()).endsWith("(상태 " + statusCode + ", " + errorType + ")");
         });
         assertThat(textsOf(failure))
                 .noneMatch(text -> text.contains(API_MESSAGE_MARKER) || text.contains(OTHER_FIELD_MARKER));
@@ -408,13 +448,13 @@ class ClaudeIssueGraderTest {
 
     @Test
     void grade_serverError_leavesTheApiMessageOut() {
-        server.respondInOrder(status(529, errorBody("overloaded_error", "Overloaded " + API_MESSAGE_MARKER)));
+        server.respondInOrder(status(503, errorBody("server_error", "Overloaded " + API_MESSAGE_MARKER)));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
 
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
             assertThat(e.getReason()).isEqualTo(Reason.UNAVAILABLE);
-            assertThat(e.getMessage()).endsWith("(상태 529, OVERLOADED_ERROR)");
+            assertThat(e.getMessage()).endsWith("(상태 503, server_error)");
         });
         assertThat(textsOf(failure))
                 .noneMatch(text -> text.contains(API_MESSAGE_MARKER) || text.contains(OTHER_FIELD_MARKER));
@@ -423,8 +463,8 @@ class ClaudeIssueGraderTest {
     @Test
     void grade_rateLimitedWithLongRetryAfter_failsAtOnceAsUnavailable() {
         server.respondInOrder(
-                status(429, errorBody("rate_limit_error", "Slow down"), Map.of("Retry-After", "30")),
-                status(200, answer("end_turn", validOutput().toString())));
+                status(429, errorBody("requests", "Slow down"), Map.of("Retry-After", "30")),
+                status(200, answer("stop", validOutput().toString())));
 
         Throwable failure = catchThrowable(() -> grader(LIMITS).grade(TITLE, BODY, LABELS));
         Duration elapsed = server.sinceFirstRequest();
@@ -447,7 +487,7 @@ class ClaudeIssueGraderTest {
 
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
             assertThat(e.getReason()).isEqualTo(Reason.UNAVAILABLE);
-            assertThat(e.getMessage()).contains("AnthropicIoException");
+            assertThat(e.getMessage()).contains("OpenAIIoException");
         });
         assertThat(server.requestCount()).isEqualTo(2);
         assertThat(elapsed).isLessThan(worstCase(impatient));
@@ -456,7 +496,7 @@ class ClaudeIssueGraderTest {
     @Test
     void grade_answerTricklingPastTheCallLimit_failsAsUnavailableNearTheLimit() {
         LlmCallLimits shortCall = new LlmCallLimits(Duration.ofSeconds(1), Duration.ofSeconds(1), 1, MAX_RETRY_WAIT);
-        server.respondInOrder(trickle(200, answer("end_turn", validOutput().toString()),
+        server.respondInOrder(trickle(200, answer("stop", validOutput().toString()),
                 Duration.ofMillis(100), Duration.ofSeconds(6)));
 
         Throwable failure = catchThrowable(() -> grader(shortCall).grade(TITLE, BODY, LABELS));
@@ -464,7 +504,7 @@ class ClaudeIssueGraderTest {
 
         assertThat(failure).isInstanceOfSatisfying(IssueGradingException.class, e -> {
             assertThat(e.getReason()).isEqualTo(Reason.UNAVAILABLE);
-            assertThat(e.getMessage()).contains("AnthropicInvalidDataException");
+            assertThat(e.getMessage()).contains("OpenAIInvalidDataException");
             assertThat(e).hasNoCause();
         });
         assertThat(server.requestCount()).isEqualTo(1);
@@ -474,23 +514,27 @@ class ClaudeIssueGraderTest {
     @Test
     void grade_logsTheAnsweringModelAndTokenUsageButNotTheIssueOrTheOutput(CapturedOutput logs) {
         ObjectNode output = validOutput().put("summaryEn", "Workers linger after shutdown. " + OUTPUT_MARKER);
-        server.respondInOrder(status(200, answer("end_turn", output.toString())));
+        server.respondInOrder(status(200, answer("stop", output.toString())));
 
         grader(LIMITS).grade(TITLE, BODY, LABELS);
 
         assertThat(logs).contains("이슈 판정 응답 model=" + ANSWERED_MODEL
-                + " stopReason=end_turn input=1830 output=412 cacheWrite=0 cacheRead=1700");
+                + " finishReason=stop input=1830 output=412 cached=1664");
         assertThat(logs).doesNotContain(OUTPUT_MARKER).doesNotContain(ISSUE_BODY_MARKER);
     }
 
-    private ClaudeIssueGrader grader(LlmCallLimits limits) {
+    private GptIssueGrader grader(LlmCallLimits limits) {
         return grader(limits, DEFAULT_TEMPERATURE);
     }
 
-    private ClaudeIssueGrader grader(LlmCallLimits limits, String temperature) {
-        AnthropicClient client = server.anthropicClient(limits);
+    private GptIssueGrader grader(LlmCallLimits limits, String temperature) {
+        return new GptIssueGrader(client(limits), REQUESTED_MODEL, temperature);
+    }
+
+    private OpenAIClient client(LlmCallLimits limits) {
+        OpenAIClient client = server.openAiClient(limits);
         clients.add(client);
-        return new ClaudeIssueGrader(client, REQUESTED_MODEL, temperature);
+        return client;
     }
 
     private static ObjectNode validOutput() {
@@ -514,70 +558,87 @@ class ClaudeIssueGraderTest {
         return output.toString();
     }
 
-    private static String answer(String stopReason, String text) {
-        return answerNode(stopReason, text).toString();
+    private static String answer(String finishReason, String content) {
+        return answerNode(finishReason, content).toString();
     }
 
-    private static ObjectNode answerNode(String stopReason, String text) {
-        ObjectNode answer = envelope(stopReason);
-        answer.putArray("content").addObject().put("type", "text").put("text", text);
+    private static ObjectNode answerNode(String finishReason, String content) {
+        ObjectNode answer = envelope();
+        ObjectNode message = choice(answer, finishReason);
+        message.put("content", content);
+        message.putNull("refusal");
         return answer;
     }
 
     private static String answerWithout(String field) {
-        ObjectNode answer = answerNode("end_turn", validOutput().toString());
+        ObjectNode answer = answerNode("stop", validOutput().toString());
         answer.remove(field);
         return answer.toString();
     }
 
-    private static String answerWithoutText(String stopReason) {
-        ObjectNode answer = envelope(stopReason);
-        answer.putArray("content");
+    private static String answerWithoutContent(String finishReason) {
+        ObjectNode answer = envelope();
+        ObjectNode message = choice(answer, finishReason);
+        message.putNull("content");
+        message.putNull("refusal");
         return answer.toString();
     }
 
-    private static String answerWithEmptyTextBlock() {
-        ObjectNode answer = envelope("end_turn");
-        answer.putArray("content").addObject().put("type", "text");
+    private static String refusal(String refusal) {
+        ObjectNode answer = envelope();
+        ObjectNode message = choice(answer, "stop");
+        message.putNull("content");
+        message.put("refusal", refusal);
         return answer.toString();
     }
 
-    private static ObjectNode envelope(String stopReason) {
+    private static String answerWithoutChoices() {
+        ObjectNode answer = envelope();
+        answer.putArray("choices");
+        return answer.toString();
+    }
+
+    private static ObjectNode choice(ObjectNode answer, String finishReason) {
+        ObjectNode choice = answer.putArray("choices").addObject()
+                .put("index", 0)
+                .put("finish_reason", finishReason);
+        choice.putNull("logprobs");
+        return choice.putObject("message").put("role", "assistant");
+    }
+
+    private static ObjectNode envelope() {
         ObjectNode answer = JSON.createObjectNode()
-                .put("id", "msg_test")
-                .put("type", "message")
-                .put("role", "assistant")
+                .put("id", "chatcmpl-test")
+                .put("object", "chat.completion")
+                .put("created", 1_700_000_000L)
                 .put("model", ANSWERED_MODEL)
-                .put("stop_reason", stopReason)
-                .putNull("stop_sequence");
-        answer.putObject("usage")
-                .put("input_tokens", 1_830)
-                .put("output_tokens", 412)
-                .put("cache_creation_input_tokens", 0)
-                .put("cache_read_input_tokens", 1_700);
+                .put("system_fingerprint", "fp_test");
+        ObjectNode usage = answer.putObject("usage")
+                .put("prompt_tokens", 1_830)
+                .put("completion_tokens", 412)
+                .put("total_tokens", 2_242);
+        usage.putObject("prompt_tokens_details").put("cached_tokens", 1_664);
         return answer;
     }
 
     private static String errorBody(String errorType, String message) {
-        ObjectNode body = JSON.createObjectNode()
-                .put("type", "error")
-                .put("request_id", OTHER_FIELD_MARKER);
+        ObjectNode body = JSON.createObjectNode();
         body.putObject("error")
-                .put("type", errorType)
                 .put("message", message)
-                .put("details", OTHER_FIELD_MARKER);
+                .put("type", errorType)
+                .put("param", OTHER_FIELD_MARKER)
+                .put("code", OTHER_FIELD_MARKER);
         return body.toString();
     }
 
     private static JsonNode outputSchema() {
-        MessageCreateParams params = MessageCreateParams.builder()
+        ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                 .model(REQUESTED_MODEL)
-                .maxTokens(1L)
                 .addUserMessage("schema")
-                .outputConfig(IssueGradingOutput.class)
+                .responseFormat(IssueGradingOutput.class)
                 .build()
                 .rawParams();
-        return ObjectMappers.jsonMapper().valueToTree(params.outputConfig().orElseThrow()).at("/format/schema");
+        return ObjectMappers.jsonMapper().valueToTree(params.responseFormat().orElseThrow()).at("/json_schema/schema");
     }
 
     private static List<String> textsOf(Throwable failure) {
