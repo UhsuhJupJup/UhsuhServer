@@ -6,6 +6,7 @@ public class IssueGradingException extends RuntimeException {
         REFUSED,
         TRUNCATED,
         INVALID_OUTPUT,
+        INVALID_INPUT,
         REJECTED,
         UNAVAILABLE
     }
