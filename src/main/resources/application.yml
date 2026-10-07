@@ -67,6 +67,32 @@ resilience4j:
         wait-duration-in-open-state: 30s                         # OPEN 후 30초간 GPT 건너뛰기, Claude, GPT 모두 OPEN이면 분류 예외
         permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
         automatic-transition-from-open-to-half-open-enabled: true
+      issueGrader:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        max-wait-duration-in-half-open-state: 2m
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-failure-predicate: uhsuhjupjup.backend.oss.pipeline.grading.infra.SystemicGradingFailure
+        ignore-exception-predicate: uhsuhjupjup.backend.oss.pipeline.grading.infra.IssueSpecificGradingFailure
+        ignore-exceptions:
+          - uhsuhjupjup.backend.oss.pipeline.grading.infra.GradingInterruptedException
+      issueGraderGpt:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        max-wait-duration-in-half-open-state: 2m
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-failure-predicate: uhsuhjupjup.backend.oss.pipeline.grading.infra.SystemicGradingFailure
+        ignore-exception-predicate: uhsuhjupjup.backend.oss.pipeline.grading.infra.IssueSpecificGradingFailure
+        ignore-exceptions:
+          - uhsuhjupjup.backend.oss.pipeline.grading.infra.GradingInterruptedException
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
@@ -104,6 +130,16 @@ oss:
       retry:
         max-retries: ${OSS_GRADING_CLAUDE_RETRY_MAX_RETRIES:1}
         max-wait: ${OSS_GRADING_CLAUDE_RETRY_MAX_WAIT:PT2S}
+    gpt:
+      enabled: ${OSS_GRADING_GPT_ENABLED:false}
+      model: ${OSS_GRADING_GPT_MODEL:gpt-4o-mini}
+      temperature: ${OSS_GRADING_GPT_TEMPERATURE:0}
+      timeout:
+        connect: ${OSS_GRADING_GPT_TIMEOUT_CONNECT:PT5S}
+        call: ${OSS_GRADING_GPT_TIMEOUT_CALL:PT30S}
+      retry:
+        max-retries: ${OSS_GRADING_GPT_RETRY_MAX_RETRIES:1}
+        max-wait: ${OSS_GRADING_GPT_RETRY_MAX_WAIT:PT2S}
 
 springdoc:
   default-produces-media-type: application/json
