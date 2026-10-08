@@ -5,17 +5,35 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 
+import java.util.Optional;
+
 public final class LlmClients {
+
+    private static final String ANTHROPIC_API_KEY_PROPERTY = "anthropic.apiKey";
+    private static final String ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY";
+    private static final String OPENAI_API_KEY_PROPERTY = "openai.apiKey";
+    private static final String OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
 
     private LlmClients() {
     }
 
     public static AnthropicClient anthropic(LlmCallLimits limits) {
-        return withLimits(AnthropicOkHttpClient.builder().fromEnv(), limits).build();
+        AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder().fromEnv();
+        strippedApiKeyFromEnv(ANTHROPIC_API_KEY_PROPERTY, ANTHROPIC_API_KEY_ENV).ifPresent(builder::apiKey);
+        return withLimits(builder, limits).build();
     }
 
     public static OpenAIClient openAi(LlmCallLimits limits) {
-        return withLimits(OpenAIOkHttpClient.builder().fromEnv(), limits).build();
+        OpenAIOkHttpClient.Builder builder = OpenAIOkHttpClient.builder().fromEnv();
+        strippedApiKeyFromEnv(OPENAI_API_KEY_PROPERTY, OPENAI_API_KEY_ENV).ifPresent(builder::apiKey);
+        return withLimits(builder, limits).build();
+    }
+
+    private static Optional<String> strippedApiKeyFromEnv(String systemProperty, String environmentVariable) {
+        return Optional.ofNullable(System.getProperty(systemProperty))
+                .or(() -> Optional.ofNullable(System.getenv(environmentVariable)))
+                .map(String::strip)
+                .filter(apiKey -> !apiKey.isEmpty());
     }
 
     static AnthropicOkHttpClient.Builder withLimits(AnthropicOkHttpClient.Builder builder, LlmCallLimits limits) {
