@@ -13,17 +13,9 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import uhsuhjupjup.backend.common.domain.BaseEntity;
-import uhsuhjupjup.backend.common.exception.BusinessException;
-import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HexFormat;
-import java.util.List;
 
 @Entity
 @Table(name = "oss_issue")
@@ -31,12 +23,7 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OssIssue extends BaseEntity {
 
-    private static final String BODY_HASH_ALGORITHM = "SHA-256";
     private static final int MAX_TITLE_LENGTH = 256;
-    private static final String CRLF = "\r\n";
-    private static final char CR = '\r';
-    private static final char LF = '\n';
-    private static final String LINE_BREAK = String.valueOf(LF);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,13 +48,19 @@ public class OssIssue extends BaseEntity {
     @Column(name = "github_created_at", nullable = false)
     private LocalDateTime githubCreatedAt;
 
+    @Column(name = "grading_failures", nullable = false, insertable = false, updatable = false)
+    private int gradingFailures;
+
+    @Column(name = "grading_failure_source_hash", length = 64, insertable = false, updatable = false)
+    private String gradingFailureSourceHash;
+
     private OssIssue(OssRepo repo, Long githubIssueId, int number, String title, String body,
                      LocalDateTime githubCreatedAt) {
         this.repo = repo;
         this.githubIssueId = githubIssueId;
         this.number = number;
         this.title = truncateTitle(title);
-        this.bodyHash = hashOf(body);
+        this.bodyHash = OssIssueBodyHash.of(body);
         this.githubCreatedAt = githubCreatedAt;
     }
 
@@ -80,7 +73,15 @@ public class OssIssue extends BaseEntity {
         this.repo = repo;
         this.number = number;
         this.title = truncateTitle(title);
-        this.bodyHash = hashOf(body);
+        this.bodyHash = OssIssueBodyHash.of(body);
+    }
+
+    public boolean gradingFailedAtLeast(int times, String sourceHash) {
+        return gradingFailures >= times && sourceHash.equals(gradingFailureSourceHash);
+    }
+
+    public boolean hasGradingFailures() {
+        return gradingFailures > 0 || gradingFailureSourceHash != null;
     }
 
     private static String truncateTitle(String title) {
@@ -88,48 +89,5 @@ public class OssIssue extends BaseEntity {
             return title;
         }
         return title.substring(0, title.offsetByCodePoints(0, MAX_TITLE_LENGTH));
-    }
-
-    private static String hashOf(String body) {
-        byte[] bytes = normalizeBody(body).getBytes(StandardCharsets.UTF_8);
-        return HexFormat.of().formatHex(sha256().digest(bytes));
-    }
-
-    private static String normalizeBody(String body) {
-        if (body == null) {
-            return "";
-        }
-        List<String> lines = Arrays.stream(body.replace(CRLF, LINE_BREAK).replace(CR, LF).split(LINE_BREAK, -1))
-                .map(OssIssue::stripTrailingSpacesAndTabs)
-                .toList();
-        int first = 0;
-        int end = lines.size();
-        while (first < end && lines.get(first).isEmpty()) {
-            first++;
-        }
-        while (end > first && lines.get(end - 1).isEmpty()) {
-            end--;
-        }
-        return String.join(LINE_BREAK, lines.subList(first, end));
-    }
-
-    private static String stripTrailingSpacesAndTabs(String line) {
-        int end = line.length();
-        while (end > 0 && isSpaceOrTab(line.charAt(end - 1))) {
-            end--;
-        }
-        return line.substring(0, end);
-    }
-
-    private static boolean isSpaceOrTab(char character) {
-        return character == ' ' || character == '\t';
-    }
-
-    private static MessageDigest sha256() {
-        try {
-            return MessageDigest.getInstance(BODY_HASH_ALGORITHM);
-        } catch (NoSuchAlgorithmException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR);
-        }
     }
 }
