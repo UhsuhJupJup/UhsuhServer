@@ -120,6 +120,10 @@ public class OssIssueGrade extends BaseEntity {
                 exclusion, reasonKo, reasonEn, summaryKo, summaryEn, criteriaVersion, model, sourceHash);
     }
 
+    public boolean isExcluded() {
+        return exclusion != null;
+    }
+
     private static void requireDifficultyAndSummaryUnlessExcluded(OssIssueGradeExclusion exclusion,
                                                                   OssIssueDifficulty difficulty,
                                                                   String summaryKo, String summaryEn) {
