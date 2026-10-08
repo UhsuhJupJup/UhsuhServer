@@ -98,6 +98,17 @@ class OssIssueGradingRunBindingTest {
         });
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    void maxIssuesBelowOne_failsStartup(String maxIssues) {
+        runnerWithEnv(Map.of("OSS_GRADING_RUN_MAX_ISSUES", maxIssues)).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context).getFailure()
+                    .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                    .hasStackTraceContaining("oss.grading.run.max-issues는 1 이상이어야 합니다: " + maxIssues);
+        });
+    }
+
     private Duration lockAtMostFor() {
         ArgumentCaptor<LockConfiguration> lockConfiguration = ArgumentCaptor.forClass(LockConfiguration.class);
         then(lockProvider).should().lock(lockConfiguration.capture());
