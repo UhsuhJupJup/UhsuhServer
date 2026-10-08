@@ -13,6 +13,7 @@ import com.openai.models.chat.completions.StructuredChatCompletionCreateParams;
 import com.openai.models.chat.completions.StructuredChatCompletionMessage;
 import com.openai.models.completions.CompletionUsage;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -99,7 +100,7 @@ class GptIssueGrader implements IssueGrader {
 
     private static void logUsage(StructuredChatCompletion<IssueGradingOutput> completion) {
         Optional<CompletionUsage> usage = completion._usage().asKnown();
-        log.info("이슈 판정 응답 model={} finishReason={} input={} output={} cached={}",
+        log.info("이슈 판정 응답 model={} finishReason={} input={} output={} cached={} issueId={}",
                 completion._model().asKnown().orElse("none"),
                 completion._choices().asKnown()
                         .flatMap(choices -> choices.stream().findFirst())
@@ -110,7 +111,12 @@ class GptIssueGrader implements IssueGrader {
                 usage.flatMap(known -> known._completionTokens().asKnown()).orElse(0L),
                 usage.flatMap(known -> known._promptTokensDetails().asKnown())
                         .flatMap(details -> details._cachedTokens().asKnown())
-                        .orElse(0L));
+                        .orElse(0L),
+                issueIdInLogContext());
+    }
+
+    private static String issueIdInLogContext() {
+        return Optional.ofNullable(MDC.get(IssueGrader.ISSUE_ID_LOG_KEY)).orElse("none");
     }
 
     private static Answer answerOf(StructuredChatCompletion<IssueGradingOutput> completion) {
