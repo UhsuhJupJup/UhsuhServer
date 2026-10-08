@@ -22,8 +22,10 @@ import uhsuhjupjup.backend.oss.github.application.GitHubClientException.Reason;
 import uhsuhjupjup.backend.oss.github.application.GitHubCredentials;
 import uhsuhjupjup.backend.oss.github.application.GitHubCredentialsMissingException;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssue;
+import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueDetail;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueListResult.IncompleteReason;
+import uhsuhjupjup.backend.oss.github.application.dto.GitHubIssueLookup;
 import uhsuhjupjup.backend.oss.github.application.dto.GitHubRepo;
 
 import java.io.IOException;
@@ -37,6 +39,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,6 +80,8 @@ class RestGitHubClient implements GitHubClient {
     private static final String RATE_LIMIT_REMAINING_HEADER = "X-RateLimit-Remaining";
     private static final String RATE_LIMIT_RESET_HEADER = "X-RateLimit-Reset";
     private static final int LOW_RATE_LIMIT_PERCENT = 10;
+    private static final String OPEN_STATE = "open";
+    private static final String LABEL_NAME_FIELD = "name";
     private static final Consumer<GitHubResponse> IGNORE_RESPONSE = response -> {
     };
 
@@ -138,6 +143,23 @@ class RestGitHubClient implements GitHubClient {
                     response -> RateLimit.of(response).ifPresent(lastRateLimit::set));
         } finally {
             logRateLimit(firstPageUri, lastRateLimit.get());
+        }
+    }
+
+    @Override
+    public GitHubIssueLookup findIssue(long repositoryId, int number) {
+        requireCredentials();
+        URI uri = UriComponentsBuilder.fromUri(apiBaseUri)
+                .pathSegment("repositories", String.valueOf(repositoryId), "issues", String.valueOf(number))
+                .build()
+                .encode()
+                .toUri();
+        AtomicReference<RateLimit> lastRateLimit = new AtomicReference<>();
+        try {
+            return readIssue(sendWithRetry(uri, null,
+                    response -> RateLimit.of(response).ifPresent(lastRateLimit::set)));
+        } finally {
+            logRateLimit(uri, lastRateLimit.get());
         }
     }
 
@@ -417,6 +439,57 @@ class RestGitHubClient implements GitHubClient {
                 toKst(payload.updatedAt(), response));
     }
 
+    private static GitHubIssueLookup readIssue(GitHubResponse response) {
+        HttpStatusCode status = response.status();
+        if (response.isRedirect()) {
+            return GitHubIssueLookup.moved();
+        }
+        if (status.isSameCodeAs(HttpStatus.NOT_FOUND) || status.isSameCodeAs(HttpStatus.GONE)) {
+            return GitHubIssueLookup.gone();
+        }
+        if (!status.isSameCodeAs(HttpStatus.OK)) {
+            throw requestFailed(response);
+        }
+        return GitHubIssueLookup.found(parseIssueDetail(response));
+    }
+
+    private static GitHubIssueDetail parseIssueDetail(GitHubResponse response) {
+        IssueDetailPayload payload;
+        try {
+            payload = OBJECT_MAPPER.readValue(response.body(), IssueDetailPayload.class);
+        } catch (IOException e) {
+            throw invalidResponse("GitHub 이슈 응답을 읽지 못했습니다: " + response.path(), e);
+        }
+        if (payload == null || payload.id() == null || payload.title() == null || payload.state() == null) {
+            throw invalidResponse("GitHub 이슈 응답에 id, 제목, 상태 중 빠진 것이 있습니다: " + response.path(), null);
+        }
+        UserPayload author = payload.user();
+        return new GitHubIssueDetail(
+                payload.id(),
+                payload.title(),
+                payload.body(),
+                labelNamesOf(payload.labels()),
+                OPEN_STATE.equalsIgnoreCase(payload.state()),
+                payload.isPullRequest(),
+                payload.assigneeCount(),
+                author == null ? null : author.login(),
+                author == null ? null : author.type());
+    }
+
+    private static List<String> labelNamesOf(JsonNode labels) {
+        if (labels == null || !labels.isArray()) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (JsonNode label : labels) {
+            JsonNode name = label.isObject() ? label.get(LABEL_NAME_FIELD) : label;
+            if (name != null && name.isTextual() && !name.asText().isBlank()) {
+                names.add(name.asText());
+            }
+        }
+        return names;
+    }
+
     private static void keepLatest(Map<Long, GitHubIssue> issues, GitHubIssue candidate) {
         GitHubIssue kept = issues.get(candidate.githubId());
         if (kept != null && candidate.updatedAt().isBefore(kept.updatedAt())) {
@@ -544,6 +617,26 @@ class RestGitHubClient implements GitHubClient {
             @JsonProperty("pull_request") JsonNode pullRequest,
             @JsonProperty("created_at") String createdAt,
             @JsonProperty("updated_at") String updatedAt) {
+
+        boolean isPullRequest() {
+            return pullRequest != null && !pullRequest.isNull();
+        }
+
+        int assigneeCount() {
+            return assignees == null ? 0 : assignees.size();
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record IssueDetailPayload(
+            Long id,
+            String title,
+            String body,
+            String state,
+            UserPayload user,
+            JsonNode labels,
+            List<JsonNode> assignees,
+            @JsonProperty("pull_request") JsonNode pullRequest) {
 
         boolean isPullRequest() {
             return pullRequest != null && !pullRequest.isNull();
