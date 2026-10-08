@@ -244,6 +244,39 @@ class OssIssueSyncIntegrationTest {
     }
 
     @Test
+    void syncRepo_issueTransferredFromAnotherRepo_clearsGradingFailuresCountedThere() {
+        Long helloWorld = saveRepo(NAME);
+        Long spoonKnife = saveRepo(OTHER_NAME);
+        given(gitHubClient.listOpenIssues(eq(OWNER), eq(NAME), any(), any()))
+                .willReturn(changed(issue(1401, 12, "Move me", "body", today(10, 0))));
+        given(gitHubClient.listOpenIssues(eq(OWNER), eq(OTHER_NAME), any(), any()))
+                .willReturn(changed(issue(1401, 3, "Move me", "body", today(10, 5))));
+        ossIssueSyncService.syncRepo(helloWorld);
+        givenGradingFailuresOnStoredBody(1401, 3);
+
+        ossIssueSyncService.syncRepo(spoonKnife);
+
+        assertThat(gradingFailuresOf(1401)).isEqualTo(new GradingFailures(0, null));
+        assertThat(storedIssue(1401).repoId()).isEqualTo(spoonKnife);
+    }
+
+    @Test
+    void syncRepo_issueRefreshedInTheSameRepo_keepsItsGradingFailures() {
+        Long repoId = saveRepo(NAME);
+        given(gitHubClient.listOpenIssues(any(), any(), any(), any())).willReturn(
+                changed(issue(1501, 7, "Old title", "body", today(10, 0))),
+                changed(issue(1501, 7, "New title", "edited body", today(10, 5))));
+        ossIssueSyncService.syncRepo(repoId);
+        givenGradingFailuresOnStoredBody(1501, 3);
+
+        ossIssueSyncService.syncRepo(repoId);
+
+        assertThat(gradingFailuresOf(1501)).isEqualTo(new GradingFailures(3, sha256Hex("body")));
+        assertThat(storedIssue(1501))
+                .isEqualTo(new StoredIssue(repoId, 7, "New title", sha256Hex("edited body"), OPENED_AT));
+    }
+
+    @Test
     void syncRepo_notModified_keepsEtagAndLatestUpdateAndRecordsOnlySyncTime() {
         Long repoId = saveRepo(NAME);
         givenState(repoId, ETAG, today(18, 0), LONG_AGO, 2);
@@ -604,6 +637,21 @@ class OssIssueSyncIntegrationTest {
                 row.getObject("github_created_at", LocalDateTime.class)), githubIssueId);
     }
 
+    private void givenGradingFailuresOnStoredBody(long githubIssueId, int failures) {
+        jdbcTemplate.update("""
+                UPDATE oss_issue SET grading_failures = ?, grading_failure_source_hash = body_hash
+                WHERE github_issue_id = ?
+                """, failures, githubIssueId);
+    }
+
+    private GradingFailures gradingFailuresOf(long githubIssueId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT grading_failures, grading_failure_source_hash FROM oss_issue WHERE github_issue_id = ?",
+                (row, rowNumber) -> new GradingFailures(
+                        row.getInt("grading_failures"), row.getString("grading_failure_source_hash")),
+                githubIssueId);
+    }
+
     private LocalDateTime updatedAtOf(long githubIssueId) {
         return jdbcTemplate.queryForObject(
                 "SELECT updated_at FROM oss_issue WHERE github_issue_id = ?", LocalDateTime.class, githubIssueId);
@@ -724,5 +772,8 @@ class OssIssueSyncIntegrationTest {
     }
 
     private record SyncLock(Duration lockAtMostFor, boolean held) {
+    }
+
+    private record GradingFailures(int count, String sourceHash) {
     }
 }
