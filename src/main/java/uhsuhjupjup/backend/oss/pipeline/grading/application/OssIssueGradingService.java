@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.LockConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.SimpleLock;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
@@ -52,6 +53,8 @@ public class OssIssueGradingService {
             EnumSet.of(StopReason.COMPLETED, StopReason.ISSUE_LIMIT, StopReason.TIME_LIMIT);
     private static final String NONE = "-";
     private static final String INTERRUPTED_CAUSE = "스레드가 중단됐습니다";
+    private static final String NO_ISSUE_TO_GRADE = "판정할 이슈 수는 1 이상이어야 합니다: ";
+    private static final String NO_DEFAULT_ISSUE_TO_GRADE = "oss.grading.run.max-issues는 1 이상이어야 합니다: ";
 
     private enum Outcome {
         GRADED,
@@ -71,7 +74,7 @@ public class OssIssueGradingService {
     private final IssueGrader issueGrader;
     private final LockProvider lockProvider;
     private final Clock clock;
-    private final int maxIssues;
+    private final int defaultMaxIssues;
     private final Duration maxDuration;
     private final int maxFailures;
     private final Duration gradingLockAtMostFor;
@@ -84,9 +87,12 @@ public class OssIssueGradingService {
                                   IssueGrader issueGrader,
                                   LockProvider lockProvider,
                                   Clock clock,
-                                  @Value("${oss.grading.run.max-issues:20}") int maxIssues,
+                                  @Value("${oss.grading.run.max-issues:20}") int defaultMaxIssues,
                                   @Value("${oss.grading.run.max-duration:PT10M}") Duration maxDuration,
                                   @Value("${oss.grading.run.max-failures:3}") int maxFailures) {
+        if (defaultMaxIssues < 1) {
+            throw new IllegalArgumentException(NO_DEFAULT_ISSUE_TO_GRADE + defaultMaxIssues);
+        }
         this.ossRepoRepository = ossRepoRepository;
         this.ossIssueRepository = ossIssueRepository;
         this.ossIssueGradeRepository = ossIssueGradeRepository;
@@ -95,18 +101,25 @@ public class OssIssueGradingService {
         this.issueGrader = issueGrader;
         this.lockProvider = lockProvider;
         this.clock = clock;
-        this.maxIssues = maxIssues;
+        this.defaultMaxIssues = defaultMaxIssues;
         this.maxDuration = maxDuration;
         this.maxFailures = maxFailures;
         this.gradingLockAtMostFor = maxDuration.plus(GRADING_LOCK_MARGIN);
     }
 
     public OssIssueGradingRunResult gradeRepo(Long repoId) {
+        return gradeRepo(repoId, defaultMaxIssues);
+    }
+
+    public OssIssueGradingRunResult gradeRepo(Long repoId, int maxIssues) {
+        if (maxIssues < 1) {
+            throw new IllegalArgumentException(NO_ISSUE_TO_GRADE + maxIssues);
+        }
         OssRepo repo = ossRepoRepository.findByIdAndStatus(repoId, OssRepoStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.OSS_REPO_NOT_FOUND));
         SimpleLock gradingLock = acquireGradingLock(repo);
         try {
-            return gradeHoldingLock(repo);
+            return gradeHoldingLock(repo, maxIssues);
         } finally {
             releaseGradingLock(gradingLock, repo);
         }
@@ -130,7 +143,7 @@ public class OssIssueGradingService {
         }
     }
 
-    private OssIssueGradingRunResult gradeHoldingLock(OssRepo repo) {
+    private OssIssueGradingRunResult gradeHoldingLock(OssRepo repo, int maxIssues) {
         Instant startedAt = clock.instant();
         List<OssIssue> candidates = ossIssueRepository.findGradingCandidates(repo.getId(), maxFailures,
                 Limit.of(maxIssues + 1));
@@ -153,12 +166,21 @@ public class OssIssueGradingService {
                 return Stop.betweenIssues(StopReason.TIME_LIMIT, NONE);
             }
             tally.countStarted();
-            Optional<Stop> stopped = gradeOne(repo, issue, startedAt, tally);
+            Optional<Stop> stopped = gradeOneInLogContext(repo, issue, startedAt, tally);
             if (stopped.isPresent()) {
                 return stopped.get();
             }
         }
         return Stop.betweenIssues(moreLeft ? StopReason.ISSUE_LIMIT : StopReason.COMPLETED, NONE);
+    }
+
+    private Optional<Stop> gradeOneInLogContext(OssRepo repo, OssIssue issue, Instant startedAt, Tally tally) {
+        MDC.put(IssueGrader.ISSUE_ID_LOG_KEY, String.valueOf(issue.getId()));
+        try {
+            return gradeOne(repo, issue, startedAt, tally);
+        } finally {
+            MDC.remove(IssueGrader.ISSUE_ID_LOG_KEY);
+        }
     }
 
     private boolean ranOutOfTime(Instant startedAt) {
