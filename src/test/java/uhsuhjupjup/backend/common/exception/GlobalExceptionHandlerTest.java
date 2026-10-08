@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.validation.constraints.Min;
 import org.hibernate.NonUniqueObjectException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.time.LocalDate;
@@ -82,6 +84,58 @@ class GlobalExceptionHandlerTest {
                 .andExpect(content().string(not(containsString("not-a-date"))));
 
         assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    void 파라미터가_허용_범위를_벗어나면_400과_파라미터_이름과_이유를_준다() throws Exception {
+        mockMvc.perform(get("/stub/pages").param("size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.path").value("/stub/pages"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("size"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("1 이상이어야 합니다."));
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    void 이름을_지정한_파라미터는_범위_위반도_형식_오류와_같은_요청_이름을_준다() throws Exception {
+        mockMvc.perform(get("/stub/named-pages").param("page-size", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("page-size"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("1 이상이어야 합니다."));
+        mockMvc.perform(get("/stub/named-pages").param("page-size", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("page-size"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("숫자여야 합니다."));
+        mockMvc.perform(get("/stub/levels/0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(1))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("level-id"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("1 이상이어야 합니다."));
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    void 반환값_검증_실패는_서버_오류라_500이고_에러_로그를_남긴다() throws Exception {
+        mockMvc.perform(get("/stub/count"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.path").value("/stub/count"))
+                .andExpect(jsonPath("$.fieldErrors").doesNotExist());
+
+        assertThat(appender.list).singleElement().satisfies(event -> {
+            assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+            assertThat(event.getThrowableProxy().getClassName())
+                    .isEqualTo(HandlerMethodValidationException.class.getName());
+        });
     }
 
     @Test
@@ -194,6 +248,25 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/stub/confirm")
         void confirm(@RequestParam String token) {
+        }
+
+        @GetMapping("/stub/pages")
+        public void pages(@RequestParam @Min(value = 1, message = "1 이상이어야 합니다.") int size) {
+        }
+
+        @GetMapping("/stub/named-pages")
+        public void namedPages(@RequestParam("page-size") @Min(value = 1, message = "1 이상이어야 합니다.")
+                               int pageSize) {
+        }
+
+        @GetMapping("/stub/levels/{level-id}")
+        public void level(@PathVariable("level-id") @Min(value = 1, message = "1 이상이어야 합니다.") long levelId) {
+        }
+
+        @GetMapping("/stub/count")
+        @Min(1)
+        public int count() {
+            return 0;
         }
 
         @PutMapping("/stub/resources")

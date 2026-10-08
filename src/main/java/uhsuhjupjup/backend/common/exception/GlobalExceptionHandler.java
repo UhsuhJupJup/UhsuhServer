@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.common.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +12,10 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -39,6 +43,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e, HttpServletRequest req) {
         List<ErrorResponse.FieldError> fields = e.getBindingResult().getFieldErrors().stream()
                 .map(f -> new ErrorResponse.FieldError(f.getField(), f.getDefaultMessage()))
+                .toList();
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, req.getRequestURI(), fields));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleMethodValidation(HandlerMethodValidationException e,
+                                                                HttpServletRequest req) {
+        if (e.isForReturnValue()) {
+            return handleEtc(e, req);
+        }
+        List<ErrorResponse.FieldError> fields = e.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> new ErrorResponse.FieldError(
+                                requestNameOf(result.getMethodParameter()), error.getDefaultMessage())))
                 .toList();
         return ResponseEntity.badRequest()
                 .contentType(MediaType.APPLICATION_JSON)
@@ -104,6 +124,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, req.getRequestURI()));
+    }
+
+    private static String requestNameOf(MethodParameter parameter) {
+        RequestParam requestParam = parameter.getParameterAnnotation(RequestParam.class);
+        if (requestParam != null && !requestParam.name().isEmpty()) {
+            return requestParam.name();
+        }
+        PathVariable pathVariable = parameter.getParameterAnnotation(PathVariable.class);
+        if (pathVariable != null && !pathVariable.name().isEmpty()) {
+            return pathVariable.name();
+        }
+        return parameter.getParameterName();
     }
 
     private String typeMismatchReason(Class<?> requiredType) {

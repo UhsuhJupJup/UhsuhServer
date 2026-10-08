@@ -15,6 +15,7 @@ import com.anthropic.models.messages.StructuredTextBlock;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.Usage;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -109,13 +110,18 @@ class ClaudeIssueGrader implements IssueGrader {
 
     private static void logUsage(StructuredMessage<IssueGradingOutput> message) {
         Optional<Usage> usage = message._usage().asKnown();
-        log.info("이슈 판정 응답 model={} stopReason={} input={} output={} cacheWrite={} cacheRead={}",
+        log.info("이슈 판정 응답 model={} stopReason={} input={} output={} cacheWrite={} cacheRead={} issueId={}",
                 message._model().asKnown().map(Model::toString).orElse("none"),
                 message._stopReason().asKnown().map(StopReason::toString).orElse("none"),
                 usage.flatMap(known -> known._inputTokens().asKnown()).orElse(0L),
                 usage.flatMap(known -> known._outputTokens().asKnown()).orElse(0L),
                 usage.flatMap(known -> known._cacheCreationInputTokens().asKnown()).orElse(0L),
-                usage.flatMap(known -> known._cacheReadInputTokens().asKnown()).orElse(0L));
+                usage.flatMap(known -> known._cacheReadInputTokens().asKnown()).orElse(0L),
+                issueIdInLogContext());
+    }
+
+    private static String issueIdInLogContext() {
+        return Optional.ofNullable(MDC.get(IssueGrader.ISSUE_ID_LOG_KEY)).orElse("none");
     }
 
     private static String answeredModelOf(StructuredMessage<IssueGradingOutput> message) {

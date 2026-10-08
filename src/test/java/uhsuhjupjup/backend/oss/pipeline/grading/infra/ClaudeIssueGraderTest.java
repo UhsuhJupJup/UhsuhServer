@@ -16,6 +16,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
+import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import uhsuhjupjup.backend.config.llm.LlmCallLimits;
@@ -24,6 +25,7 @@ import uhsuhjupjup.backend.config.llm.MockLlmServer;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueDifficulty;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueEvidence;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueGradeExclusion;
+import uhsuhjupjup.backend.oss.pipeline.grading.application.IssueGrader;
 import uhsuhjupjup.backend.oss.pipeline.grading.application.IssueGradingException;
 import uhsuhjupjup.backend.oss.pipeline.grading.application.IssueGradingException.Reason;
 import uhsuhjupjup.backend.oss.pipeline.grading.application.dto.IssueGradingResult;
@@ -481,6 +483,30 @@ class ClaudeIssueGraderTest {
         assertThat(logs).contains("이슈 판정 응답 model=" + ANSWERED_MODEL
                 + " stopReason=end_turn input=1830 output=412 cacheWrite=0 cacheRead=1700");
         assertThat(logs).doesNotContain(OUTPUT_MARKER).doesNotContain(ISSUE_BODY_MARKER);
+    }
+
+    @Test
+    void grade_insideAGradingRun_putsTheIssueIdOfTheLogContextOnTheUsageLine(CapturedOutput logs) {
+        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+
+        MDC.put(IssueGrader.ISSUE_ID_LOG_KEY, "42");
+        try {
+            grader(LIMITS).grade(TITLE, BODY, LABELS);
+        } finally {
+            MDC.remove(IssueGrader.ISSUE_ID_LOG_KEY);
+        }
+
+        assertThat(logs).contains("이슈 판정 응답 model=" + ANSWERED_MODEL
+                + " stopReason=end_turn input=1830 output=412 cacheWrite=0 cacheRead=1700 issueId=42");
+    }
+
+    @Test
+    void grade_outsideAGradingRun_logsNoIssueIdOnTheUsageLine(CapturedOutput logs) {
+        server.respondInOrder(status(200, answer("end_turn", validOutput().toString())));
+
+        grader(LIMITS).grade(TITLE, BODY, LABELS);
+
+        assertThat(logs).contains("cacheRead=1700 issueId=none");
     }
 
     private ClaudeIssueGrader grader(LlmCallLimits limits) {
