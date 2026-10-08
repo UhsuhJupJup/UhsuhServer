@@ -14,9 +14,7 @@ import uhsuhjupjup.backend.oss.repo.application.dto.OssRepoSort;
 import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoDetailResponse;
 import uhsuhjupjup.backend.oss.repo.ui.dto.OssRepoPageResponse;
 
-import java.beans.PropertyEditor;
-import java.beans.PropertyEditorSupport;
-import java.util.function.Function;
+import static uhsuhjupjup.backend.common.web.ParameterEditors.parsedBy;
 
 @RestController
 @RequestMapping("/api/oss/repos")
@@ -46,14 +44,5 @@ public class OssRepoController implements OssRepoControllerApi {
     @GetMapping("/{repoId}")
     public OssRepoDetailResponse detail(@PathVariable Long repoId) {
         return OssRepoDetailResponse.from(ossRepoService.getDetail(repoId));
-    }
-
-    private static PropertyEditor parsedBy(Function<String, ?> parser) {
-        return new PropertyEditorSupport() {
-            @Override
-            public void setAsText(String text) {
-                setValue(text.isEmpty() ? null : parser.apply(text));
-            }
-        };
     }
 }

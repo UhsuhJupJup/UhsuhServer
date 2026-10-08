@@ -12,9 +12,7 @@ import uhsuhjupjup.backend.oss.issue.application.OssIssueService;
 import uhsuhjupjup.backend.oss.issue.application.dto.OssIssueLanguage;
 import uhsuhjupjup.backend.oss.issue.ui.dto.OssIssueDetailResponse;
 
-import java.beans.PropertyEditor;
-import java.beans.PropertyEditorSupport;
-import java.util.function.Function;
+import static uhsuhjupjup.backend.common.web.ParameterEditors.parsedBy;
 
 @RestController
 @RequestMapping("/api/oss/issues")
@@ -33,14 +31,5 @@ public class OssIssueController implements OssIssueControllerApi {
     public OssIssueDetailResponse detail(@PathVariable Long issueId,
                                          @RequestParam(required = false) OssIssueLanguage lang) {
         return OssIssueDetailResponse.from(ossIssueService.getDetail(issueId, lang));
-    }
-
-    private static PropertyEditor parsedBy(Function<String, ?> parser) {
-        return new PropertyEditorSupport() {
-            @Override
-            public void setAsText(String text) {
-                setValue(text.isEmpty() ? null : parser.apply(text));
-            }
-        };
     }
 }

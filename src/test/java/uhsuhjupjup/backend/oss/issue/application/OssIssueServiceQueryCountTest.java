@@ -12,6 +12,7 @@ import org.springframework.test.context.TestPropertySource;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.oss.issue.application.dto.OssIssueDetailResult;
 import uhsuhjupjup.backend.oss.issue.application.dto.OssIssueLanguage;
+import uhsuhjupjup.backend.oss.issue.application.dto.OssIssuePageResult;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssue;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueDifficulty;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueEvidence;
@@ -36,6 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OssIssueServiceQueryCountTest {
 
     private static final LocalDateTime OPENED_AT = LocalDateTime.of(2026, 10, 5, 9, 12, 44);
+    private static final int LISTED_ISSUE_COUNT = 6;
 
     @Autowired
     private OssIssueService ossIssueService;
@@ -88,6 +90,79 @@ class OssIssueServiceQueryCountTest {
                 .isInstanceOf(BusinessException.class);
 
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    void getRepoIssues_readsRepoAndThenThePageWithItsIssuesInTwoStatementsWhateverThePageSize() {
+        Long repoId = saveRepoWithGradedIssues(LISTED_ISSUE_COUNT);
+
+        OssIssuePageResult onePerPage = ossIssueService.getRepoIssues(repoId, null, OssIssueLanguage.EN, null, 1);
+        long statementsForOne = statistics.getPrepareStatementCount();
+        entityManager.clear();
+        statistics.clear();
+
+        OssIssuePageResult allInOnePage = ossIssueService.getRepoIssues(repoId, null, OssIssueLanguage.EN, null,
+                LISTED_ISSUE_COUNT);
+
+        assertThat(onePerPage.items()).hasSize(1);
+        assertThat(onePerPage.nextCursor()).isNotNull();
+        assertThat(allInOnePage.items()).hasSize(LISTED_ISSUE_COUNT)
+                .allSatisfy(item -> {
+                    assertThat(item.repoFullName()).isEqualTo("acme/listed");
+                    assertThat(item.title()).startsWith("Listed issue ");
+                    assertThat(item.summary()).isEqualTo("Summary.");
+                });
+        assertThat(allInOnePage.nextCursor()).isNull();
+        assertThat(statementsForOne).isEqualTo(2);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+    }
+
+    @Test
+    void getRepoIssues_nextPage_alsoTakesTwoStatements() {
+        Long repoId = saveRepoWithGradedIssues(LISTED_ISSUE_COUNT);
+        OssIssuePageResult first = ossIssueService.getRepoIssues(repoId, null, null, null, 2);
+        entityManager.clear();
+        statistics.clear();
+
+        OssIssuePageResult second = ossIssueService.getRepoIssues(repoId, null, null, first.nextCursor(), 2);
+
+        assertThat(second.items()).hasSize(2);
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+    }
+
+    @Test
+    void getRepoIssues_activeRepoWithNothingListed_stillTakesTwoStatements() {
+        Long repoId = saveRepoWithGradedIssues(0);
+
+        OssIssuePageResult result = ossIssueService.getRepoIssues(repoId, null, null, null, null);
+
+        assertThat(result.items()).isEmpty();
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
+    }
+
+    @Test
+    void getRepoIssues_missingRepo_stopsAfterTheFirstStatement() {
+        Long missingRepoId = ossRepoRepository.findAll().stream().mapToLong(OssRepo::getId).max().orElseThrow() + 1;
+        statistics.clear();
+
+        assertThatThrownBy(() -> ossIssueService.getRepoIssues(missingRepoId, null, null, null, null))
+                .isInstanceOf(BusinessException.class);
+
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    private Long saveRepoWithGradedIssues(int count) {
+        OssRepo repo = ossRepoRepository.save(OssRepo.create(2L, "acme/listed", null, "Go", 3_000));
+        for (int number = 1; number <= count; number++) {
+            OssIssue listed = ossIssueRepository.save(OssIssue.create(repo, 100L + number, number,
+                    "Listed issue " + number, "Body " + number, OPENED_AT.plusMinutes(number)));
+            ossIssueGradeRepository.save(grade(listed, "이전 이유", "Earlier reason."));
+            ossIssueGradeRepository.save(grade(listed, "이유", "Reason."));
+        }
+        entityManager.flush();
+        entityManager.clear();
+        statistics.clear();
+        return repo.getId();
     }
 
     private static OssIssueGrade grade(OssIssue issue, String reasonKo, String reasonEn) {
