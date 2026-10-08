@@ -47,6 +47,7 @@ public enum ErrorCode {
 
     OSS_CATEGORY_NOT_FOUND(HttpStatus.BAD_REQUEST, "없는 카테고리 코드가 있습니다."),
     OSS_REPO_NOT_FOUND(HttpStatus.NOT_FOUND, "레포를 찾을 수 없습니다."),
+    OSS_ISSUE_NOT_FOUND(HttpStatus.NOT_FOUND, "이슈를 찾을 수 없습니다."),
 
     OSS_ISSUE_SYNC_IN_PROGRESS(HttpStatus.CONFLICT, "이 레포의 이슈 수집이 이미 진행 중입니다. 잠시 뒤 다시 시도해 주세요."),
     OSS_ISSUE_GRADING_IN_PROGRESS(HttpStatus.CONFLICT, "이 레포의 이슈 판정이 이미 진행 중입니다. 잠시 뒤 다시 시도해 주세요.");

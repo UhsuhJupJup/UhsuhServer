@@ -99,6 +99,18 @@ class OssIssueGradeTest {
     }
 
     @ParameterizedTest
+    @EnumSource(OssIssueGradeExclusion.class)
+    void isExcluded_anyExclusion_isTrueWithOrWithoutDifficulty(OssIssueGradeExclusion exclusion) {
+        assertThat(gradeOf(null, exclusion).isExcluded()).isTrue();
+        assertThat(gradeOf(OssIssueDifficulty.HARD, exclusion).isExcluded()).isTrue();
+    }
+
+    @Test
+    void isExcluded_withoutExclusion_isFalse() {
+        assertThat(gradeOf(OssIssueDifficulty.HARD, null).isExcluded()).isFalse();
+    }
+
+    @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"claude-haiku-4-5-20251001",
             "BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD",

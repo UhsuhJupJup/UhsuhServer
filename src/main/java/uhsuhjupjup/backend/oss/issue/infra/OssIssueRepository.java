@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssue;
+import uhsuhjupjup.backend.oss.repo.domain.OssRepoStatus;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +14,13 @@ import java.util.Optional;
 public interface OssIssueRepository extends JpaRepository<OssIssue, Long> {
 
     Optional<OssIssue> findByGithubIssueId(Long githubIssueId);
+
+    @Query("""
+            select i from OssIssue i
+            join fetch i.repo r
+            where i.id = :id and r.status = :repoStatus
+            """)
+    Optional<OssIssue> findWithRepoByIdAndRepoStatus(Long id, OssRepoStatus repoStatus);
 
     List<OssIssue> findAllByGithubIssueIdIn(Collection<Long> githubIssueIds);
 

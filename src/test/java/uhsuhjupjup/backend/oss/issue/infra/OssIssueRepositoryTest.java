@@ -7,12 +7,14 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssue;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueBodyHash;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueDifficulty;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueEvidence;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueGrade;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
+import uhsuhjupjup.backend.oss.repo.domain.OssRepoStatus;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
@@ -84,6 +86,38 @@ class OssIssueRepositoryTest {
         OssIssue loaded = ossIssueRepository.findByGithubIssueId(1L).orElseThrow();
 
         assertThat(Hibernate.isInitialized(loaded.getRepo())).isFalse();
+    }
+
+    @Test
+    void findWithRepoByIdAndRepoStatus_loadsIssueTogetherWithItsRepo() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long id = ossIssueRepository.saveAndFlush(issue(repo, 1L, 1)).getId();
+        entityManager.clear();
+
+        OssIssue loaded = ossIssueRepository.findWithRepoByIdAndRepoStatus(id, OssRepoStatus.ACTIVE).orElseThrow();
+
+        assertThat(Hibernate.isInitialized(loaded.getRepo())).isTrue();
+        assertThat(loaded.getRepo().getFullName()).isEqualTo("spring-projects/spring-boot");
+    }
+
+    @Test
+    void findWithRepoByIdAndRepoStatus_findsIssueOnlyWhenIdAndRepoStatusBothMatch() {
+        OssRepo active = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssRepo suspended = repo(2L, "octocat/suspended");
+        ReflectionTestUtils.setField(suspended, "status", OssRepoStatus.SUSPENDED);
+        ossRepoRepository.save(suspended);
+        Long ofActive = ossIssueRepository.save(issue(active, 1L, 1)).getId();
+        Long ofSuspended = ossIssueRepository.save(issue(suspended, 2L, 1)).getId();
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(ossIssueRepository.findWithRepoByIdAndRepoStatus(ofActive, OssRepoStatus.ACTIVE))
+                .map(OssIssue::getId).hasValue(ofActive);
+        assertThat(ossIssueRepository.findWithRepoByIdAndRepoStatus(ofSuspended, OssRepoStatus.ACTIVE)).isEmpty();
+        assertThat(ossIssueRepository.findWithRepoByIdAndRepoStatus(ofSuspended, OssRepoStatus.SUSPENDED))
+                .map(OssIssue::getId).hasValue(ofSuspended);
+        assertThat(ossIssueRepository.findWithRepoByIdAndRepoStatus(ofSuspended + 1, OssRepoStatus.ACTIVE))
+                .isEmpty();
     }
 
     @Test
