@@ -20,9 +20,6 @@ public record OssIssueDetailResponse(
         String summary,
         LocalDateTime gradedAt) {
 
-    private static final String GITHUB_URL_PREFIX = "https://github.com/";
-    private static final String ISSUES_PATH = "/issues/";
-
     public record RepoSummary(Long id, String fullName) {
     }
 
@@ -36,7 +33,7 @@ public record OssIssueDetailResponse(
 
     public static OssIssueDetailResponse from(OssIssueDetailResult result) {
         return new OssIssueDetailResponse(result.id(), result.number(), result.title(),
-                GITHUB_URL_PREFIX + result.repoFullName() + ISSUES_PATH + result.number(),
+                GitHubIssueUrl.of(result.repoFullName(), result.number()),
                 result.githubCreatedAt(),
                 new RepoSummary(result.repoId(), result.repoFullName()),
                 result.difficulty(),
