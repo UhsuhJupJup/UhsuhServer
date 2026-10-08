@@ -4,18 +4,18 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssueGrade;
 
-import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 public interface OssIssueGradeRepository extends JpaRepository<OssIssueGrade, Long> {
 
-    Optional<OssIssueGrade> findFirstByIssueIdOrderByIdDesc(Long issueId);
-
     @Query("""
             select g from OssIssueGrade g
-            where g.issue.id in :issueIds
-            and g.id = (select max(latest.id) from OssIssueGrade latest where latest.issue = g.issue)
+            where g.id = (
+                select max(matching.id) from OssIssueGrade matching
+                join matching.issue issue
+                where issue.id = :issueId and matching.sourceHash = issue.bodyHash)
             """)
-    List<OssIssueGrade> findLatestByIssueIdIn(Collection<Long> issueIds);
+    Optional<OssIssueGrade> findCurrentByIssueId(Long issueId);
+
+    boolean existsByIssueIdAndSourceHash(Long issueId, String sourceHash);
 }
