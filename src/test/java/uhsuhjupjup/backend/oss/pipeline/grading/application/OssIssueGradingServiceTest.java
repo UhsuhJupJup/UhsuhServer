@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.CannotAcquireLockException;
@@ -52,6 +53,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -98,6 +100,8 @@ class OssIssueGradingServiceTest {
             OssIssueEvidence.PRESENT, OssIssueEvidence.PRESENT, OssIssueEvidence.ABSENT, OssIssueEvidence.PARTIAL,
             false, null, "REASONKOMARKER", "REASONENMARKER", "SUMMARYKOMARKER", "SUMMARYENMARKER");
     private static final IssueGradingResult GRADED = new IssueGradingResult(VERDICT, MODEL);
+    private static final String REQUEST_ID_LOG_KEY = "requestId";
+    private static final String CALLER_REQUEST_ID = "req-7f3a";
     private static final GitHubClientException FIRST_OUTAGE = new GitHubClientException(
             GitHubClientException.Reason.UNAVAILABLE,
             "GitHub가 응답하지 않습니다(시도 3번, 마지막 ConnectException): /repositories/1296269/issues/1", null);
@@ -143,6 +147,11 @@ class OssIssueGradingServiceTest {
     @AfterEach
     void clearInterrupt() {
         Thread.interrupted();
+    }
+
+    @AfterEach
+    void clearLogContext() {
+        MDC.clear();
     }
 
     @Test
@@ -570,6 +579,135 @@ class OssIssueGradingServiceTest {
         assertThat(result.ungradable()).containsEntry(OssIssueUngradableReason.GONE, MAX_ISSUES);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {1, 5, MAX_ISSUES + 5})
+    void gradeRepo_requestedCount_gradesUpToThatManyWhateverTheConfiguredDefault(int count) {
+        List<OssIssue> candidates = IntStream.rangeClosed(1, count + 1).mapToObj(this::issue).toList();
+        givenActiveRepo();
+        given(ossIssueRepository.findGradingCandidates(REPO_ID, MAX_FAILURES, Limit.of(count + 1)))
+                .willReturn(candidates);
+        given(gitHubClient.findIssue(eq(REPO_GITHUB_ID), anyInt())).willAnswer(invocation ->
+                GitHubIssueLookup.found(detailOf(candidates.get(invocation.<Integer>getArgument(1) - 1))));
+        given(issueGrader.grade(FETCHED_TITLE, FETCHED_BODY, LABELS)).willReturn(GRADED);
+
+        OssIssueGradingRunResult result = ossIssueGradingService.gradeRepo(REPO_ID, count);
+
+        assertThat(result).isEqualTo(result(StopReason.ISSUE_LIMIT, count, count, 0, 0, 0, 0, 0, Map.of(), Map.of()));
+        then(gitHubClient).should(never()).findIssue(REPO_GITHUB_ID, count + 1);
+    }
+
+    @Test
+    void gradeRepo_requestedCountAboveTheCandidates_completes() {
+        givenActiveRepo();
+        given(ossIssueRepository.findGradingCandidates(REPO_ID, MAX_FAILURES, Limit.of(6)))
+                .willReturn(List.of(issue(1), issue(2)));
+        given(gitHubClient.findIssue(eq(REPO_GITHUB_ID), anyInt())).willReturn(GitHubIssueLookup.gone());
+
+        OssIssueGradingRunResult result = ossIssueGradingService.gradeRepo(REPO_ID, 5);
+
+        assertThat(result).isEqualTo(result(StopReason.COMPLETED, 2, 0, 0, 0, 0, 0, 0,
+                Map.of(OssIssueUngradableReason.GONE, 2), Map.of()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void gradeRepo_requestedCountBelowOne_isRefusedBeforeLookingUpTheRepoOrTakingTheLock(int count) {
+        assertThatThrownBy(() -> ossIssueGradingService.gradeRepo(REPO_ID, count))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(String.valueOf(count));
+
+        then(ossRepoRepository).shouldHaveNoInteractions();
+        then(lockProvider).shouldHaveNoInteractions();
+        then(ossIssueRepository).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void gradeRepo_keepsEachIssueIdInTheLogContextOnlyWhileThatIssueIsBeingFetchedGradedAndSaved() {
+        OssIssue first = issue(1);
+        OssIssue second = issue(2);
+        List<String> contexts = new ArrayList<>();
+        givenActiveRepo();
+        given(ossIssueRepository.findGradingCandidates(REPO_ID, MAX_FAILURES, CANDIDATE_LIMIT)).willAnswer(invocation -> {
+            contexts.add("select " + issueIdInLogContext());
+            return List.of(first, second);
+        });
+        given(gitHubClient.findIssue(eq(REPO_GITHUB_ID), anyInt())).willAnswer(invocation -> {
+            contexts.add("fetch #" + invocation.getArgument(1) + " " + issueIdInLogContext());
+            return GitHubIssueLookup.found(detailOf(invocation.<Integer>getArgument(1) == 1 ? first : second));
+        });
+        given(issueGrader.grade(FETCHED_TITLE, FETCHED_BODY, LABELS)).willAnswer(invocation -> {
+            contexts.add("grade " + issueIdInLogContext());
+            return GRADED;
+        });
+        willAnswer(invocation -> {
+            contexts.add("save " + issueIdInLogContext());
+            return null;
+        }).given(ossIssueGradeSaver).save(any(), eq(VERDICT), eq(MODEL), eq(FETCHED_BODY_HASH));
+        willAnswer(invocation -> {
+            contexts.add("unlock " + issueIdInLogContext());
+            return null;
+        }).given(gradingLock).unlock();
+
+        ossIssueGradingService.gradeRepo(REPO_ID);
+
+        assertThat(contexts).containsExactly("select null", "fetch #1 1", "grade 1", "save 1",
+                "fetch #2 2", "grade 2", "save 2", "unlock null");
+        assertThat(issueIdInLogContext()).isNull();
+    }
+
+    @Test
+    void gradeRepo_keepsWhatTheCallerPutInTheLogContextWhileGradingAndAfterwards() {
+        OssIssue first = issue(1);
+        OssIssue second = issue(2);
+        List<String> contexts = new ArrayList<>();
+        MDC.put(REQUEST_ID_LOG_KEY, CALLER_REQUEST_ID);
+        givenActiveRepo();
+        givenCandidates(first, second);
+        given(gitHubClient.findIssue(eq(REPO_GITHUB_ID), anyInt())).willAnswer(invocation ->
+                GitHubIssueLookup.found(detailOf(invocation.<Integer>getArgument(1) == 1 ? first : second)));
+        given(issueGrader.grade(FETCHED_TITLE, FETCHED_BODY, LABELS)).willAnswer(invocation -> {
+            contexts.add(MDC.get(REQUEST_ID_LOG_KEY) + " " + issueIdInLogContext());
+            return GRADED;
+        });
+
+        ossIssueGradingService.gradeRepo(REPO_ID);
+
+        assertThat(contexts).containsExactly(CALLER_REQUEST_ID + " 1", CALLER_REQUEST_ID + " 2");
+        assertThat(MDC.get(REQUEST_ID_LOG_KEY)).isEqualTo(CALLER_REQUEST_ID);
+        assertThat(issueIdInLogContext()).isNull();
+    }
+
+    @Test
+    void gradeRepo_runStoppedOnAnIssue_leavesNoIssueIdInTheLogContext() {
+        OssIssue held = issue(1);
+        givenActiveRepo();
+        givenCandidates(held, issue(2));
+        givenFound(held);
+        given(issueGrader.grade(FETCHED_TITLE, FETCHED_BODY, LABELS))
+                .willThrow(new IssueGradingException(Reason.UNAVAILABLE, "이슈를 판정하지 못했습니다: Claude, GPT 실패"));
+
+        assertThat(ossIssueGradingService.gradeRepo(REPO_ID).stopReason()).isEqualTo(StopReason.GRADER_UNAVAILABLE);
+
+        assertThat(issueIdInLogContext()).isNull();
+    }
+
+    @Test
+    void gradeRepo_failureThrownWhileHandlingAnIssue_removesOnlyTheIssueIdFromTheLogContext() {
+        OssIssue issue = issue(1);
+        DataAccessResourceFailureException saveFailure = new DataAccessResourceFailureException("connection lost");
+        MDC.put(REQUEST_ID_LOG_KEY, CALLER_REQUEST_ID);
+        givenActiveRepo();
+        givenCandidates(issue);
+        givenFound(issue);
+        given(issueGrader.grade(FETCHED_TITLE, FETCHED_BODY, LABELS)).willReturn(GRADED);
+        willThrow(saveFailure).given(ossIssueGradeSaver).save(any(), any(), any(), any());
+
+        assertThatThrownBy(() -> ossIssueGradingService.gradeRepo(REPO_ID)).isSameAs(saveFailure);
+
+        assertThat(issueIdInLogContext()).isNull();
+        assertThat(MDC.get(REQUEST_ID_LOG_KEY)).isEqualTo(CALLER_REQUEST_ID);
+    }
+
     @Test
     void gradeRepo_tenMinutesPassed_stopsBeforeStartingTheNextIssueLeavingItForTheNextRun() {
         OssIssue first = issue(1);
@@ -908,6 +1046,10 @@ class OssIssueGradingServiceTest {
                 + result.failed().values().stream().mapToInt(Integer::intValue).sum();
         assertThat(accounted).as("every selected issue lands in exactly one count").isEqualTo(result.selected());
         return result;
+    }
+
+    private static String issueIdInLogContext() {
+        return MDC.get(IssueGrader.ISSUE_ID_LOG_KEY);
     }
 
     private static List<String> issueLines(CapturedOutput output) {
