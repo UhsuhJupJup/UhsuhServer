@@ -5,8 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.jdbc.core.JdbcTemplate;
 import uhsuhjupjup.backend.oss.issue.domain.OssIssue;
+import uhsuhjupjup.backend.oss.issue.domain.OssIssueBodyHash;
+import uhsuhjupjup.backend.oss.issue.domain.OssIssueDifficulty;
+import uhsuhjupjup.backend.oss.issue.domain.OssIssueEvidence;
+import uhsuhjupjup.backend.oss.issue.domain.OssIssueGrade;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 import uhsuhjupjup.backend.oss.repo.infra.OssRepoRepository;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
@@ -22,10 +27,16 @@ class OssIssueRepositoryTest {
 
     private static final long GITHUB_ISSUE_ID_BEYOND_INT = 5_611_573_057L;
     private static final LocalDateTime OPENED_AT = LocalDateTime.of(2026, 9, 28, 17, 23, 29);
+    private static final LocalDateTime LONG_AGO = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
     private static final String ABC_SHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    private static final String OLD_BODY_HASH = OssIssueBodyHash.of("old body");
+    private static final int MAX_FAILURES = 3;
 
     @Autowired
     private OssIssueRepository ossIssueRepository;
+
+    @Autowired
+    private OssIssueGradeRepository ossIssueGradeRepository;
 
     @Autowired
     private OssRepoRepository ossRepoRepository;
@@ -152,11 +163,150 @@ class OssIssueRepositoryTest {
         assertThat(bodyColumns).containsExactly("body_hash varchar(64)");
     }
 
+    @Test
+    void savedIssue_startsWithoutGradingFailures() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long id = ossIssueRepository.saveAndFlush(issue(repo, 1L, 1)).getId();
+        entityManager.clear();
+
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(0, null));
+        assertThat(ossIssueRepository.findById(id).orElseThrow())
+                .returns(0, OssIssue::getGradingFailures)
+                .returns(null, OssIssue::getGradingFailureSourceHash);
+    }
+
+    @Test
+    void findGradingCandidates_returnsIssuesOfThatRepoNewestFirstUpToLimitBreakingTiesByLargerId() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssRepo otherRepo = ossRepoRepository.save(repo(2L, "facebook/react"));
+        Long oldest = saveIssue(repo, 11L, OPENED_AT.minusDays(2));
+        Long newest = saveIssue(repo, 12L, OPENED_AT);
+        Long middle = saveIssue(repo, 13L, OPENED_AT.minusDays(1));
+        Long newestSavedLater = saveIssue(repo, 14L, OPENED_AT);
+        saveIssue(otherRepo, 21L, OPENED_AT.plusDays(1));
+        entityManager.clear();
+
+        assertThat(candidateIds(repo, 3)).containsExactly(newestSavedLater, newest, middle);
+        assertThat(candidateIds(repo, 10)).containsExactly(newestSavedLater, newest, middle, oldest);
+    }
+
+    @Test
+    void findGradingCandidates_skipsIssueGradedForItsCurrentBodyButKeepsIssueGradedOnlyForAnOldBody() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        OssIssue graded = ossIssueRepository.save(issue(repo, 11L, 1));
+        OssIssue gradedForOldBody = ossIssueRepository.save(issue(repo, 12L, 2));
+        Long ungraded = ossIssueRepository.save(issue(repo, 13L, 3)).getId();
+        ossIssueGradeRepository.save(grade(graded, OLD_BODY_HASH));
+        ossIssueGradeRepository.save(grade(graded, graded.getBodyHash()));
+        ossIssueGradeRepository.save(grade(gradedForOldBody, OLD_BODY_HASH));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(candidateIds(repo, 10)).containsExactlyInAnyOrder(gradedForOldBody.getId(), ungraded);
+    }
+
+    @Test
+    void findGradingCandidates_skipsIssueThatFailedMaxTimesOnItsCurrentBodyOnly() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long failedMaxTimes = saveIssue(repo, 11L, OPENED_AT);
+        Long failedFewerTimes = saveIssue(repo, 12L, OPENED_AT);
+        Long failedMaxTimesOnOldBody = saveIssue(repo, 13L, OPENED_AT);
+        entityManager.clear();
+        givenGradingFailures(failedMaxTimes, MAX_FAILURES, ABC_SHA256);
+        givenGradingFailures(failedFewerTimes, MAX_FAILURES - 1, ABC_SHA256);
+        givenGradingFailures(failedMaxTimesOnOldBody, MAX_FAILURES + 2, OLD_BODY_HASH);
+
+        assertThat(candidateIds(repo, 10)).containsExactlyInAnyOrder(failedFewerTimes, failedMaxTimesOnOldBody);
+    }
+
+    @Test
+    void recordGradingFailure_countsUpForTheSameHashAndStartsAgainAtOneForAnotherHash() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long id = saveIssue(repo, 11L, OPENED_AT);
+        entityManager.clear();
+
+        ossIssueRepository.recordGradingFailure(id, ABC_SHA256);
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(1, ABC_SHA256));
+
+        ossIssueRepository.recordGradingFailure(id, ABC_SHA256);
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(2, ABC_SHA256));
+
+        ossIssueRepository.recordGradingFailure(id, OLD_BODY_HASH);
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(1, OLD_BODY_HASH));
+    }
+
+    @Test
+    void recordAndClearGradingFailures_leaveIssueDataAndUpdatedAtAsTheyWere() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long id = saveIssue(repo, 11L, OPENED_AT);
+        entityManager.clear();
+        jdbcTemplate.update("update oss_issue set updated_at = ? where id = ?", LONG_AGO, id);
+
+        ossIssueRepository.recordGradingFailure(id, OLD_BODY_HASH);
+        ossIssueRepository.clearGradingFailures(id);
+
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(0, null));
+        assertThat(jdbcTemplate.queryForObject("select updated_at from oss_issue where id = ?", LocalDateTime.class,
+                id)).isEqualTo(LONG_AGO);
+        assertThat(ossIssueRepository.findById(id).orElseThrow())
+                .returns("Retry interval is ignored", OssIssue::getTitle)
+                .returns(ABC_SHA256, OssIssue::getBodyHash);
+    }
+
+    @Test
+    void savingIssueLoadedBeforeFailureWasRecorded_keepsTheRecordedFailure() {
+        OssRepo repo = ossRepoRepository.save(repo(1L, "spring-projects/spring-boot"));
+        Long id = saveIssue(repo, 11L, OPENED_AT);
+        entityManager.clear();
+        OssIssue loadedBeforeFailure = ossIssueRepository.findById(id).orElseThrow();
+
+        ossIssueRepository.recordGradingFailure(id, ABC_SHA256);
+        loadedBeforeFailure.refresh(repo, 1, "Retry interval is ignored on restart", "edited body");
+        entityManager.flush();
+
+        assertThat(gradingFailuresOf(id)).isEqualTo(new GradingFailures(1, ABC_SHA256));
+        assertThat(jdbcTemplate.queryForObject("select title from oss_issue where id = ?", String.class, id))
+                .isEqualTo("Retry interval is ignored on restart");
+    }
+
     private OssIssue issue(OssRepo repo, long githubIssueId, int number) {
         return OssIssue.create(repo, githubIssueId, number, "Retry interval is ignored", "abc", OPENED_AT);
     }
 
     private OssRepo repo(Long githubId, String fullName) {
         return OssRepo.create(githubId, fullName, null, "Java", 1_000);
+    }
+
+    private Long saveIssue(OssRepo repo, long githubIssueId, LocalDateTime openedAt) {
+        return ossIssueRepository.saveAndFlush(OssIssue.create(
+                repo, githubIssueId, (int) githubIssueId, "Retry interval is ignored", "abc", openedAt)).getId();
+    }
+
+    private List<Long> candidateIds(OssRepo repo, int limit) {
+        return ossIssueRepository.findGradingCandidates(repo.getId(), MAX_FAILURES, Limit.of(limit)).stream()
+                .map(OssIssue::getId)
+                .toList();
+    }
+
+    private static OssIssueGrade grade(OssIssue issue, String sourceHash) {
+        return OssIssueGrade.create(issue, OssIssueDifficulty.EASY,
+                OssIssueEvidence.PRESENT, OssIssueEvidence.PRESENT, OssIssueEvidence.PRESENT, OssIssueEvidence.PRESENT,
+                false, null, "이유", "Reason.", "요약", "Summary.", "v1", "claude-haiku-4-5", sourceHash);
+    }
+
+    private void givenGradingFailures(Long issueId, int failures, String sourceHash) {
+        jdbcTemplate.update("update oss_issue set grading_failures = ?, grading_failure_source_hash = ? where id = ?",
+                failures, sourceHash, issueId);
+    }
+
+    private GradingFailures gradingFailuresOf(Long issueId) {
+        return jdbcTemplate.queryForObject(
+                "select grading_failures, grading_failure_source_hash from oss_issue where id = ?",
+                (row, rowNumber) -> new GradingFailures(
+                        row.getInt("grading_failures"), row.getString("grading_failure_source_hash")),
+                issueId);
+    }
+
+    private record GradingFailures(int count, String sourceHash) {
     }
 }
