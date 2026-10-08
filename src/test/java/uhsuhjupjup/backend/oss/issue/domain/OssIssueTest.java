@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import uhsuhjupjup.backend.oss.repo.domain.OssRepo;
 
 import java.time.LocalDateTime;
@@ -153,6 +154,39 @@ class OssIssueTest {
         assertThat(issue.getNumber()).isEqualTo(7);
         assertThat(issue.getGithubIssueId()).isEqualTo(5_611_425_470L);
         assertThat(issue.getGithubCreatedAt()).isEqualTo(OPENED_AT);
+    }
+
+    @Test
+    void create_startsWithoutGradingFailures() {
+        OssIssue issue = issueWithBody("abc");
+
+        assertThat(issue.getGradingFailures()).isZero();
+        assertThat(issue.getGradingFailureSourceHash()).isNull();
+        assertThat(issue.gradingFailedAtLeast(1, issue.getBodyHash())).isFalse();
+    }
+
+    @Test
+    void gradingFailedAtLeast_countsOnlyFailuresRecordedForThatBodyHash() {
+        OssIssue issue = issueWithBody("abc");
+        String failedBodyHash = issue.getBodyHash();
+        ReflectionTestUtils.setField(issue, "gradingFailures", 3);
+        ReflectionTestUtils.setField(issue, "gradingFailureSourceHash", failedBodyHash);
+
+        assertThat(issue.gradingFailedAtLeast(3, failedBodyHash)).isTrue();
+        assertThat(issue.gradingFailedAtLeast(2, failedBodyHash)).isTrue();
+        assertThat(issue.gradingFailedAtLeast(4, failedBodyHash)).isFalse();
+        assertThat(issue.gradingFailedAtLeast(3, OssIssueBodyHash.of("edited body"))).isFalse();
+    }
+
+    @Test
+    void hasGradingFailures_isTrueOnlyOnceAFailureWasRecorded() {
+        OssIssue fresh = issueWithBody("abc");
+        OssIssue failedOnce = issueWithBody("abc");
+        ReflectionTestUtils.setField(failedOnce, "gradingFailures", 1);
+        ReflectionTestUtils.setField(failedOnce, "gradingFailureSourceHash", failedOnce.getBodyHash());
+
+        assertThat(fresh.hasGradingFailures()).isFalse();
+        assertThat(failedOnce.hasGradingFailures()).isTrue();
     }
 
     private OssIssue issueWithBody(String body) {

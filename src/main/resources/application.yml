@@ -140,6 +140,10 @@ oss:
       retry:
         max-retries: ${OSS_GRADING_GPT_RETRY_MAX_RETRIES:1}
         max-wait: ${OSS_GRADING_GPT_RETRY_MAX_WAIT:PT2S}
+    run:
+      max-issues: ${OSS_GRADING_RUN_MAX_ISSUES:20}
+      max-duration: ${OSS_GRADING_RUN_MAX_DURATION:PT10M}
+      max-failures: ${OSS_GRADING_RUN_MAX_FAILURES:3}
 
 springdoc:
   default-produces-media-type: application/json

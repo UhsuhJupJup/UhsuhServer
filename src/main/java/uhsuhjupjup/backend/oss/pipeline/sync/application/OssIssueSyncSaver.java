@@ -81,18 +81,25 @@ public class OssIssueSyncSaver {
                 .findAllByGithubIssueIdIn(issues.stream().map(GitHubIssue::githubId).toList()).stream()
                 .collect(Collectors.toMap(OssIssue::getGithubIssueId, Function.identity()));
         List<OssIssue> created = new ArrayList<>();
+        List<Long> movedFromAnotherRepo = new ArrayList<>();
         int bodyChanged = 0;
         for (GitHubIssue issue : issues) {
             OssIssue existing = storedByGithubId.get(issue.githubId());
             if (existing == null) {
                 created.add(OssIssue.create(repo, issue.githubId(), issue.number(), issue.title(), issue.body(),
                         issue.createdAt()));
-            } else if (refreshChangesBody(existing, repo, issue)) {
+                continue;
+            }
+            if (!existing.getRepo().getId().equals(repoId)) {
+                movedFromAnotherRepo.add(existing.getId());
+            }
+            if (refreshChangesBody(existing, repo, issue)) {
                 bodyChanged++;
             }
         }
         created.sort(Comparator.comparing(OssIssue::getGithubIssueId));
         ossIssueRepository.saveAll(created);
+        movedFromAnotherRepo.forEach(ossIssueRepository::clearGradingFailures);
         return new Stored(created.size(), bodyChanged, issues.size() - created.size() - bodyChanged);
     }
 
