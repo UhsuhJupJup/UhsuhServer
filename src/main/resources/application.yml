@@ -34,6 +34,9 @@ claude:
   timeout:
     connect: ${CLAUDE_TIMEOUT_CONNECT:PT5S}   # 연결 수립 상한
     call: ${CLAUDE_TIMEOUT_CALL:PT10S}        # 요청 1건 전체(읽기 포함) 상한, 노트추천 요청 스레드가 오래 붙잡히지 않게
+  retry:
+    max-retries: ${CLAUDE_RETRY_MAX_RETRIES:1}
+    max-wait: ${CLAUDE_RETRY_MAX_WAIT:PT2S}
 
 gpt:
   enabled: ${GPT_ENABLED:false}               # Claude 실패/서킷 OPEN 시 폴백, 키 없으면 false 유지
@@ -41,6 +44,9 @@ gpt:
   timeout:
     connect: ${GPT_TIMEOUT_CONNECT:PT5S}      # 연결 수립 상한
     call: ${GPT_TIMEOUT_CALL:PT10S}           # 요청 1건 전체(읽기 포함) 상한
+  retry:
+    max-retries: ${GPT_RETRY_MAX_RETRIES:1}
+    max-wait: ${GPT_RETRY_MAX_WAIT:PT2S}
 
 resilience4j:
   circuitbreaker:

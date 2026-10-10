@@ -2,7 +2,7 @@ package uhsuhjupjup.backend.pipeline.matching.infra;
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIf;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchTarget;
@@ -12,17 +12,26 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = ".+")
+@EnabledIf("liveTestEnabled")
 class ClaudeKeywordClassifierLiveTest {
 
-    private final ClaudeKeywordClassifier classifier =
-            new ClaudeKeywordClassifier(AnthropicOkHttpClient.fromEnv(), "claude-haiku-4-5");
+    private final ClaudeKeywordClassifier classifier = new ClaudeKeywordClassifier(
+            AnthropicOkHttpClient.builder()
+                    .fromEnv()
+                    .apiKey(System.getenv("ANTHROPIC_API_KEY").strip())
+                    .build(),
+            "claude-haiku-4-5");
 
     private final MatchCatalog catalog = new MatchCatalog(List.of(
             new MatchTarget(1L, "redis", Set.of("레디스")),
             new MatchTarget(2L, "kafka", Set.of()),
             new MatchTarget(3L, "kubernetes", Set.of("k8s")),
             new MatchTarget(4L, "결제", Set.of("payment", "정산"))));
+
+    static boolean liveTestEnabled() {
+        String apiKey = System.getenv("ANTHROPIC_API_KEY");
+        return "true".equals(System.getenv("KEYWORD_CLASSIFIER_LIVE_TEST")) && apiKey != null && !apiKey.isBlank();
+    }
 
     @Test
     void classify_relevantArticle_matchesRedis() {
