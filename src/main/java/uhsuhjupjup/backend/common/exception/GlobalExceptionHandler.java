@@ -2,20 +2,30 @@ package uhsuhjupjup.backend.common.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.util.ClassUtils;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.sql.SQLException;
 import java.util.List;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final int MYSQL_DUPLICATE_ENTRY = 1062;
+    private static final String NUMBER_REQUIRED = "숫자여야 합니다.";
+    private static final String INVALID_FORMAT = "형식이 올바르지 않습니다.";
+    private static final String REQUIRED_VALUE = "필수 값입니다.";
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException e, HttpServletRequest req) {
@@ -33,6 +43,38 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, req.getRequestURI(), fields));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e,
+                                                            HttpServletRequest req) {
+        List<ErrorResponse.FieldError> fields = List.of(
+                new ErrorResponse.FieldError(e.getName(), typeMismatchReason(e.getRequiredType())));
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, req.getRequestURI(), fields));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e,
+                                                                HttpServletRequest req) {
+        List<ErrorResponse.FieldError> fields = List.of(
+                new ErrorResponse.FieldError(e.getParameterName(), REQUIRED_VALUE));
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR, req.getRequestURI(), fields));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException e,
+                                                             HttpServletRequest req) {
+        if (!isDuplicateKey(e)) {
+            return handleEtc(e, req);
+        }
+        log.warn("Duplicate key conflict at {}", req.getRequestURI());
+        return ResponseEntity.status(ErrorCode.RESOURCE_ALREADY_EXISTS.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.of(ErrorCode.RESOURCE_ALREADY_EXISTS, req.getRequestURI()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -62,5 +104,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, req.getRequestURI()));
+    }
+
+    private String typeMismatchReason(Class<?> requiredType) {
+        boolean numeric = requiredType != null
+                && Number.class.isAssignableFrom(ClassUtils.resolvePrimitiveIfNecessary(requiredType));
+        return numeric ? NUMBER_REQUIRED : INVALID_FORMAT;
+    }
+
+    private boolean isDuplicateKey(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sqlException && sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY) {
+                return true;
+            }
+        }
+        return false;
     }
 }
