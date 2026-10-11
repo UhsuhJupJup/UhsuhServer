@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordDetailResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordGraphResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.TopKeywordResponse;
 
 import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -44,6 +45,39 @@ public interface KeywordControllerApi {
     List<KeywordResponse> list(
             @Parameter(description = "이름 검색어. 부분 일치", example = "redis") String q,
             @Parameter(description = "이 토픽에 속한 키워드만", example = "1") Long topicId);
+
+    @Operation(
+            summary = "글이 가장 많은 키워드 조회",
+            description = """
+                    ### 인증
+
+                    - 로그인 없이 호출할 수 있습니다.
+
+                    ### 조회 결과
+
+                    - 글이 가장 많이 붙은 키워드 하나를 반환합니다.
+                    - `articleCount`는 그 키워드가 붙은 글의 수입니다. 키워드 상세 조회의 `articleCount`와 같은 값입니다.
+                    - 글 수가 같은 키워드가 여럿이면 이름순으로 첫 번째입니다. 대소문자를 구분하지 않습니다.
+
+                    ### 활용
+
+                    - 메인 화면이 처음 보여 줄 키워드를 고르는 데 사용하는 것을 상정했습니다. 받은 `id`로 키워드별 그래프를 조회합니다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = TopKeywordResponse.class))),
+            @ApiResponse(responseCode = "404", description = "글이 붙은 키워드가 하나도 없음",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = """
+                            {
+                              "code": "KEYWORD_NOT_FOUND",
+                              "message": "키워드를 찾을 수 없습니다.",
+                              "status": 404,
+                              "path": "/api/keywords/top",
+                              "timestamp": "2026-09-04T14:20:11.482"
+                            }
+                            """)))
+    })
+    TopKeywordResponse top();
 
     @Operation(
             summary = "키워드 상세 조회",
