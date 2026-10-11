@@ -266,6 +266,49 @@ class KeywordIntegrationTest {
                 .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
     }
 
+    @Test
+    void top_returnsKeywordWithMostArticlesAndSameCountAsDetail() throws Exception {
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        attach(saveArticle(blog, 1), mysql, jpa);
+        attach(saveArticle(blog, 2), mysql);
+        attach(saveArticle(blog, 3), mysql);
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(mysql.getId()))
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.articleCount").value(3));
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleCount").value(3));
+    }
+
+    @Test
+    void top_whenCountsTie_returnsFirstByName() throws Exception {
+        Keyword azure = keywordRepository.save(Keyword.create("Azure"));
+        Keyword aws = keywordRepository.save(Keyword.create("aws"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        Keyword abc = keywordRepository.save(Keyword.create("abc"));
+        attach(saveArticle(blog, 1), azure, aws, abc);
+        attach(saveArticle(blog, 2), azure, aws);
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(aws.getId()))
+                .andExpect(jsonPath("$.name").value("aws"))
+                .andExpect(jsonPath("$.articleCount").value(2));
+    }
+
+    @Test
+    void top_whenNoKeywordHasArticles_returns404() throws Exception {
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
     private Article saveArticle(Blog blog, int number) {
         return articleRepository.save(Article.create(
                 blog,
