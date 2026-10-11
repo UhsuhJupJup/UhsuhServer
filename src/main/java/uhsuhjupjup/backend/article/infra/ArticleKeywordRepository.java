@@ -3,6 +3,7 @@ package uhsuhjupjup.backend.article.infra;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
@@ -115,4 +116,16 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
             order by count(ak1.id) desc, ak2.keyword.id asc, ak3.keyword.id asc
             """)
     List<KeywordNeighborLink> findNeighborLinks(Long keywordId, Collection<Long> neighborIds);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordArticleCount(k.id, k.name, counted.articleCount)
+            from (
+                select ak.keyword.id as keywordId, count(ak.id) as articleCount
+                from ArticleKeyword ak
+                group by ak.keyword.id
+            ) counted
+            join Keyword k on k.id = counted.keywordId
+            order by counted.articleCount desc, k.name asc
+            """)
+    List<KeywordArticleCount> findTopKeywords(Pageable pageable);
 }
