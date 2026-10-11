@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import uhsuhjupjup.backend.article.application.KeywordSummaryQueryService;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
@@ -22,6 +23,7 @@ public class KeywordService {
 
     private final KeywordRepository keywordRepository;
     private final TopicKeywordRepository topicKeywordRepository;
+    private final KeywordSummaryQueryService keywordSummaryQueryService;
 
     public List<Keyword> search(String query, Long topicId) {
         if (topicId != null) {
@@ -52,6 +54,6 @@ public class KeywordService {
         List<Topic> topics = topicKeywordRepository.findWithTopicByKeywordId(keywordId).stream()
                 .map(TopicKeyword::getTopic)
                 .toList();
-        return new KeywordDetailResult(keyword, topics);
+        return new KeywordDetailResult(keyword, topics, keywordSummaryQueryService.summarize(keywordId));
     }
 }
