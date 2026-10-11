@@ -133,6 +133,15 @@ class SubscriptionIntegrationTest {
     }
 
     @Test
+    void unsubscribeByToken_withoutToken_returns400() throws Exception {
+        mockMvc.perform(get("/api/unsubscribe"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("token"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("필수 값입니다."));
+    }
+
+    @Test
     void unsubscribeOneClickByPost_clearsAllWithoutAuth() throws Exception {
         mockMvc.perform(put("/api/subscriptions").header("Authorization", BEARER)
                         .contentType(MediaType.APPLICATION_JSON)

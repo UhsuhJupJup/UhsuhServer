@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.keyword;
 
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import uhsuhjupjup.backend.article.domain.Article;
+import uhsuhjupjup.backend.article.domain.ArticleKeyword;
+import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
@@ -21,8 +28,11 @@ import uhsuhjupjup.backend.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
 import uhsuhjupjup.backend.topic.infra.TopicRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.IntStream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +58,15 @@ class KeywordIntegrationTest {
 
     @Autowired
     private TopicKeywordRepository topicKeywordRepository;
+
+    @Autowired
+    private BlogRepository blogRepository;
+
+    @Autowired
+    private ArticleRepository articleRepository;
+
+    @Autowired
+    private ArticleKeywordRepository articleKeywordRepository;
 
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
@@ -109,5 +128,198 @@ class KeywordIntegrationTest {
         mockMvc.perform(get("/api/keywords/999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
+    @Test
+    void detail_returnsArticleCountAndRelatedKeywords() throws Exception {
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        Keyword hibernate = keywordRepository.save(Keyword.create("Hibernate"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        Article first = saveArticle(blog, 1);
+        Article second = saveArticle(blog, 2);
+        Article third = saveArticle(blog, 3);
+        attach(first, mysql, jpa, hibernate);
+        attach(second, mysql, jpa);
+        attach(third, mysql);
+        attach(saveArticle(blog, 4), jpa);
+
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.topics[0].name").value("Database"))
+                .andExpect(jsonPath("$.articleCount").value(3))
+                .andExpect(jsonPath("$.relatedKeywords.length()").value(2))
+                .andExpect(jsonPath("$.relatedKeywords[0].id").value(jpa.getId()))
+                .andExpect(jsonPath("$.relatedKeywords[0].name").value("JPA"))
+                .andExpect(jsonPath("$.relatedKeywords[0].sharedArticleCount").value(2))
+                .andExpect(jsonPath("$.relatedKeywords[1].name").value("Hibernate"))
+                .andExpect(jsonPath("$.relatedKeywords[1].sharedArticleCount").value(1));
+        mockMvc.perform(get("/api/articles").param("keywordIds", mysql.getId().toString()).param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    void detail_withoutArticles_returnsZeroAndEmptyRelatedKeywords() throws Exception {
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleCount").value(0))
+                .andExpect(jsonPath("$.relatedKeywords").isArray())
+                .andExpect(jsonPath("$.relatedKeywords").isEmpty());
+    }
+
+    @Test
+    void graph_returnsCenterNeighborsAndLinksCountedInsideCenterArticles() throws Exception {
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        Keyword hibernate = keywordRepository.save(Keyword.create("Hibernate"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        attach(saveArticle(blog, 1), mysql, jpa, hibernate);
+        attach(saveArticle(blog, 2), mysql, jpa);
+        attach(saveArticle(blog, 3), mysql);
+        attach(saveArticle(blog, 4), jpa, hibernate);
+
+        mockMvc.perform(get("/api/keywords/" + mysql.getId() + "/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.id").value(mysql.getId()))
+                .andExpect(jsonPath("$.center.name").value("MySQL"))
+                .andExpect(jsonPath("$.center.articleCount").value(3))
+                .andExpect(jsonPath("$.neighbors.length()").value(2))
+                .andExpect(jsonPath("$.neighbors[0].id").value(jpa.getId()))
+                .andExpect(jsonPath("$.neighbors[0].name").value("JPA"))
+                .andExpect(jsonPath("$.neighbors[0].sharedArticleCount").value(2))
+                .andExpect(jsonPath("$.neighbors[1].name").value("Hibernate"))
+                .andExpect(jsonPath("$.neighbors[1].sharedArticleCount").value(1))
+                .andExpect(jsonPath("$.neighborLinks.length()").value(1))
+                .andExpect(jsonPath("$.neighborLinks[0].sourceId").value(jpa.getId()))
+                .andExpect(jsonPath("$.neighborLinks[0].targetId").value(hibernate.getId()))
+                .andExpect(jsonPath("$.neighborLinks[0].sharedArticleCount").value(1));
+        mockMvc.perform(get("/api/keywords/" + jpa.getId() + "/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.articleCount").value(3))
+                .andExpect(jsonPath("$.neighbors[?(@.id == " + mysql.getId() + ")].sharedArticleCount").value(2));
+    }
+
+    @Test
+    void graph_neighborsStartWithRelatedKeywordsOfDetailAndStopAtTen() throws Exception {
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        Article shared = saveArticle(blog, 1);
+        attach(shared, mysql);
+        List<Keyword> others = IntStream.iterate(11, number -> number - 1).limit(11)
+                .mapToObj(number -> keywordRepository.save(Keyword.create(String.format("n%02d", number))))
+                .toList();
+        others.forEach(other -> attach(shared, other));
+        Article second = saveArticle(blog, 2);
+        attach(second, mysql, others.get(0));
+
+        String detail = mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleCount").value(2))
+                .andExpect(jsonPath("$.relatedKeywords.length()").value(8))
+                .andReturn().getResponse().getContentAsString();
+        String graph = mockMvc.perform(get("/api/keywords/" + mysql.getId() + "/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.articleCount").value(2))
+                .andExpect(jsonPath("$.neighbors.length()").value(10))
+                .andExpect(jsonPath("$.neighbors[0].name").value("n11"))
+                .andExpect(jsonPath("$.neighbors[0].sharedArticleCount").value(2))
+                .andExpect(jsonPath("$.neighbors[9].name").value("n09"))
+                .andExpect(jsonPath("$.neighbors[?(@.id == " + mysql.getId() + ")]").isEmpty())
+                .andExpect(jsonPath("$.neighborLinks.length()").value(45))
+                .andReturn().getResponse().getContentAsString();
+
+        List<Object> related = JsonPath.read(detail, "$.relatedKeywords");
+        List<Object> firstEightNeighbors = JsonPath.read(graph, "$.neighbors[0:8]");
+        assertThat(firstEightNeighbors).isEqualTo(related);
+    }
+
+    @Test
+    void graph_withoutArticles_returnsZeroAndEmptyLists() throws Exception {
+        mockMvc.perform(get("/api/keywords/" + mysql.getId() + "/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.name").value("MySQL"))
+                .andExpect(jsonPath("$.center.articleCount").value(0))
+                .andExpect(jsonPath("$.neighbors").isEmpty())
+                .andExpect(jsonPath("$.neighborLinks").isEmpty());
+    }
+
+    @Test
+    void graph_whenArticlesHaveNoOtherKeyword_returnsCountAndEmptyLists() throws Exception {
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        attach(saveArticle(blog, 1), mysql);
+        attach(saveArticle(blog, 2), mysql);
+
+        mockMvc.perform(get("/api/keywords/" + mysql.getId() + "/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.articleCount").value(2))
+                .andExpect(jsonPath("$.neighbors").isEmpty())
+                .andExpect(jsonPath("$.neighborLinks").isEmpty());
+    }
+
+    @Test
+    void graph_whenNotFound_returns404() throws Exception {
+        mockMvc.perform(get("/api/keywords/999999/graph"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
+    @Test
+    void top_returnsKeywordWithMostArticlesAndSameCountAsDetail() throws Exception {
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        attach(saveArticle(blog, 1), mysql, jpa);
+        attach(saveArticle(blog, 2), mysql);
+        attach(saveArticle(blog, 3), mysql);
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(mysql.getId()))
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.articleCount").value(3));
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleCount").value(3));
+    }
+
+    @Test
+    void top_whenCountsTie_returnsFirstByName() throws Exception {
+        Keyword azure = keywordRepository.save(Keyword.create("Azure"));
+        Keyword aws = keywordRepository.save(Keyword.create("aws"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        Keyword abc = keywordRepository.save(Keyword.create("abc"));
+        attach(saveArticle(blog, 1), azure, aws, abc);
+        attach(saveArticle(blog, 2), azure, aws);
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(aws.getId()))
+                .andExpect(jsonPath("$.name").value("aws"))
+                .andExpect(jsonPath("$.articleCount").value(2));
+    }
+
+    @Test
+    void top_whenNoKeywordHasArticles_returns404() throws Exception {
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
+    private Article saveArticle(Blog blog, int number) {
+        return articleRepository.save(Article.create(
+                blog,
+                "키워드 통합 테스트 글 " + number,
+                "https://keyword-it.example.com/" + number,
+                LocalDateTime.of(2026, 6, number, 0, 0)));
+    }
+
+    private void attach(Article article, Keyword... keywords) {
+        for (Keyword keyword : keywords) {
+            articleKeywordRepository.save(ArticleKeyword.of(article, keyword, "title"));
+        }
     }
 }

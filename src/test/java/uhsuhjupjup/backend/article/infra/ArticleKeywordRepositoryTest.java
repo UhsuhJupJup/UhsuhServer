@@ -4,9 +4,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
+import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.blog.domain.Blog;
@@ -19,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -35,6 +39,7 @@ class ArticleKeywordRepositoryTest {
     @Autowired
     private KeywordRepository keywordRepository;
 
+    private Blog blog;
     private Keyword mysql;
     private Keyword transaction;
     private Keyword lock;
@@ -42,7 +47,7 @@ class ArticleKeywordRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        Blog blog = blogRepository.save(
+        blog = blogRepository.save(
                 Blog.create("우아한형제들", "techblog.woowahan.com", "https://techblog.woowahan.com/feed.xml"));
         mysql = keywordRepository.save(Keyword.create("MySQL"));
         transaction = keywordRepository.save(Keyword.create("트랜잭션"));
@@ -135,5 +140,211 @@ class ArticleKeywordRepositoryTest {
 
         assertThat(frequencies).extracting(KeywordFrequency::keywordId, KeywordFrequency::articleCount)
                 .containsExactlyInAnyOrder(tuple(lock.getId(), 3L), tuple(redis.getId(), 1L));
+    }
+
+    @Test
+    void 키워드에_붙은_글의_수를_센다() {
+        Keyword unused = keywordRepository.save(Keyword.create("Kotlin"));
+
+        assertThat(articleKeywordRepository.countByKeywordId(lock.getId())).isEqualTo(3);
+        assertThat(articleKeywordRepository.countByKeywordId(mysql.getId())).isEqualTo(2);
+        assertThat(articleKeywordRepository.countByKeywordId(unused.getId())).isZero();
+    }
+
+    @Test
+    void 연관_키워드는_함께_붙은_글이_많은순이고_자기_자신은_없다() {
+        List.of(4, 5).forEach(number -> {
+            Article article = articleRepository.save(Article.create(
+                    blog, "MySQL 트랜잭션 " + number, "https://ex/" + number, LocalDateTime.of(2026, 6, number, 0, 0)));
+            articleKeywordRepository.save(ArticleKeyword.of(article, mysql, "title"));
+            articleKeywordRepository.save(ArticleKeyword.of(article, transaction, "title"));
+        });
+
+        List<KeywordRelation> related = articleKeywordRepository.findRelatedKeywords(
+                mysql.getId(), PageRequest.of(0, 8));
+
+        assertThat(related)
+                .extracting(KeywordRelation::keywordId, KeywordRelation::name, KeywordRelation::sharedArticleCount)
+                .containsExactly(
+                        tuple(transaction.getId(), "트랜잭션", 3L),
+                        tuple(lock.getId(), "락", 2L));
+    }
+
+    @Test
+    void 함께_붙은_글_수가_같으면_대소문자를_가리지_않는_이름순이다() {
+        Keyword cloud = keywordRepository.save(Keyword.create("클라우드"));
+        Keyword bigtable = keywordRepository.save(Keyword.create("Bigtable"));
+        Keyword azure = keywordRepository.save(Keyword.create("Azure"));
+        Keyword aws = keywordRepository.save(Keyword.create("aws"));
+        Article article = articleRepository.save(
+                Article.create(blog, "클라우드 비교", "https://ex/cloud", LocalDateTime.of(2026, 6, 4, 0, 0)));
+        List.of(cloud, bigtable, azure, aws)
+                .forEach(keyword -> articleKeywordRepository.save(ArticleKeyword.of(article, keyword, "title")));
+
+        List<KeywordRelation> related = articleKeywordRepository.findRelatedKeywords(
+                cloud.getId(), PageRequest.of(0, 8));
+
+        List<Long> relatedIds = related.stream().map(KeywordRelation::keywordId).toList();
+        List<String> namesInListOrder = keywordRepository.findAllByOrderByNameAsc().stream()
+                .filter(keyword -> relatedIds.contains(keyword.getId()))
+                .map(Keyword::getName)
+                .toList();
+        assertThat(related).extracting(KeywordRelation::name).containsExactly("aws", "Azure", "Bigtable");
+        assertThat(related).extracting(KeywordRelation::name).containsExactlyElementsOf(namesInListOrder);
+        assertThat(related).extracting(KeywordRelation::sharedArticleCount).containsOnly(1L);
+    }
+
+    @Test
+    void 연관_키워드가_요청한_수보다_많으면_순서대로_그만큼만_반환한다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Article shared = articleRepository.save(
+                Article.create(blog, "키워드가 많은 글", "https://ex/hub", LocalDateTime.of(2026, 6, 5, 0, 0)));
+        Article second = articleRepository.save(
+                Article.create(blog, "허브와 k9", "https://ex/hub-2", LocalDateTime.of(2026, 6, 6, 0, 0)));
+        articleKeywordRepository.save(ArticleKeyword.of(shared, hub, "title"));
+        articleKeywordRepository.save(ArticleKeyword.of(second, hub, "title"));
+        List<Keyword> numbered = IntStream.iterate(9, number -> number - 1).limit(9)
+                .mapToObj(number -> keywordRepository.save(Keyword.create("k" + number)))
+                .toList();
+        numbered.forEach(keyword -> articleKeywordRepository.save(ArticleKeyword.of(shared, keyword, "title")));
+        articleKeywordRepository.save(ArticleKeyword.of(second, numbered.get(0), "title"));
+
+        List<KeywordRelation> related = articleKeywordRepository.findRelatedKeywords(
+                hub.getId(), PageRequest.of(0, 8));
+
+        assertThat(related).extracting(KeywordRelation::name, KeywordRelation::sharedArticleCount)
+                .containsExactly(
+                        tuple("k9", 2L),
+                        tuple("k1", 1L), tuple("k2", 1L), tuple("k3", 1L), tuple("k4", 1L),
+                        tuple("k5", 1L), tuple("k6", 1L), tuple("k7", 1L));
+    }
+
+    @Test
+    void 글이_없는_키워드는_연관_키워드가_없다() {
+        Keyword unused = keywordRepository.save(Keyword.create("Kotlin"));
+
+        assertThat(articleKeywordRepository.findRelatedKeywords(unused.getId(), PageRequest.of(0, 8))).isEmpty();
+    }
+
+    @Test
+    void 이웃끼리의_연결은_중심_키워드의_글_안에서만_센다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        attach(saveArticle("g1"), hub, first, second);
+        attach(saveArticle("g2"), hub, first, second);
+        attach(saveArticle("g3"), hub, first);
+        attach(saveArticle("g4"), first, second);
+        attach(saveArticle("g5"), first, second);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links)
+                .extracting(
+                        KeywordNeighborLink::sourceKeywordId,
+                        KeywordNeighborLink::targetKeywordId,
+                        KeywordNeighborLink::sharedArticleCount)
+                .containsExactly(tuple(first.getId(), second.getId(), 2L));
+    }
+
+    @Test
+    void 중심_키워드가_없는_글에서만_함께_붙은_이웃은_연결되지_않는다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        attach(saveArticle("g1"), hub, first);
+        attach(saveArticle("g2"), hub, second);
+        attach(saveArticle("g3"), first, second);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links).isEmpty();
+    }
+
+    @Test
+    void 이웃끼리의_연결은_넘긴_이웃_사이에서만_나온다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        Keyword outside = keywordRepository.save(Keyword.create("목록 밖"));
+        attach(saveArticle("g1"), hub, first, second, outside);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links)
+                .extracting(KeywordNeighborLink::sourceKeywordId, KeywordNeighborLink::targetKeywordId)
+                .containsExactly(tuple(first.getId(), second.getId()));
+    }
+
+    @Test
+    void 이웃끼리의_연결은_쌍마다_한_번이고_글이_많은순_다음_id순이다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        Keyword third = keywordRepository.save(Keyword.create("셋째"));
+        Keyword fourth = keywordRepository.save(Keyword.create("넷째"));
+        attach(saveArticle("g1"), hub, second, third);
+        attach(saveArticle("g2"), hub, first, fourth);
+        attach(saveArticle("g3"), hub, third, fourth);
+        attach(saveArticle("g4"), hub, third, fourth);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(fourth.getId(), third.getId(), second.getId(), first.getId()));
+
+        assertThat(links)
+                .extracting(
+                        KeywordNeighborLink::sourceKeywordId,
+                        KeywordNeighborLink::targetKeywordId,
+                        KeywordNeighborLink::sharedArticleCount)
+                .containsExactly(
+                        tuple(third.getId(), fourth.getId(), 2L),
+                        tuple(first.getId(), fourth.getId(), 1L),
+                        tuple(second.getId(), third.getId(), 1L));
+    }
+
+    @Test
+    void 글이_가장_많은_키워드를_반환한다() {
+        List<KeywordArticleCount> top = articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1));
+
+        assertThat(top)
+                .extracting(
+                        KeywordArticleCount::keywordId,
+                        KeywordArticleCount::name,
+                        KeywordArticleCount::articleCount)
+                .containsExactly(tuple(lock.getId(), "락", 3L));
+    }
+
+    @Test
+    void 글_수가_같으면_대소문자를_가리지_않는_이름순으로_첫_번째다() {
+        Keyword azure = keywordRepository.save(Keyword.create("Azure"));
+        Keyword aws = keywordRepository.save(Keyword.create("aws"));
+        List.of("t1", "t2", "t3", "t4").forEach(slug -> attach(saveArticle(slug), azure, aws));
+
+        List<KeywordArticleCount> top = articleKeywordRepository.findTopKeywords(PageRequest.of(0, 2));
+
+        assertThat(top)
+                .extracting(KeywordArticleCount::name, KeywordArticleCount::articleCount)
+                .containsExactly(tuple("aws", 4L), tuple("Azure", 4L));
+    }
+
+    @Test
+    void 글이_붙은_키워드가_없으면_가장_많은_키워드도_없다() {
+        articleKeywordRepository.deleteAllInBatch();
+
+        assertThat(articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1))).isEmpty();
+    }
+
+    private Article saveArticle(String slug) {
+        return articleRepository.save(
+                Article.create(blog, "그래프 " + slug, "https://ex/" + slug, LocalDateTime.of(2026, 6, 10, 0, 0)));
+    }
+
+    private void attach(Article article, Keyword... keywords) {
+        for (Keyword keyword : keywords) {
+            articleKeywordRepository.save(ArticleKeyword.of(article, keyword, "title"));
+        }
     }
 }

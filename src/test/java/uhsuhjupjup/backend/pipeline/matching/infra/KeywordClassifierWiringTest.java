@@ -54,7 +54,7 @@ class KeywordClassifierWiringTest {
             return mock(KeywordMatcher.class);
         }
 
-        @Bean
+        @Bean(AnthropicConfig.KEYWORD_CLASSIFIER_CLIENT)
         AnthropicClient anthropicClient() {
             return mock(AnthropicClient.class);
         }

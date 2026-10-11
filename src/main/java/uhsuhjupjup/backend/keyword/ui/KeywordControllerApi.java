@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordDetailResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.KeywordGraphResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.TopKeywordResponse;
 
 import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,6 +47,39 @@ public interface KeywordControllerApi {
             @Parameter(description = "이 토픽에 속한 키워드만", example = "1") Long topicId);
 
     @Operation(
+            summary = "글이 가장 많은 키워드 조회",
+            description = """
+                    ### 인증
+
+                    - 로그인 없이 호출할 수 있습니다.
+
+                    ### 조회 결과
+
+                    - 글이 가장 많이 붙은 키워드 하나를 반환합니다.
+                    - `articleCount`는 그 키워드가 붙은 글의 수입니다. 키워드 상세 조회의 `articleCount`와 같은 값입니다.
+                    - 글 수가 같은 키워드가 여럿이면 이름순으로 첫 번째입니다. 대소문자를 구분하지 않습니다.
+
+                    ### 활용
+
+                    - 메인 화면이 처음 보여 줄 키워드를 고르는 데 사용하는 것을 상정했습니다. 받은 `id`로 키워드별 그래프를 조회합니다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = TopKeywordResponse.class))),
+            @ApiResponse(responseCode = "404", description = "글이 붙은 키워드가 하나도 없음",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = """
+                            {
+                              "code": "KEYWORD_NOT_FOUND",
+                              "message": "키워드를 찾을 수 없습니다.",
+                              "status": 404,
+                              "path": "/api/keywords/top",
+                              "timestamp": "2026-09-04T14:20:11.482"
+                            }
+                            """)))
+    })
+    TopKeywordResponse top();
+
+    @Operation(
             summary = "키워드 상세 조회",
             description = """
                     ### 인증
@@ -56,6 +91,13 @@ public interface KeywordControllerApi {
                     - 키워드 하나와 그 키워드가 속한 토픽 목록을 함께 반환합니다.
                     - 하나의 키워드가 여러 토픽에 동시에 속할 수 있습니다.
                     - 어느 토픽에도 속하지 않은 키워드는 `topics`가 빈 배열입니다.
+
+                    ### 글 수와 연관 키워드
+
+                    - `articleCount`는 이 키워드가 붙은 글의 수입니다. 글이 없으면 0입니다.
+                    - `relatedKeywords`는 같은 글에 함께 붙은 다른 키워드입니다. 함께 붙은 글이 많은 순으로 최대 8개이고, 없으면 빈 배열입니다.
+                    - `relatedKeywords[].sharedArticleCount`는 두 키워드가 함께 붙은 글의 수입니다.
+                    - `sharedArticleCount`가 같으면 이름순입니다. 키워드 목록 조회와 같은 순서이고 대소문자를 구분하지 않습니다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공",
@@ -72,4 +114,51 @@ public interface KeywordControllerApi {
                             """)))
     })
     KeywordDetailResponse detail(@Parameter(description = "키워드 ID", example = "42", required = true) Long id);
+
+    @Operation(
+            summary = "키워드별 그래프 조회",
+            description = """
+                    ### 인증
+
+                    - 로그인 없이 호출할 수 있습니다.
+
+                    ### 조회 결과
+
+                    - 키워드 하나를 중심으로, 같은 글에 함께 붙은 이웃 키워드와 이웃끼리의 연결을 반환합니다.
+                    - `center.articleCount`는 중심 키워드가 붙은 글의 수입니다. 키워드 상세 조회의 `articleCount`와 같은 값입니다.
+
+                    ### 이웃
+
+                    - `neighbors`는 함께 붙은 글이 많은 순으로 최대 10개입니다. 같으면 이름순이고 대소문자를 구분하지 않습니다.
+                    - `neighbors[].sharedArticleCount`는 중심 키워드와 그 이웃이 함께 붙은 글의 수입니다.
+                    - 앞 8개는 키워드 상세 조회의 `relatedKeywords`와 순서와 값이 같습니다.
+                    - 중심 키워드 자신은 이웃에 없습니다. 함께 붙은 키워드가 없으면 빈 배열입니다.
+
+                    ### 이웃끼리의 연결
+
+                    - `neighborLinks`는 응답에 실린 이웃 두 개가 중심 키워드의 글 안에서 함께 붙은 글의 수입니다. 세 키워드가 모두 붙은 글의 수와 같습니다.
+                    - 전역 그래프의 연결 값(두 키워드가 함께 붙은 모든 글)과는 다른 값입니다.
+                    - 쌍마다 한 번만 반환하고 `sourceId`가 `targetId`보다 작습니다. 0인 쌍은 반환하지 않습니다.
+                    - 글 수가 많은 순이고, 같으면 `sourceId`, `targetId` 오름차순입니다.
+                    - 이웃이 하나 이하면 빈 배열입니다.
+
+                    ### 글이 없는 키워드
+
+                    - `center.articleCount`는 0이고 `neighbors`와 `neighborLinks`는 빈 배열입니다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = KeywordGraphResponse.class))),
+            @ApiResponse(responseCode = "404", description = "해당 ID의 키워드가 없음",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = """
+                            {
+                              "code": "KEYWORD_NOT_FOUND",
+                              "message": "키워드를 찾을 수 없습니다.",
+                              "status": 404,
+                              "path": "/api/keywords/999/graph",
+                              "timestamp": "2026-09-04T14:20:11.482"
+                            }
+                            """)))
+    })
+    KeywordGraphResponse graph(@Parameter(description = "키워드 ID", example = "42", required = true) Long id);
 }

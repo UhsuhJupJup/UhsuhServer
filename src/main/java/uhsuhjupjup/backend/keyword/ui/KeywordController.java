@@ -8,7 +8,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.keyword.application.KeywordService;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordDetailResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.KeywordGraphResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.TopKeywordResponse;
 
 import java.util.List;
 
@@ -29,8 +31,20 @@ public class KeywordController implements KeywordControllerApi {
     }
 
     @Override
+    @GetMapping("/top")
+    public TopKeywordResponse top() {
+        return TopKeywordResponse.from(keywordService.getTop());
+    }
+
+    @Override
     @GetMapping("/{id}")
     public KeywordDetailResponse detail(@PathVariable Long id) {
         return KeywordDetailResponse.from(keywordService.getDetail(id));
+    }
+
+    @Override
+    @GetMapping("/{id}/graph")
+    public KeywordGraphResponse graph(@PathVariable Long id) {
+        return KeywordGraphResponse.from(keywordService.getGraph(id));
     }
 }

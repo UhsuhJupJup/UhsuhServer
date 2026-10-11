@@ -3,9 +3,12 @@ package uhsuhjupjup.backend.article.infra;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
+import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 
 import java.time.LocalDateTime;
@@ -85,4 +88,44 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
             group by ak.keyword.id
             """)
     List<KeywordFrequency> findKeywordFrequenciesByIds(Collection<Long> keywordIds);
+
+    @Query("select count(ak) from ArticleKeyword ak where ak.keyword.id = :keywordId")
+    long countByKeywordId(Long keywordId);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordRelation(ak2.keyword.id, ak2.keyword.name, count(ak2.id))
+            from ArticleKeyword ak1, ArticleKeyword ak2
+            where ak1.keyword.id = :keywordId
+              and ak2.article.id = ak1.article.id
+              and ak2.keyword.id <> :keywordId
+            group by ak2.keyword.id, ak2.keyword.name
+            order by count(ak2.id) desc, ak2.keyword.name asc
+            """)
+    List<KeywordRelation> findRelatedKeywords(Long keywordId, Pageable pageable);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink(ak2.keyword.id, ak3.keyword.id, count(ak1.id))
+            from ArticleKeyword ak1, ArticleKeyword ak2, ArticleKeyword ak3
+            where ak1.keyword.id = :keywordId
+              and ak2.article.id = ak1.article.id
+              and ak3.article.id = ak1.article.id
+              and ak2.keyword.id in :neighborIds
+              and ak3.keyword.id in :neighborIds
+              and ak2.keyword.id < ak3.keyword.id
+            group by ak2.keyword.id, ak3.keyword.id
+            order by count(ak1.id) desc, ak2.keyword.id asc, ak3.keyword.id asc
+            """)
+    List<KeywordNeighborLink> findNeighborLinks(Long keywordId, Collection<Long> neighborIds);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordArticleCount(k.id, k.name, counted.articleCount)
+            from (
+                select ak.keyword.id as keywordId, count(ak.id) as articleCount
+                from ArticleKeyword ak
+                group by ak.keyword.id
+            ) counted
+            join Keyword k on k.id = counted.keywordId
+            order by counted.articleCount desc, k.name asc
+            """)
+    List<KeywordArticleCount> findTopKeywords(Pageable pageable);
 }
