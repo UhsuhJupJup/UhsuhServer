@@ -56,6 +56,13 @@ public interface KeywordControllerApi {
                     - 키워드 하나와 그 키워드가 속한 토픽 목록을 함께 반환합니다.
                     - 하나의 키워드가 여러 토픽에 동시에 속할 수 있습니다.
                     - 어느 토픽에도 속하지 않은 키워드는 `topics`가 빈 배열입니다.
+
+                    ### 글 수와 연관 키워드
+
+                    - `articleCount`는 이 키워드가 붙은 글의 수입니다. 글이 없으면 0입니다.
+                    - `relatedKeywords`는 같은 글에 함께 붙은 다른 키워드입니다. 함께 붙은 글이 많은 순으로 최대 8개이고, 없으면 빈 배열입니다.
+                    - `relatedKeywords[].sharedArticleCount`는 두 키워드가 함께 붙은 글의 수입니다.
+                    - `sharedArticleCount`가 같으면 이름순입니다. 키워드 목록 조회와 같은 순서이고 대소문자를 구분하지 않습니다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공",
