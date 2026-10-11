@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
@@ -302,6 +303,38 @@ class ArticleKeywordRepositoryTest {
                         tuple(third.getId(), fourth.getId(), 2L),
                         tuple(first.getId(), fourth.getId(), 1L),
                         tuple(second.getId(), third.getId(), 1L));
+    }
+
+    @Test
+    void 글이_가장_많은_키워드를_반환한다() {
+        List<KeywordArticleCount> top = articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1));
+
+        assertThat(top)
+                .extracting(
+                        KeywordArticleCount::keywordId,
+                        KeywordArticleCount::name,
+                        KeywordArticleCount::articleCount)
+                .containsExactly(tuple(lock.getId(), "락", 3L));
+    }
+
+    @Test
+    void 글_수가_같으면_대소문자를_가리지_않는_이름순으로_첫_번째다() {
+        Keyword azure = keywordRepository.save(Keyword.create("Azure"));
+        Keyword aws = keywordRepository.save(Keyword.create("aws"));
+        List.of("t1", "t2", "t3", "t4").forEach(slug -> attach(saveArticle(slug), azure, aws));
+
+        List<KeywordArticleCount> top = articleKeywordRepository.findTopKeywords(PageRequest.of(0, 2));
+
+        assertThat(top)
+                .extracting(KeywordArticleCount::name, KeywordArticleCount::articleCount)
+                .containsExactly(tuple("aws", 4L), tuple("Azure", 4L));
+    }
+
+    @Test
+    void 글이_붙은_키워드가_없으면_가장_많은_키워드도_없다() {
+        articleKeywordRepository.deleteAllInBatch();
+
+        assertThat(articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1))).isEmpty();
     }
 
     private Article saveArticle(String slug) {
