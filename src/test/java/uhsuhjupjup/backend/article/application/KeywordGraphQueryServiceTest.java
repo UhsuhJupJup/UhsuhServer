@@ -6,6 +6,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
@@ -115,5 +116,20 @@ class KeywordGraphQueryServiceTest {
 
         assertThatThrownBy(() -> keywordGraphQueryService.findNeighborhood(3L))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void 글이_가장_많은_키워드_하나를_읽는다() {
+        KeywordArticleCount top = new KeywordArticleCount(3L, "MySQL", 5L);
+        given(articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1))).willReturn(List.of(top));
+
+        assertThat(keywordGraphQueryService.findTop()).contains(top);
+    }
+
+    @Test
+    void 글이_붙은_키워드가_없으면_가장_많은_키워드는_비어_있다() {
+        given(articleKeywordRepository.findTopKeywords(PageRequest.of(0, 1))).willReturn(List.of());
+
+        assertThat(keywordGraphQueryService.findTop()).isEmpty();
     }
 }
