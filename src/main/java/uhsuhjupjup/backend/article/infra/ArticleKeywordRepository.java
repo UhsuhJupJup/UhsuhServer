@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
+import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 
 import java.time.LocalDateTime;
@@ -85,4 +86,18 @@ public interface ArticleKeywordRepository extends JpaRepository<ArticleKeyword, 
             group by ak.keyword.id
             """)
     List<KeywordFrequency> findKeywordFrequenciesByIds(Collection<Long> keywordIds);
+
+    @Query("select count(ak) from ArticleKeyword ak where ak.keyword.id = :keywordId")
+    long countByKeywordId(Long keywordId);
+
+    @Query("""
+            select new uhsuhjupjup.backend.article.application.dto.KeywordRelation(ak2.keyword.id, ak2.keyword.name, count(ak2.id))
+            from ArticleKeyword ak1, ArticleKeyword ak2
+            where ak1.keyword.id = :keywordId
+              and ak2.article.id = ak1.article.id
+              and ak2.keyword.id <> :keywordId
+            group by ak2.keyword.id, ak2.keyword.name
+            order by count(ak2.id) desc, ak2.keyword.name asc
+            """)
+    List<KeywordRelation> findRelatedKeywords(Long keywordId, Pageable pageable);
 }
