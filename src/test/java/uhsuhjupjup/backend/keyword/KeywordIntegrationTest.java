@@ -10,6 +10,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import uhsuhjupjup.backend.article.domain.Article;
+import uhsuhjupjup.backend.article.domain.ArticleKeyword;
+import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
+import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.blog.infra.BlogRepository;
 import uhsuhjupjup.backend.common.auth.FirebaseTokenVerifier;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.domain.KeywordAlias;
@@ -21,6 +27,7 @@ import uhsuhjupjup.backend.topic.domain.TopicKeyword;
 import uhsuhjupjup.backend.topic.infra.TopicKeywordRepository;
 import uhsuhjupjup.backend.topic.infra.TopicRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -48,6 +55,15 @@ class KeywordIntegrationTest {
 
     @Autowired
     private TopicKeywordRepository topicKeywordRepository;
+
+    @Autowired
+    private BlogRepository blogRepository;
+
+    @Autowired
+    private ArticleRepository articleRepository;
+
+    @Autowired
+    private ArticleKeywordRepository articleKeywordRepository;
 
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
@@ -109,5 +125,58 @@ class KeywordIntegrationTest {
         mockMvc.perform(get("/api/keywords/999999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
+    @Test
+    void detail_returnsArticleCountAndRelatedKeywords() throws Exception {
+        Keyword jpa = keywordRepository.save(Keyword.create("JPA"));
+        Keyword hibernate = keywordRepository.save(Keyword.create("Hibernate"));
+        Blog blog = blogRepository.save(
+                Blog.create("키워드 통합 테스트", "keyword-it.example.com", "https://keyword-it.example.com/rss"));
+        Article first = saveArticle(blog, 1);
+        Article second = saveArticle(blog, 2);
+        Article third = saveArticle(blog, 3);
+        attach(first, mysql, jpa, hibernate);
+        attach(second, mysql, jpa);
+        attach(third, mysql);
+        attach(saveArticle(blog, 4), jpa);
+
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.topics[0].name").value("Database"))
+                .andExpect(jsonPath("$.articleCount").value(3))
+                .andExpect(jsonPath("$.relatedKeywords.length()").value(2))
+                .andExpect(jsonPath("$.relatedKeywords[0].id").value(jpa.getId()))
+                .andExpect(jsonPath("$.relatedKeywords[0].name").value("JPA"))
+                .andExpect(jsonPath("$.relatedKeywords[0].sharedArticleCount").value(2))
+                .andExpect(jsonPath("$.relatedKeywords[1].name").value("Hibernate"))
+                .andExpect(jsonPath("$.relatedKeywords[1].sharedArticleCount").value(1));
+        mockMvc.perform(get("/api/articles").param("keywordIds", mysql.getId().toString()).param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    void detail_withoutArticles_returnsZeroAndEmptyRelatedKeywords() throws Exception {
+        mockMvc.perform(get("/api/keywords/" + mysql.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleCount").value(0))
+                .andExpect(jsonPath("$.relatedKeywords").isArray())
+                .andExpect(jsonPath("$.relatedKeywords").isEmpty());
+    }
+
+    private Article saveArticle(Blog blog, int number) {
+        return articleRepository.save(Article.create(
+                blog,
+                "키워드 통합 테스트 글 " + number,
+                "https://keyword-it.example.com/" + number,
+                LocalDateTime.of(2026, 6, number, 0, 0)));
+    }
+
+    private void attach(Article article, Keyword... keywords) {
+        for (Keyword keyword : keywords) {
+            articleKeywordRepository.save(ArticleKeyword.of(article, keyword, "title"));
+        }
     }
 }
