@@ -5,6 +5,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import uhsuhjupjup.backend.article.application.KeywordSummaryQueryService;
+import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
+import uhsuhjupjup.backend.article.application.dto.KeywordSummaryResult;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
@@ -22,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class KeywordServiceTest {
@@ -31,6 +35,9 @@ class KeywordServiceTest {
 
     @Mock
     private TopicKeywordRepository topicKeywordRepository;
+
+    @Mock
+    private KeywordSummaryQueryService keywordSummaryQueryService;
 
     @InjectMocks
     private KeywordService keywordService;
@@ -74,17 +81,30 @@ class KeywordServiceTest {
     }
 
     @Test
-    void getDetail_returnsKeywordWithTopics() {
+    void getDetail_returnsKeywordWithTopicsAndSummary() {
         Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
         Topic database = TopicFixture.topic(1L, "Database");
+        KeywordSummaryResult summary = new KeywordSummaryResult(5, List.of(new KeywordRelation(7L, "Kafka", 2L)));
         given(keywordRepository.findById(3L)).willReturn(Optional.of(keyword));
         given(topicKeywordRepository.findWithTopicByKeywordId(3L))
                 .willReturn(List.of(TopicKeyword.of(database, keyword)));
+        given(keywordSummaryQueryService.summarize(3L)).willReturn(summary);
 
         KeywordDetailResult result = keywordService.getDetail(3L);
 
         assertThat(result.keyword()).isEqualTo(keyword);
         assertThat(result.topics()).containsExactly(database);
+        assertThat(result.summary()).isEqualTo(summary);
+    }
+
+    @Test
+    void getDetail_whenSummaryFails_propagates() {
+        Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
+        given(keywordRepository.findById(3L)).willReturn(Optional.of(keyword));
+        given(keywordSummaryQueryService.summarize(3L)).willThrow(new IllegalStateException("조회 실패"));
+
+        assertThatThrownBy(() -> keywordService.getDetail(3L))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -95,5 +115,6 @@ class KeywordServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.KEYWORD_NOT_FOUND);
+        verifyNoInteractions(keywordSummaryQueryService);
     }
 }
