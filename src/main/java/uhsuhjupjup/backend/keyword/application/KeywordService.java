@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import uhsuhjupjup.backend.article.application.KeywordGraphQueryService;
 import uhsuhjupjup.backend.article.application.KeywordSummaryQueryService;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
+import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.topic.domain.Topic;
@@ -24,6 +26,7 @@ public class KeywordService {
     private final KeywordRepository keywordRepository;
     private final TopicKeywordRepository topicKeywordRepository;
     private final KeywordSummaryQueryService keywordSummaryQueryService;
+    private final KeywordGraphQueryService keywordGraphQueryService;
 
     public List<Keyword> search(String query, Long topicId) {
         if (topicId != null) {
@@ -49,11 +52,20 @@ public class KeywordService {
     }
 
     public KeywordDetailResult getDetail(Long keywordId) {
-        Keyword keyword = keywordRepository.findById(keywordId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+        Keyword keyword = getKeyword(keywordId);
         List<Topic> topics = topicKeywordRepository.findWithTopicByKeywordId(keywordId).stream()
                 .map(TopicKeyword::getTopic)
                 .toList();
         return new KeywordDetailResult(keyword, topics, keywordSummaryQueryService.summarize(keywordId));
+    }
+
+    public KeywordGraphResult getGraph(Long keywordId) {
+        Keyword keyword = getKeyword(keywordId);
+        return new KeywordGraphResult(keyword, keywordGraphQueryService.findNeighborhood(keywordId));
+    }
+
+    private Keyword getKeyword(Long keywordId) {
+        return keywordRepository.findById(keywordId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
     }
 }
