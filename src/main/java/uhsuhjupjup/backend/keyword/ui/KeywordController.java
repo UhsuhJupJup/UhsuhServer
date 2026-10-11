@@ -10,6 +10,7 @@ import uhsuhjupjup.backend.keyword.application.KeywordService;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordDetailResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordGraphResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordResponse;
+import uhsuhjupjup.backend.keyword.ui.dto.TopKeywordResponse;
 
 import java.util.List;
 
@@ -27,6 +28,12 @@ public class KeywordController implements KeywordControllerApi {
         return keywordService.search(q, topicId).stream()
                 .map(KeywordResponse::from)
                 .toList();
+    }
+
+    @Override
+    @GetMapping("/top")
+    public TopKeywordResponse top() {
+        return TopKeywordResponse.from(keywordService.getTop());
     }
 
     @Override
