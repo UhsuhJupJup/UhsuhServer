@@ -7,6 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
@@ -222,5 +223,95 @@ class ArticleKeywordRepositoryTest {
         Keyword unused = keywordRepository.save(Keyword.create("Kotlin"));
 
         assertThat(articleKeywordRepository.findRelatedKeywords(unused.getId(), PageRequest.of(0, 8))).isEmpty();
+    }
+
+    @Test
+    void 이웃끼리의_연결은_중심_키워드의_글_안에서만_센다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        attach(saveArticle("g1"), hub, first, second);
+        attach(saveArticle("g2"), hub, first, second);
+        attach(saveArticle("g3"), hub, first);
+        attach(saveArticle("g4"), first, second);
+        attach(saveArticle("g5"), first, second);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links)
+                .extracting(
+                        KeywordNeighborLink::sourceKeywordId,
+                        KeywordNeighborLink::targetKeywordId,
+                        KeywordNeighborLink::sharedArticleCount)
+                .containsExactly(tuple(first.getId(), second.getId(), 2L));
+    }
+
+    @Test
+    void 중심_키워드가_없는_글에서만_함께_붙은_이웃은_연결되지_않는다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        attach(saveArticle("g1"), hub, first);
+        attach(saveArticle("g2"), hub, second);
+        attach(saveArticle("g3"), first, second);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links).isEmpty();
+    }
+
+    @Test
+    void 이웃끼리의_연결은_넘긴_이웃_사이에서만_나온다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        Keyword outside = keywordRepository.save(Keyword.create("목록 밖"));
+        attach(saveArticle("g1"), hub, first, second, outside);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(first.getId(), second.getId()));
+
+        assertThat(links)
+                .extracting(KeywordNeighborLink::sourceKeywordId, KeywordNeighborLink::targetKeywordId)
+                .containsExactly(tuple(first.getId(), second.getId()));
+    }
+
+    @Test
+    void 이웃끼리의_연결은_쌍마다_한_번이고_글이_많은순_다음_id순이다() {
+        Keyword hub = keywordRepository.save(Keyword.create("허브"));
+        Keyword first = keywordRepository.save(Keyword.create("첫째"));
+        Keyword second = keywordRepository.save(Keyword.create("둘째"));
+        Keyword third = keywordRepository.save(Keyword.create("셋째"));
+        Keyword fourth = keywordRepository.save(Keyword.create("넷째"));
+        attach(saveArticle("g1"), hub, second, third);
+        attach(saveArticle("g2"), hub, first, fourth);
+        attach(saveArticle("g3"), hub, third, fourth);
+        attach(saveArticle("g4"), hub, third, fourth);
+
+        List<KeywordNeighborLink> links = articleKeywordRepository.findNeighborLinks(
+                hub.getId(), List.of(fourth.getId(), third.getId(), second.getId(), first.getId()));
+
+        assertThat(links)
+                .extracting(
+                        KeywordNeighborLink::sourceKeywordId,
+                        KeywordNeighborLink::targetKeywordId,
+                        KeywordNeighborLink::sharedArticleCount)
+                .containsExactly(
+                        tuple(third.getId(), fourth.getId(), 2L),
+                        tuple(first.getId(), fourth.getId(), 1L),
+                        tuple(second.getId(), third.getId(), 1L));
+    }
+
+    private Article saveArticle(String slug) {
+        return articleRepository.save(
+                Article.create(blog, "그래프 " + slug, "https://ex/" + slug, LocalDateTime.of(2026, 6, 10, 0, 0)));
+    }
+
+    private void attach(Article article, Keyword... keywords) {
+        for (Keyword keyword : keywords) {
+            articleKeywordRepository.save(ArticleKeyword.of(article, keyword, "title"));
+        }
     }
 }
