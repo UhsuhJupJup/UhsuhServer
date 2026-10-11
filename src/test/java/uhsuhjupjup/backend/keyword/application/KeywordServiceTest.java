@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uhsuhjupjup.backend.article.application.KeywordGraphQueryService;
 import uhsuhjupjup.backend.article.application.KeywordSummaryQueryService;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
@@ -159,5 +160,23 @@ class KeywordServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.KEYWORD_NOT_FOUND);
         verifyNoInteractions(keywordGraphQueryService);
+    }
+
+    @Test
+    void getTop_returnsKeywordWithMostArticles() {
+        KeywordArticleCount top = new KeywordArticleCount(3L, "MySQL", 5L);
+        given(keywordGraphQueryService.findTop()).willReturn(Optional.of(top));
+
+        assertThat(keywordService.getTop()).isEqualTo(top);
+    }
+
+    @Test
+    void getTop_whenNoKeywordHasArticles_throws() {
+        given(keywordGraphQueryService.findTop()).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> keywordService.getTop())
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.KEYWORD_NOT_FOUND);
     }
 }
