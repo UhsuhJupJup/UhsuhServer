@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
@@ -23,7 +24,10 @@ import uhsuhjupjup.backend.support.TopicFixture;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -171,5 +175,26 @@ class KeywordControllerTest {
         mockMvc.perform(get("/api/keywords/3/graph"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
+    @Test
+    void top_returnsKeywordWithMostArticlesWithoutCallingDetail() throws Exception {
+        given(keywordService.getTop()).willReturn(new KeywordArticleCount(3L, "MySQL", 5L));
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.name").value("MySQL"))
+                .andExpect(jsonPath("$.articleCount").value(5));
+        verify(keywordService, never()).getDetail(anyLong());
+    }
+
+    @Test
+    void top_whenNoKeywordHasArticles_returns404() throws Exception {
+        given(keywordService.getTop()).willThrow(new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+
+        mockMvc.perform(get("/api/keywords/top"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
     }
 }
