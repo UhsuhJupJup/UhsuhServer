@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import uhsuhjupjup.backend.article.application.KeywordGraphQueryService;
 import uhsuhjupjup.backend.article.application.KeywordSummaryQueryService;
+import uhsuhjupjup.backend.article.application.dto.KeywordArticleCount;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
@@ -62,6 +63,11 @@ public class KeywordService {
     public KeywordGraphResult getGraph(Long keywordId) {
         Keyword keyword = getKeyword(keywordId);
         return new KeywordGraphResult(keyword, keywordGraphQueryService.findNeighborhood(keywordId));
+    }
+
+    public KeywordArticleCount getTop() {
+        return keywordGraphQueryService.findTop()
+                .orElseThrow(() -> new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
     }
 
     private Keyword getKeyword(Long keywordId) {
