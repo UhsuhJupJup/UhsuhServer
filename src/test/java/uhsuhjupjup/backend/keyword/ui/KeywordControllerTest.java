@@ -7,10 +7,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
+import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.article.application.dto.KeywordSummaryResult;
+import uhsuhjupjup.backend.common.exception.BusinessException;
+import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.common.exception.GlobalExceptionHandler;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
+import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
 import uhsuhjupjup.backend.keyword.application.KeywordService;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
@@ -106,6 +111,64 @@ class KeywordControllerTest {
         given(keywordService.getDetail(3L)).willThrow(new IllegalStateException("조회 실패"));
 
         mockMvc.perform(get("/api/keywords/3"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
+    @Test
+    void graph_returnsCenterNeighborsAndNeighborLinks() throws Exception {
+        Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
+        KeywordNeighborhoodResult neighborhood = new KeywordNeighborhoodResult(
+                5,
+                List.of(new KeywordRelation(7L, "Kafka", 2L), new KeywordRelation(9L, "Redis", 1L)),
+                List.of(new KeywordNeighborLink(7L, 9L, 1L)));
+        given(keywordService.getGraph(3L)).willReturn(new KeywordGraphResult(keyword, neighborhood));
+
+        mockMvc.perform(get("/api/keywords/3/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.id").value(3))
+                .andExpect(jsonPath("$.center.name").value("MySQL"))
+                .andExpect(jsonPath("$.center.articleCount").value(5))
+                .andExpect(jsonPath("$.neighbors.length()").value(2))
+                .andExpect(jsonPath("$.neighbors[0].id").value(7))
+                .andExpect(jsonPath("$.neighbors[0].name").value("Kafka"))
+                .andExpect(jsonPath("$.neighbors[0].sharedArticleCount").value(2))
+                .andExpect(jsonPath("$.neighbors[1].name").value("Redis"))
+                .andExpect(jsonPath("$.neighborLinks.length()").value(1))
+                .andExpect(jsonPath("$.neighborLinks[0].sourceId").value(7))
+                .andExpect(jsonPath("$.neighborLinks[0].targetId").value(9))
+                .andExpect(jsonPath("$.neighborLinks[0].sharedArticleCount").value(1));
+    }
+
+    @Test
+    void graph_withoutArticles_returnsZeroAndEmptyLists() throws Exception {
+        Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
+        given(keywordService.getGraph(3L))
+                .willReturn(new KeywordGraphResult(keyword, new KeywordNeighborhoodResult(0, List.of(), List.of())));
+
+        mockMvc.perform(get("/api/keywords/3/graph"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.center.articleCount").value(0))
+                .andExpect(jsonPath("$.neighbors").isArray())
+                .andExpect(jsonPath("$.neighbors").isEmpty())
+                .andExpect(jsonPath("$.neighborLinks").isArray())
+                .andExpect(jsonPath("$.neighborLinks").isEmpty());
+    }
+
+    @Test
+    void graph_whenKeywordNotFound_returns404() throws Exception {
+        given(keywordService.getGraph(99L)).willThrow(new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+
+        mockMvc.perform(get("/api/keywords/99/graph"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KEYWORD_NOT_FOUND"));
+    }
+
+    @Test
+    void graph_whenQueryFails_returns500() throws Exception {
+        given(keywordService.getGraph(3L)).willThrow(new IllegalStateException("조회 실패"));
+
+        mockMvc.perform(get("/api/keywords/3/graph"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
     }
