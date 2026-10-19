@@ -2,8 +2,10 @@ package uhsuhjupjup.backend.common.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Ticker;
 
+import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -18,7 +20,7 @@ public class LocalCache {
     public LocalCache(LocalCacheSettings settings, Ticker ticker) {
         this.store = Caffeine.newBuilder()
                 .maximumSize(settings.maximumSize())
-                .expireAfterWrite(settings.ttl())
+                .expireAfter(new JitterExpiry(settings.ttl()))
                 .ticker(ticker)
                 .build();
     }
@@ -83,11 +85,35 @@ public class LocalCache {
         }
     }
 
+    Duration expiresAfter(Object key) {
+        return store.policy().expireVariably()
+                .flatMap(policy -> policy.getExpiresAfter(key))
+                .orElse(Duration.ZERO);
+    }
+
     public long size() {
         store.cleanUp();
         return store.estimatedSize();
     }
 
     public record Stamp(long epoch, long generation) {
+    }
+
+    private record JitterExpiry(TtlJitter ttl) implements Expiry<Object, Object> {
+
+        @Override
+        public long expireAfterCreate(Object key, Object value, long currentTime) {
+            return ttl.next().toNanos();
+        }
+
+        @Override
+        public long expireAfterUpdate(Object key, Object value, long currentTime, long currentDuration) {
+            return ttl.next().toNanos();
+        }
+
+        @Override
+        public long expireAfterRead(Object key, Object value, long currentTime, long currentDuration) {
+            return currentDuration;
+        }
     }
 }

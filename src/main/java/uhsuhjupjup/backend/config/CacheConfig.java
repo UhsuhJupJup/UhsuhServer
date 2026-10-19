@@ -48,7 +48,8 @@ public class CacheConfig implements CachingConfigurer {
                                          ObjectProvider<MeterRegistry> meterRegistry,
                                          @Value("${cache.keyword-graph.ttl-min:55m}") Duration ttlMin,
                                          @Value("${cache.keyword-graph.ttl-max:60m}") Duration ttlMax,
-                                         @Value("${cache.keyword-graph.local-ttl:5m}") Duration localTtl,
+                                         @Value("${cache.keyword-graph.local-ttl-min:270s}") Duration localTtlMin,
+                                         @Value("${cache.keyword-graph.local-ttl-max:5m}") Duration localTtlMax,
                                          @Value("${cache.keyword-graph.local-max-size:1000}") long localMaxSize,
                                          @Value("${cache.keyword-graph.lock-ttl:10s}") Duration lockTtl,
                                          @Value("${cache.keyword-graph.lock-wait-timeout:3s}") Duration lockWaitTimeout,
@@ -57,7 +58,7 @@ public class CacheConfig implements CachingConfigurer {
         TtlJitter remoteTtl = keywordGraphTtl(ttlMin, ttlMax);
         return keywordGraphCache(connectionFactory, meterRegistry.getIfAvailable(SimpleMeterRegistry::new),
                 remoteTtl,
-                keywordGraphLocalSettings(localTtl, localMaxSize, remoteTtl),
+                keywordGraphLocalSettings(localTtlMin, localTtlMax, localMaxSize, remoteTtl),
                 new CacheLockSettings(lockTtl, lockWaitTimeout, lockRetryInterval, redisFailureBackoff),
                 Ticker.systemTicker());
     }
@@ -107,14 +108,15 @@ public class CacheConfig implements CachingConfigurer {
         return new TtlJitter(min, max);
     }
 
-    public static LocalCacheSettings keywordGraphLocalSettings(Duration ttl, long maximumSize, TtlJitter remoteTtl) {
-        if (ttl.compareTo(KEYWORD_GRAPH_LOCAL_MAX_TTL) > 0) {
-            throw new IllegalStateException("키워드 그래프 로컬 캐시 TTL은 5분을 넘을 수 없습니다: " + ttl);
+    public static LocalCacheSettings keywordGraphLocalSettings(Duration min, Duration max, long maximumSize,
+                                                               TtlJitter remoteTtl) {
+        if (max.compareTo(KEYWORD_GRAPH_LOCAL_MAX_TTL) > 0) {
+            throw new IllegalStateException("키워드 그래프 로컬 캐시 TTL 상한은 5분을 넘을 수 없습니다: " + max);
         }
-        if (ttl.compareTo(remoteTtl.min()) >= 0) {
-            throw new IllegalStateException("로컬 캐시 TTL은 Redis TTL보다 짧아야 합니다: " + ttl + " >= " + remoteTtl.min());
+        if (max.compareTo(remoteTtl.min()) >= 0) {
+            throw new IllegalStateException("로컬 캐시 TTL은 Redis TTL보다 짧아야 합니다: " + max + " >= " + remoteTtl.min());
         }
-        return new LocalCacheSettings(ttl, maximumSize);
+        return new LocalCacheSettings(new TtlJitter(min, max), maximumSize);
     }
 
     @Override

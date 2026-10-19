@@ -81,7 +81,8 @@ cache:
   keyword-graph:
     ttl-min: ${KEYWORD_GRAPH_CACHE_TTL_MIN:55m}
     ttl-max: ${KEYWORD_GRAPH_CACHE_TTL_MAX:60m}
-    local-ttl: ${KEYWORD_GRAPH_LOCAL_CACHE_TTL:5m}
+    local-ttl-min: ${KEYWORD_GRAPH_LOCAL_CACHE_TTL_MIN:270s}
+    local-ttl-max: ${KEYWORD_GRAPH_LOCAL_CACHE_TTL_MAX:5m}
     local-max-size: ${KEYWORD_GRAPH_LOCAL_CACHE_MAX_SIZE:1000}
     lock-ttl: ${KEYWORD_GRAPH_CACHE_LOCK_TTL:10s}
     lock-wait-timeout: ${KEYWORD_GRAPH_CACHE_LOCK_WAIT_TIMEOUT:3s}
