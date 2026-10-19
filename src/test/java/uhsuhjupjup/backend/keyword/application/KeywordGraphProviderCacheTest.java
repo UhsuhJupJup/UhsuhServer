@@ -23,6 +23,7 @@ import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.common.cache.CacheLockSettings;
 import uhsuhjupjup.backend.common.cache.LocalCacheSettings;
 import uhsuhjupjup.backend.common.cache.TieredCache;
+import uhsuhjupjup.backend.common.cache.TtlJitter;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.config.CacheConfig;
@@ -113,7 +114,7 @@ class KeywordGraphProviderCacheTest {
             TieredCache otherServer = CacheConfig.keywordGraphCache(otherConnection,
                     new SimpleMeterRegistry(),
                     CacheConfig.keywordGraphTtl(Duration.ofMinutes(55), Duration.ofMinutes(60)),
-                    new LocalCacheSettings(Duration.ofMinutes(5), 1_000),
+                    new LocalCacheSettings(new TtlJitter(Duration.ofSeconds(270), Duration.ofMinutes(5)), 1_000),
                     new CacheLockSettings(Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(50), Duration.ofSeconds(10)),
                     Ticker.systemTicker());
             otherServer.put(5L, graph(5L, "Redis"));

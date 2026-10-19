@@ -25,7 +25,8 @@ class CacheTestServers implements AutoCloseable {
     static final String CACHE_PREFIX = "test:cache:";
     static final String LOCK_PREFIX = "test:lock:";
     static final TtlJitter REMOTE_TTL = new TtlJitter(Duration.ofMinutes(55), Duration.ofMinutes(60));
-    static final LocalCacheSettings LOCAL = new LocalCacheSettings(Duration.ofMinutes(5), 1_000);
+    static final LocalCacheSettings LOCAL = new LocalCacheSettings(
+            new TtlJitter(Duration.ofSeconds(270), Duration.ofMinutes(5)), 1_000);
     static final CacheLockSettings LOCK = new CacheLockSettings(
             Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(20), Duration.ofSeconds(10));
 

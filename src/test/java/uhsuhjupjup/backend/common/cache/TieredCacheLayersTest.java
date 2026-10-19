@@ -192,7 +192,7 @@ class TieredCacheLayersTest {
 
     @Test
     void 조회해도_로컬_TTL이_늘어나지_않는다() {
-        Server server = servers.server(LOCK, new LocalCacheSettings(Duration.ofMinutes(5), 1_000),
+        Server server = servers.server(LOCK, new LocalCacheSettings(new TtlJitter(Duration.ofMinutes(5), Duration.ofMinutes(5)), 1_000),
                 servers.connectionFactory(), CacheTestServers.serializer());
         server.cache().get(8L, () -> "graph-8");
         redis.opsForValue().set(cacheKey(8L), "\"new-graph\"", Duration.ofMinutes(50));
@@ -204,6 +204,21 @@ class TieredCacheLayersTest {
         server.advance(Duration.ofSeconds(61));
 
         assertThat(server.cache().get(8L, () -> "computed")).isEqualTo("new-graph");
+    }
+
+    @Test
+    void 로컬_TTL은_저장할_때마다_4분30초에서_5분_사이로_달라진다() {
+        LocalCache local = new LocalCache(LOCAL, () -> 0L);
+        java.util.Set<Long> seconds = new java.util.HashSet<>();
+
+        for (long key = 1; key <= 50; key++) {
+            local.putIfUnchanged(key, "v" + key, local.stamp(key));
+            Duration ttl = local.expiresAfter(key);
+            assertThat(ttl).isBetween(Duration.ofSeconds(270), Duration.ofMinutes(5));
+            seconds.add(ttl.toSeconds());
+        }
+
+        assertThat(seconds).hasSizeGreaterThan(5);
     }
 
     @Test

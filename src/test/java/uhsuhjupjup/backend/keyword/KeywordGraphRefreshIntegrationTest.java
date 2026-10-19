@@ -28,6 +28,7 @@ import uhsuhjupjup.backend.common.cache.CacheInvalidationPublisher;
 import uhsuhjupjup.backend.common.cache.CacheLockSettings;
 import uhsuhjupjup.backend.common.cache.LocalCacheSettings;
 import uhsuhjupjup.backend.common.cache.TieredCache;
+import uhsuhjupjup.backend.common.cache.TtlJitter;
 import uhsuhjupjup.backend.config.CacheConfig;
 import uhsuhjupjup.backend.keyword.application.KeywordGraphProvider;
 import uhsuhjupjup.backend.keyword.application.KeywordService;
@@ -199,7 +200,7 @@ class KeywordGraphRefreshIntegrationTest {
         LettuceConnectionFactory factory = connectionFactory();
         TieredCache cache = CacheConfig.keywordGraphCache(factory, new SimpleMeterRegistry(),
                 CacheConfig.keywordGraphTtl(Duration.ofMinutes(55), Duration.ofMinutes(60)),
-                new LocalCacheSettings(Duration.ofMinutes(5), 1_000),
+                new LocalCacheSettings(new TtlJitter(Duration.ofSeconds(270), Duration.ofMinutes(5)), 1_000),
                 new CacheLockSettings(Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(50), Duration.ofSeconds(10)),
                 Ticker.systemTicker());
         RedisMessageListenerContainer container = CacheConfig.invalidationListenerContainer(factory, List.of(cache));
