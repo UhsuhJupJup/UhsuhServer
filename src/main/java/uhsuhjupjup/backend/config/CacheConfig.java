@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.config;
 
+import com.github.benmanes.caffeine.cache.Ticker;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,7 +17,10 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import uhsuhjupjup.backend.common.cache.CacheLockSettings;
-import uhsuhjupjup.backend.common.cache.DistributedSingleFlightCache;
+import uhsuhjupjup.backend.common.cache.LocalCache;
+import uhsuhjupjup.backend.common.cache.LocalCacheSettings;
+import uhsuhjupjup.backend.common.cache.RedisCacheLayer;
+import uhsuhjupjup.backend.common.cache.TieredCache;
 import uhsuhjupjup.backend.common.cache.TtlJitter;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
 
@@ -31,31 +35,44 @@ public class CacheConfig implements CachingConfigurer {
     public static final String KEY_PREFIX = "uhsuh:cache:";
     public static final String LOCK_PREFIX = "uhsuh:lock:";
     public static final Duration KEYWORD_GRAPH_MAX_TTL = Duration.ofHours(1);
+    public static final Duration KEYWORD_GRAPH_LOCAL_MAX_TTL = Duration.ofMinutes(5);
 
     @Bean
-    public CacheManager cacheManager(RedisConnectionFactory connectionFactory,
-                                     ObjectProvider<MeterRegistry> meterRegistry,
-                                     @Value("${cache.keyword-graph.ttl-min:55m}") Duration ttlMin,
-                                     @Value("${cache.keyword-graph.ttl-max:60m}") Duration ttlMax,
-                                     @Value("${cache.keyword-graph.lock-ttl:10s}") Duration lockTtl,
-                                     @Value("${cache.keyword-graph.lock-wait-timeout:3s}") Duration lockWaitTimeout,
-                                     @Value("${cache.keyword-graph.lock-retry-interval:50ms}") Duration lockRetryInterval,
-                                     @Value("${cache.keyword-graph.redis-failure-backoff:10s}") Duration redisFailureBackoff) {
+    public TieredCache keywordGraphCache(RedisConnectionFactory connectionFactory,
+                                         ObjectProvider<MeterRegistry> meterRegistry,
+                                         @Value("${cache.keyword-graph.ttl-min:55m}") Duration ttlMin,
+                                         @Value("${cache.keyword-graph.ttl-max:60m}") Duration ttlMax,
+                                         @Value("${cache.keyword-graph.local-ttl:5m}") Duration localTtl,
+                                         @Value("${cache.keyword-graph.local-max-size:1000}") long localMaxSize,
+                                         @Value("${cache.keyword-graph.lock-ttl:10s}") Duration lockTtl,
+                                         @Value("${cache.keyword-graph.lock-wait-timeout:3s}") Duration lockWaitTimeout,
+                                         @Value("${cache.keyword-graph.lock-retry-interval:50ms}") Duration lockRetryInterval,
+                                         @Value("${cache.keyword-graph.redis-failure-backoff:10s}") Duration redisFailureBackoff) {
+        TtlJitter remoteTtl = keywordGraphTtl(ttlMin, ttlMax);
+        return keywordGraphCache(connectionFactory, meterRegistry.getIfAvailable(SimpleMeterRegistry::new),
+                remoteTtl,
+                keywordGraphLocalSettings(localTtl, localMaxSize, remoteTtl),
+                new CacheLockSettings(lockTtl, lockWaitTimeout, lockRetryInterval, redisFailureBackoff),
+                Ticker.systemTicker());
+    }
+
+    @Bean
+    public CacheManager cacheManager(TieredCache keywordGraphCache) {
         SimpleCacheManager cacheManager = new SimpleCacheManager();
-        cacheManager.setCaches(List.of(keywordGraphCache(connectionFactory,
-                meterRegistry.getIfAvailable(SimpleMeterRegistry::new),
-                keywordGraphTtl(ttlMin, ttlMax),
-                new CacheLockSettings(lockTtl, lockWaitTimeout, lockRetryInterval, redisFailureBackoff))));
+        cacheManager.setCaches(List.of(keywordGraphCache));
         return cacheManager;
     }
 
-    public static DistributedSingleFlightCache keywordGraphCache(RedisConnectionFactory connectionFactory,
-                                                                 MeterRegistry meterRegistry,
-                                                                 TtlJitter ttl,
-                                                                 CacheLockSettings lockSettings) {
-        return new DistributedSingleFlightCache(KEYWORD_GRAPH, KEY_PREFIX, LOCK_PREFIX,
-                DistributedSingleFlightCache.bytesTemplate(connectionFactory),
-                keywordGraphSerializer(), lockSettings, ttl, meterRegistry);
+    public static TieredCache keywordGraphCache(RedisConnectionFactory connectionFactory,
+                                                MeterRegistry meterRegistry,
+                                                TtlJitter remoteTtl,
+                                                LocalCacheSettings localSettings,
+                                                CacheLockSettings lockSettings,
+                                                Ticker ticker) {
+        RedisCacheLayer remote = new RedisCacheLayer(KEYWORD_GRAPH, KEY_PREFIX, LOCK_PREFIX,
+                RedisCacheLayer.bytesTemplate(connectionFactory), keywordGraphSerializer(), lockSettings, remoteTtl,
+                meterRegistry);
+        return new TieredCache(KEYWORD_GRAPH, new LocalCache(localSettings, ticker), remote, lockSettings, meterRegistry);
     }
 
     public static TtlJitter keywordGraphTtl(Duration min, Duration max) {
@@ -63,6 +80,16 @@ public class CacheConfig implements CachingConfigurer {
             throw new IllegalStateException("키워드 그래프 캐시 TTL 상한은 1시간을 넘을 수 없습니다: " + max);
         }
         return new TtlJitter(min, max);
+    }
+
+    public static LocalCacheSettings keywordGraphLocalSettings(Duration ttl, long maximumSize, TtlJitter remoteTtl) {
+        if (ttl.compareTo(KEYWORD_GRAPH_LOCAL_MAX_TTL) > 0) {
+            throw new IllegalStateException("키워드 그래프 로컬 캐시 TTL은 5분을 넘을 수 없습니다: " + ttl);
+        }
+        if (ttl.compareTo(remoteTtl.min()) >= 0) {
+            throw new IllegalStateException("로컬 캐시 TTL은 Redis TTL보다 짧아야 합니다: " + ttl + " >= " + remoteTtl.min());
+        }
+        return new LocalCacheSettings(ttl, maximumSize);
     }
 
     @Override

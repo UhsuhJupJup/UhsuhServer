@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.keyword.application;
 
+import com.github.benmanes.caffeine.cache.Ticker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,8 @@ import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
 import uhsuhjupjup.backend.common.cache.CacheLockSettings;
-import uhsuhjupjup.backend.common.cache.DistributedSingleFlightCache;
+import uhsuhjupjup.backend.common.cache.LocalCacheSettings;
+import uhsuhjupjup.backend.common.cache.TieredCache;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.config.CacheConfig;
@@ -107,10 +109,12 @@ class KeywordGraphProviderCacheTest {
                 new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379)));
         otherConnection.afterPropertiesSet();
         try {
-            DistributedSingleFlightCache otherServer = CacheConfig.keywordGraphCache(otherConnection,
+            TieredCache otherServer = CacheConfig.keywordGraphCache(otherConnection,
                     new SimpleMeterRegistry(),
                     CacheConfig.keywordGraphTtl(Duration.ofMinutes(55), Duration.ofMinutes(60)),
-                    new CacheLockSettings(Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(50), Duration.ofSeconds(10)));
+                    new LocalCacheSettings(Duration.ofMinutes(5), 1_000),
+                    new CacheLockSettings(Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(50), Duration.ofSeconds(10)),
+                    Ticker.systemTicker());
             otherServer.put(5L, graph(5L, "Redis"));
 
             KeywordGraphResult result = provider.keywordGraph(5L);
