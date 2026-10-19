@@ -25,7 +25,8 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest(
         classes = {CacheConfig.class, KeywordGraphProvider.class},
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
-        properties = {"spring.data.redis.host=127.0.0.1", "spring.data.redis.port=1"})
+        properties = {"spring.data.redis.host=127.0.0.1", "spring.data.redis.port=1",
+                "cache.invalidation.listener-enabled=false"})
 @ImportAutoConfiguration(RedisAutoConfiguration.class)
 class KeywordGraphProviderRedisDownTest {
 

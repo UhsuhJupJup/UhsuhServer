@@ -76,6 +76,8 @@ notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
 
 cache:
+  invalidation:
+    listener-enabled: ${CACHE_INVALIDATION_LISTENER_ENABLED:true}
   keyword-graph:
     ttl-min: ${KEYWORD_GRAPH_CACHE_TTL_MIN:55m}
     ttl-max: ${KEYWORD_GRAPH_CACHE_TTL_MAX:60m}

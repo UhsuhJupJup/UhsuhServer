@@ -6,20 +6,24 @@ import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.keyword.application.KeywordGraphRefresher;
 import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.collection.application.FeedClient;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.FetchedArticle;
 import uhsuhjupjup.backend.pipeline.collection.domain.ArticleUrl;
 import uhsuhjupjup.backend.pipeline.matching.application.dto.MatchingResult;
+import uhsuhjupjup.backend.pipeline.matching.application.dto.SavedTags;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -36,6 +40,7 @@ public class MatchingService {
     private final FeedClient feedClient;
     private final KeywordClassifier keywordClassifier;
     private final ArticleKeywordSaver articleKeywordSaver;
+    private final KeywordGraphRefresher keywordGraphRefresher;
 
     public MatchingResult matchRecent() {
         List<Article> articles = articleRepository.findPendingClassificationWithBlog(
@@ -45,6 +50,7 @@ public class MatchingService {
 
         int articlesTagged = 0;
         int tagsCreated = 0;
+        Set<Long> changedKeywordIds = new HashSet<>();
         Map<Long, List<Article>> byBlog = articles.stream()
                 .collect(Collectors.groupingBy(article -> article.getBlog().getId()));
         for (List<Article> blogArticles : byBlog.values()) {
@@ -58,20 +64,33 @@ public class MatchingService {
                     List<KeywordMatch> matches = keywordClassifier.classify(article.getTitle(), body, catalog).stream()
                             .limit(MAX_KEYWORDS)
                             .toList();
-                    int created = articleKeywordSaver.recordClassification(
+                    SavedTags saved = articleKeywordSaver.recordClassification(
                             article.getId(), matches, LocalDateTime.now());
-                    if (created > 0) {
+                    if (saved.created() > 0) {
                         articlesTagged++;
                     }
-                    tagsCreated += created;
+                    tagsCreated += saved.created();
+                    changedKeywordIds.addAll(saved.changedKeywordIds());
                 } catch (Exception e) {
                     log.warn("분류 실패 articleId={} 사유={}", article.getId(), e.getMessage());
                 }
             }
         }
+        refreshKeywordGraphs(changedKeywordIds);
         MatchingResult result = new MatchingResult(articles.size(), articlesTagged, tagsCreated);
         log.info("매칭 완료 {}", result);
         return result;
+    }
+
+    private void refreshKeywordGraphs(Set<Long> changedKeywordIds) {
+        if (changedKeywordIds.isEmpty()) {
+            return;
+        }
+        try {
+            keywordGraphRefresher.refreshAfterCommit(changedKeywordIds);
+        } catch (RuntimeException e) {
+            log.warn("키워드 그래프 갱신 실패 대상={} 사유={}", changedKeywordIds.size(), e.getMessage());
+        }
     }
 
     private Optional<Map<String, String>> fetchBodies(Blog blog) {

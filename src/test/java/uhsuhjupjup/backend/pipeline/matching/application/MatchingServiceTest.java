@@ -8,17 +8,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
+import uhsuhjupjup.backend.keyword.application.KeywordGraphRefresher;
 import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.pipeline.collection.application.FeedClient;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.FetchedArticle;
 import uhsuhjupjup.backend.pipeline.matching.application.dto.MatchingResult;
+import uhsuhjupjup.backend.pipeline.matching.application.dto.SavedTags;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.support.ArticleFixture;
 import uhsuhjupjup.backend.support.BlogFixture;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +52,9 @@ class MatchingServiceTest {
     @Mock
     private ArticleKeywordSaver articleKeywordSaver;
 
+    @Mock
+    private KeywordGraphRefresher keywordGraphRefresher;
+
     @InjectMocks
     private MatchingService matchingService;
 
@@ -65,14 +71,58 @@ class MatchingServiceTest {
         given(keywordClassifier.classify(eq("MySQL 데드락"), eq("본문1"), any()))
                 .willReturn(List.of(new KeywordMatch(3L, "ai")));
         given(keywordClassifier.classify(eq("무관한 글"), eq("본문2"), any())).willReturn(List.of());
-        given(articleKeywordSaver.recordClassification(eq(1L), any(), any())).willReturn(1);
-        given(articleKeywordSaver.recordClassification(eq(2L), any(), any())).willReturn(0);
+        given(articleKeywordSaver.recordClassification(eq(1L), any(), any())).willReturn(new SavedTags(1, Set.of(3L, 4L)));
+        given(articleKeywordSaver.recordClassification(eq(2L), any(), any())).willReturn(SavedTags.NONE);
 
         MatchingResult result = matchingService.matchRecent();
 
         assertThat(result.articlesScanned()).isEqualTo(2);
         assertThat(result.articlesTagged()).isEqualTo(1);
         assertThat(result.tagsCreated()).isEqualTo(1);
+        verify(keywordGraphRefresher).refreshAfterCommit(Set.of(3L, 4L));
+    }
+
+    @Test
+    void matchRecent_refreshesEachChangedKeywordOnceAcrossArticles() {
+        Article a1 = ArticleFixture.article(1L, blog, "글 1", "https://b.com/1", LocalDateTime.now());
+        Article a2 = ArticleFixture.article(2L, blog, "글 2", "https://b.com/2", LocalDateTime.now());
+        given(articleRepository.findPendingClassificationWithBlog(any())).willReturn(List.of(a1, a2));
+        given(feedClient.fetch(any())).willReturn(List.of());
+        given(keywordClassifier.classify(any(), any(), any())).willReturn(List.of(new KeywordMatch(3L, "title")));
+        given(articleKeywordSaver.recordClassification(eq(1L), any(), any())).willReturn(new SavedTags(1, Set.of(3L, 5L)));
+        given(articleKeywordSaver.recordClassification(eq(2L), any(), any())).willReturn(new SavedTags(1, Set.of(3L, 6L)));
+
+        matchingService.matchRecent();
+
+        verify(keywordGraphRefresher).refreshAfterCommit(Set.of(3L, 5L, 6L));
+    }
+
+    @Test
+    void matchRecent_doesNotRefreshKeywordsOfArticlesWhoseSaveFailed() {
+        Article a1 = ArticleFixture.article(1L, blog, "글 1", "https://b.com/1", LocalDateTime.now());
+        Article a2 = ArticleFixture.article(2L, blog, "글 2", "https://b.com/2", LocalDateTime.now());
+        given(articleRepository.findPendingClassificationWithBlog(any())).willReturn(List.of(a1, a2));
+        given(feedClient.fetch(any())).willReturn(List.of());
+        given(keywordClassifier.classify(any(), any(), any())).willReturn(List.of(new KeywordMatch(3L, "title")));
+        given(articleKeywordSaver.recordClassification(eq(1L), any(), any())).willThrow(new IllegalStateException("롤백"));
+        given(articleKeywordSaver.recordClassification(eq(2L), any(), any())).willReturn(new SavedTags(1, Set.of(7L)));
+
+        matchingService.matchRecent();
+
+        verify(keywordGraphRefresher).refreshAfterCommit(Set.of(7L));
+    }
+
+    @Test
+    void matchRecent_whenNothingChanged_doesNotRefresh() {
+        Article a1 = ArticleFixture.article(1L, blog, "글 1", "https://b.com/1", LocalDateTime.now());
+        given(articleRepository.findPendingClassificationWithBlog(any())).willReturn(List.of(a1));
+        given(feedClient.fetch(any())).willReturn(List.of());
+        given(keywordClassifier.classify(any(), any(), any())).willReturn(List.of(new KeywordMatch(3L, "title")));
+        given(articleKeywordSaver.recordClassification(eq(1L), any(), any())).willReturn(SavedTags.NONE);
+
+        matchingService.matchRecent();
+
+        verify(keywordGraphRefresher, never()).refreshAfterCommit(any());
     }
 
     @Test

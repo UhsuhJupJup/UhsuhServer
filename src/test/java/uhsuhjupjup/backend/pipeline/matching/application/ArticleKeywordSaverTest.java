@@ -14,6 +14,7 @@ import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.blog.domain.Blog;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
+import uhsuhjupjup.backend.pipeline.matching.application.dto.SavedTags;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.support.ArticleFixture;
 import uhsuhjupjup.backend.support.BlogFixture;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
@@ -58,10 +60,11 @@ class ArticleKeywordSaverTest {
         given(articleKeywordRepository.findKeywordIdsByArticleId(10L)).willReturn(List.of(1L));
         given(keywordRepository.getReferenceById(2L)).willReturn(keyword2);
 
-        int saved = saver.recordClassification(10L,
+        SavedTags saved = saver.recordClassification(10L,
                 List.of(new KeywordMatch(1L, "title"), new KeywordMatch(2L, "alias")), classifiedAt);
 
-        assertThat(saved).isEqualTo(1);
+        assertThat(saved.created()).isEqualTo(1);
+        assertThat(saved.changedKeywordIds()).containsExactlyInAnyOrder(1L, 2L);
         verify(articleKeywordRepository).saveAll(savedCaptor.capture());
         assertThat(savedCaptor.getValue()).hasSize(1);
         assertThat(savedCaptor.getValue().get(0).getKeyword()).isEqualTo(keyword2);
@@ -74,11 +77,12 @@ class ArticleKeywordSaverTest {
         given(articleRepository.findById(10L)).willReturn(Optional.of(article));
         given(articleKeywordRepository.findKeywordIdsByArticleId(10L)).willReturn(List.of(1L, 2L));
 
-        int saved = saver.recordClassification(10L,
+        SavedTags saved = saver.recordClassification(10L,
                 List.of(new KeywordMatch(1L, "title"), new KeywordMatch(2L, "alias")), classifiedAt);
 
-        assertThat(saved).isZero();
+        assertThat(saved).isEqualTo(SavedTags.NONE);
         verify(keywordRepository, never()).getReferenceById(anyLong());
+        verify(articleKeywordRepository, never()).saveAll(any());
         assertThat(article.getClassifiedAt()).isEqualTo(classifiedAt);
     }
 
@@ -86,9 +90,9 @@ class ArticleKeywordSaverTest {
     void recordClassification_whenEmpty_marksAndSkipsTagQuery() {
         given(articleRepository.findById(10L)).willReturn(Optional.of(article));
 
-        int saved = saver.recordClassification(10L, List.of(), classifiedAt);
+        SavedTags saved = saver.recordClassification(10L, List.of(), classifiedAt);
 
-        assertThat(saved).isZero();
+        assertThat(saved).isEqualTo(SavedTags.NONE);
         verify(articleKeywordRepository, never()).findKeywordIdsByArticleId(anyLong());
         assertThat(article.getClassifiedAt()).isEqualTo(classifiedAt);
     }

@@ -119,6 +119,41 @@ public class RedisCacheLayer {
         }
     }
 
+    public RefreshOutcome refresh(Object key, Callable<?> valueLoader) {
+        if (redisSkipped()) {
+            return RefreshOutcome.REDIS_UNAVAILABLE;
+        }
+        String lockKey = lockKey(key);
+        String token = UUID.randomUUID().toString();
+        long deadline = System.nanoTime() + lockSettings.localWaitLimit().toNanos();
+        while (true) {
+            Boolean acquired;
+            try {
+                acquired = redis.opsForValue().setIfAbsent(lockKey, bytes(token), lockSettings.lockTtl());
+            } catch (RuntimeException e) {
+                skipRedisForAWhile();
+                lockFailed.increment();
+                log.warn("갱신 락을 얻지 못했습니다 cache={} key={} cause={}", name, key, e.toString());
+                return RefreshOutcome.REDIS_UNAVAILABLE;
+            }
+            if (Boolean.TRUE.equals(acquired)) {
+                lockAcquired.increment();
+                return refreshUnderLock(key, valueLoader, lockKey, token);
+            }
+            if (System.nanoTime() >= deadline) {
+                lockTimedOut.increment();
+                log.warn("갱신 락 대기 시간 초과, 이번 갱신을 건너뜁니다 cache={} key={}", name, key);
+                return RefreshOutcome.LOCK_TIMEOUT;
+            }
+            try {
+                Thread.sleep(lockSettings.retryInterval().toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return RefreshOutcome.FAILED;
+            }
+        }
+    }
+
     public void put(Object key, Object value) {
         if (value == null) {
             return;
@@ -167,6 +202,22 @@ public class RedisCacheLayer {
                 storeIfAbsent(key, value);
             }
             return value;
+        } finally {
+            release(lockKey, token);
+        }
+    }
+
+    private RefreshOutcome refreshUnderLock(Object key, Callable<?> valueLoader, String lockKey, String token) {
+        try {
+            Object value;
+            try {
+                value = compute(key, valueLoader);
+            } catch (ValueRetrievalException e) {
+                log.warn("갱신 계산 실패 cache={} key={} cause={}", name, key, String.valueOf(e.getCause()));
+                return RefreshOutcome.FAILED;
+            }
+            return storeIfOwner(key, value, lockKey, token) ? RefreshOutcome.STORED
+                    : redisSkipped() ? RefreshOutcome.REDIS_UNAVAILABLE : RefreshOutcome.LOST_LOCK;
         } finally {
             release(lockKey, token);
         }
