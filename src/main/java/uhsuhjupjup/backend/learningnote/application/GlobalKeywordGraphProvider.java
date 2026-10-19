@@ -1,11 +1,8 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CachePut;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
-import uhsuhjupjup.backend.config.CacheConfig;
 import uhsuhjupjup.backend.article.application.dto.KeywordEdge;
 import uhsuhjupjup.backend.article.application.dto.KeywordFrequency;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
@@ -30,17 +27,7 @@ public class GlobalKeywordGraphProvider {
     private final ArticleKeywordRepository articleKeywordRepository;
     private final KeywordRepository keywordRepository;
 
-    @Cacheable(cacheNames = CacheConfig.GLOBAL_GRAPH, sync = true)
     public NoteGraphResult globalKeywordGraph() {
-        return computeGraph();
-    }
-
-    @CachePut(cacheNames = CacheConfig.GLOBAL_GRAPH)
-    public NoteGraphResult refreshGlobalGraph() {
-        return computeGraph();
-    }
-
-    private NoteGraphResult computeGraph() {
         List<KeywordEdge> topEdges = articleKeywordRepository.findTopCooccurrenceEdges(PageRequest.of(0, TOP_EDGES));
         LinkedHashSet<Long> keywordIds = topEdges.stream()
                 .flatMap(edge -> Stream.of(edge.keywordAId(), edge.keywordBId()))

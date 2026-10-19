@@ -6,8 +6,8 @@ public record KeywordGraphCenterResponse(Long id, String name, long articleCount
 
     public static KeywordGraphCenterResponse from(KeywordGraphResult result) {
         return new KeywordGraphCenterResponse(
-                result.keyword().getId(),
-                result.keyword().getName(),
+                result.keywordId(),
+                result.keywordName(),
                 result.neighborhood().articleCount());
     }
 }

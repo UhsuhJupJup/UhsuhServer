@@ -1,6 +1,10 @@
 spring:
   application:
     name: backend
+  data:
+    redis:
+      timeout: 1s
+      connect-timeout: 1s
   datasource:
     url: jdbc:mysql://localhost:3306/uhsuhjupjup?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: uhsuhjupjup
@@ -70,6 +74,20 @@ resilience4j:
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
+
+cache:
+  invalidation:
+    listener-enabled: ${CACHE_INVALIDATION_LISTENER_ENABLED:true}
+  keyword-graph:
+    ttl-min: ${KEYWORD_GRAPH_CACHE_TTL_MIN:55m}
+    ttl-max: ${KEYWORD_GRAPH_CACHE_TTL_MAX:60m}
+    local-ttl-min: ${KEYWORD_GRAPH_LOCAL_CACHE_TTL_MIN:270s}
+    local-ttl-max: ${KEYWORD_GRAPH_LOCAL_CACHE_TTL_MAX:5m}
+    local-max-size: ${KEYWORD_GRAPH_LOCAL_CACHE_MAX_SIZE:1000}
+    lock-ttl: ${KEYWORD_GRAPH_CACHE_LOCK_TTL:10s}
+    lock-wait-timeout: ${KEYWORD_GRAPH_CACHE_LOCK_WAIT_TIMEOUT:3s}
+    lock-retry-interval: ${KEYWORD_GRAPH_CACHE_LOCK_RETRY_INTERVAL:50ms}
+    redis-failure-backoff: ${KEYWORD_GRAPH_CACHE_REDIS_FAILURE_BACKOFF:10s}
 
 outbox:
   poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:60000}

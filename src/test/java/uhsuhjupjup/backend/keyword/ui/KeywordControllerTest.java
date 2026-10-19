@@ -17,6 +17,7 @@ import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.common.exception.GlobalExceptionHandler;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordDetailResult;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
+import uhsuhjupjup.backend.keyword.application.KeywordGraphProvider;
 import uhsuhjupjup.backend.keyword.application.KeywordService;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.support.KeywordFixture;
@@ -38,11 +39,14 @@ class KeywordControllerTest {
     @Mock
     private KeywordService keywordService;
 
+    @Mock
+    private KeywordGraphProvider keywordGraphProvider;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new KeywordController(keywordService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new KeywordController(keywordService, keywordGraphProvider))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -126,7 +130,7 @@ class KeywordControllerTest {
                 5,
                 List.of(new KeywordRelation(7L, "Kafka", 2L), new KeywordRelation(9L, "Redis", 1L)),
                 List.of(new KeywordNeighborLink(7L, 9L, 1L)));
-        given(keywordService.getGraph(3L)).willReturn(new KeywordGraphResult(keyword, neighborhood));
+        given(keywordGraphProvider.keywordGraph(3L)).willReturn(KeywordGraphResult.of(keyword, neighborhood));
 
         mockMvc.perform(get("/api/keywords/3/graph"))
                 .andExpect(status().isOk())
@@ -147,8 +151,8 @@ class KeywordControllerTest {
     @Test
     void graph_withoutArticles_returnsZeroAndEmptyLists() throws Exception {
         Keyword keyword = KeywordFixture.keyword(3L, "MySQL");
-        given(keywordService.getGraph(3L))
-                .willReturn(new KeywordGraphResult(keyword, new KeywordNeighborhoodResult(0, List.of(), List.of())));
+        given(keywordGraphProvider.keywordGraph(3L))
+                .willReturn(KeywordGraphResult.of(keyword, new KeywordNeighborhoodResult(0, List.of(), List.of())));
 
         mockMvc.perform(get("/api/keywords/3/graph"))
                 .andExpect(status().isOk())
@@ -161,7 +165,7 @@ class KeywordControllerTest {
 
     @Test
     void graph_whenKeywordNotFound_returns404() throws Exception {
-        given(keywordService.getGraph(99L)).willThrow(new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
+        given(keywordGraphProvider.keywordGraph(99L)).willThrow(new BusinessException(ErrorCode.KEYWORD_NOT_FOUND));
 
         mockMvc.perform(get("/api/keywords/99/graph"))
                 .andExpect(status().isNotFound())
@@ -170,7 +174,7 @@ class KeywordControllerTest {
 
     @Test
     void graph_whenQueryFails_returns500() throws Exception {
-        given(keywordService.getGraph(3L)).willThrow(new IllegalStateException("조회 실패"));
+        given(keywordGraphProvider.keywordGraph(3L)).willThrow(new IllegalStateException("조회 실패"));
 
         mockMvc.perform(get("/api/keywords/3/graph"))
                 .andExpect(status().isInternalServerError())

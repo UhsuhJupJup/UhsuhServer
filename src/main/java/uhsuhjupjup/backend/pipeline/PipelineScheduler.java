@@ -6,7 +6,6 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.integration.redis.util.RedisLockRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import uhsuhjupjup.backend.learningnote.application.GlobalKeywordGraphProvider;
 import uhsuhjupjup.backend.pipeline.collection.application.CollectionService;
 import uhsuhjupjup.backend.pipeline.collection.application.dto.CollectionResult;
 import uhsuhjupjup.backend.pipeline.matching.application.MatchingService;
@@ -32,7 +31,6 @@ public class PipelineScheduler {
     private final NotificationService notificationService;
     private final PipelineRunRecorder pipelineRunRecorder;
     private final RedisLockRegistry redisLockRegistry;
-    private final GlobalKeywordGraphProvider globalKeywordGraphProvider;
 
     @Scheduled(cron = "${pipeline.ingest-cron:0 0 6 * * *}", zone = "Asia/Seoul")
     @SchedulerLock(name = "pipelineIngest",
@@ -45,10 +43,6 @@ public class PipelineScheduler {
             MatchingResult matching = runStage("매칭",
                     () -> runWithLock(CLASSIFICATION_LOCK, matchingService::matchRecent));
             pipelineRunRecorder.recordIngest(startedAt, LocalDateTime.now(), collection, matching);
-            runStage("그래프 캐시 선계산", () -> {
-                globalKeywordGraphProvider.refreshGlobalGraph();
-                return null;
-            });
             return null;
         });
     }

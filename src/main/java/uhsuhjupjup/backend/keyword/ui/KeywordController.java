@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import uhsuhjupjup.backend.keyword.application.KeywordGraphProvider;
 import uhsuhjupjup.backend.keyword.application.KeywordService;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordDetailResponse;
 import uhsuhjupjup.backend.keyword.ui.dto.KeywordGraphResponse;
@@ -20,6 +21,7 @@ import java.util.List;
 public class KeywordController implements KeywordControllerApi {
 
     private final KeywordService keywordService;
+    private final KeywordGraphProvider keywordGraphProvider;
 
     @Override
     @GetMapping
@@ -45,6 +47,6 @@ public class KeywordController implements KeywordControllerApi {
     @Override
     @GetMapping("/{id}/graph")
     public KeywordGraphResponse graph(@PathVariable Long id) {
-        return KeywordGraphResponse.from(keywordService.getGraph(id));
+        return KeywordGraphResponse.from(keywordGraphProvider.keywordGraph(id));
     }
 }
