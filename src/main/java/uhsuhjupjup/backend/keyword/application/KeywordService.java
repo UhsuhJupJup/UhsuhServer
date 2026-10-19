@@ -62,7 +62,7 @@ public class KeywordService {
 
     public KeywordGraphResult getGraph(Long keywordId) {
         Keyword keyword = getKeyword(keywordId);
-        return new KeywordGraphResult(keyword, keywordGraphQueryService.findNeighborhood(keywordId));
+        return KeywordGraphResult.of(keyword, keywordGraphQueryService.findNeighborhood(keywordId));
     }
 
     public KeywordArticleCount getTop() {

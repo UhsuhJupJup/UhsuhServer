@@ -138,7 +138,8 @@ class KeywordServiceTest {
 
         KeywordGraphResult result = keywordService.getGraph(3L);
 
-        assertThat(result.keyword()).isEqualTo(keyword);
+        assertThat(result.keywordId()).isEqualTo(3L);
+        assertThat(result.keywordName()).isEqualTo("MySQL");
         assertThat(result.neighborhood()).isEqualTo(neighborhood);
     }
 
