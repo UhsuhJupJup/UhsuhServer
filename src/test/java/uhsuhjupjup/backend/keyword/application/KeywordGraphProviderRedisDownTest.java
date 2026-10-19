@@ -36,7 +36,7 @@ class KeywordGraphProviderRedisDownTest {
     private KeywordService keywordService;
 
     @Test
-    void Redis가_안_되면_캐시를_건너뛰고_DB에서_계산해_응답한다() {
+    void Redis가_안_되면_DB에서_계산해_응답하고_다음_요청은_로컬_캐시에서_응답한다() {
         KeywordGraphResult graph = new KeywordGraphResult(3L, "MySQL", new KeywordNeighborhoodResult(0, List.of(), List.of()));
         given(keywordService.getGraph(3L)).willReturn(graph);
 
@@ -47,7 +47,7 @@ class KeywordGraphProviderRedisDownTest {
         }).doesNotThrowAnyException();
 
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5));
-        verify(keywordService, times(2)).getGraph(3L);
+        verify(keywordService, times(1)).getGraph(3L);
     }
 
     @Test

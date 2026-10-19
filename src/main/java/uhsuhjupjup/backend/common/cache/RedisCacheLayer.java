@@ -3,8 +3,7 @@ package uhsuhjupjup.backend.common.cache;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
-import org.springframework.cache.support.SimpleValueWrapper;
+import org.springframework.cache.Cache.ValueRetrievalException;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -17,15 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Slf4j
-public class DistributedSingleFlightCache implements Cache {
+public class RedisCacheLayer {
 
     private static final RedisScript<Long> STORE_IF_OWNER = new DefaultRedisScript<>(
             "if redis.call('get', KEYS[1]) == ARGV[1] then "
@@ -42,7 +35,6 @@ public class DistributedSingleFlightCache implements Cache {
     private final RedisSerializer<Object> serializer;
     private final CacheLockSettings lockSettings;
     private final TtlJitter ttl;
-    private final ConcurrentMap<Object, CompletableFuture<Object>> loading = new ConcurrentHashMap<>();
     private volatile long redisRetryAt;
     private final Counter hits;
     private final Counter misses;
@@ -53,9 +45,9 @@ public class DistributedSingleFlightCache implements Cache {
     private final Counter lockFailed;
     private final Counter loads;
 
-    public DistributedSingleFlightCache(String name, String keyPrefix, String lockPrefix,
-                                        RedisTemplate<String, byte[]> redis, RedisSerializer<Object> serializer,
-                                        CacheLockSettings lockSettings, TtlJitter ttl, MeterRegistry meterRegistry) {
+    public RedisCacheLayer(String name, String keyPrefix, String lockPrefix,
+                           RedisTemplate<String, byte[]> redis, RedisSerializer<Object> serializer,
+                           CacheLockSettings lockSettings, TtlJitter ttl, MeterRegistry meterRegistry) {
         this.name = name;
         this.cacheKeyPrefix = keyPrefix + name + "::";
         this.lockKeyPrefix = lockPrefix + name + "::";
@@ -63,14 +55,16 @@ public class DistributedSingleFlightCache implements Cache {
         this.serializer = serializer;
         this.lockSettings = lockSettings;
         this.ttl = ttl;
-        this.hits = getCounter(meterRegistry, "hit");
-        this.misses = getCounter(meterRegistry, "miss");
-        this.stored = counter(meterRegistry, "uhsuh.cache.puts", "result", "stored");
-        this.storeRejected = counter(meterRegistry, "uhsuh.cache.puts", "result", "rejected");
-        this.lockAcquired = counter(meterRegistry, "uhsuh.cache.lock.attempts", "result", "acquired");
-        this.lockTimedOut = counter(meterRegistry, "uhsuh.cache.lock.attempts", "result", "timeout");
-        this.lockFailed = counter(meterRegistry, "uhsuh.cache.lock.attempts", "result", "error");
-        this.loads = counter(meterRegistry, "uhsuh.cache.loads", "result", "computed");
+        this.hits = Counter.builder("cache.gets").tag("cache", name).tag("name", name)
+                .tag("cache.manager", "cacheManager").tag("result", "hit").register(meterRegistry);
+        this.misses = Counter.builder("cache.gets").tag("cache", name).tag("name", name)
+                .tag("cache.manager", "cacheManager").tag("result", "miss").register(meterRegistry);
+        this.stored = counter(meterRegistry, "uhsuh.cache.puts", "stored");
+        this.storeRejected = counter(meterRegistry, "uhsuh.cache.puts", "rejected");
+        this.lockAcquired = counter(meterRegistry, "uhsuh.cache.lock.attempts", "acquired");
+        this.lockTimedOut = counter(meterRegistry, "uhsuh.cache.lock.attempts", "timeout");
+        this.lockFailed = counter(meterRegistry, "uhsuh.cache.lock.attempts", "error");
+        this.loads = counter(meterRegistry, "uhsuh.cache.loads", "computed");
     }
 
     public static RedisTemplate<String, byte[]> bytesTemplate(RedisConnectionFactory connectionFactory) {
@@ -82,105 +76,14 @@ public class DistributedSingleFlightCache implements Cache {
         return template;
     }
 
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public Object getNativeCache() {
-        return redis;
-    }
-
-    @Override
-    public ValueWrapper get(Object key) {
-        Object value = lookup(key);
-        return value == null ? null : new SimpleValueWrapper(value);
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> T get(Object key, Class<T> type) {
-        Object value = lookup(key);
-        if (value != null && type != null && !type.isInstance(value)) {
-            throw new IllegalStateException("캐시 값 타입 불일치 cache=%s key=%s expected=%s actual=%s"
-                    .formatted(name, key, type.getName(), value.getClass().getName()));
-        }
-        return type == null ? (T) value : type.cast(value);
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T> T get(Object key, Callable<T> valueLoader) {
-        Object cached = lookup(key);
-        if (cached != null) {
-            return (T) cached;
-        }
-        CompletableFuture<Object> mine = new CompletableFuture<>();
-        CompletableFuture<Object> running = loading.putIfAbsent(key, mine);
-        if (running != null) {
-            return (T) awaitLocal(key, valueLoader, running);
-        }
-        try {
-            T value = loadAcrossServers(key, valueLoader);
-            mine.complete(value);
-            return value;
-        } catch (ValueRetrievalException e) {
-            mine.completeExceptionally(e.getCause());
-            throw e;
-        } catch (RuntimeException | Error e) {
-            mine.completeExceptionally(e);
-            throw e;
-        } finally {
-            loading.remove(key, mine);
-        }
-    }
-
-    @Override
-    public void put(Object key, Object value) {
-        if (value == null) {
-            return;
-        }
-        redis.opsForValue().set(cacheKey(key), serializer.serialize(value), ttl.next());
-        stored.increment();
-    }
-
-    @Override
-    public void evict(Object key) {
-        redis.delete(cacheKey(key));
-    }
-
-    @Override
-    public void clear() {
-        try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(cacheKeyPrefix + "*").count(500).build())) {
-            keys.forEachRemaining(redis::delete);
-        }
-    }
-
-    private Object awaitLocal(Object key, Callable<?> valueLoader, CompletableFuture<Object> running) {
-        try {
-            return running.get(lockSettings.localWaitLimit().toMillis(), TimeUnit.MILLISECONDS);
-        } catch (ExecutionException e) {
-            if (e.getCause() instanceof InterruptedException && !Thread.currentThread().isInterrupted()) {
-                return get(key, valueLoader);
-            }
-            throw new ValueRetrievalException(key, valueLoader, e.getCause());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new ValueRetrievalException(key, valueLoader, e);
-        } catch (TimeoutException e) {
-            Object cached = read(key);
-            if (cached != null) {
-                return cached;
-            }
-            log.warn("같은 서버의 선행 계산을 기다리다 시간 초과 cache={} key={}", name, key);
-            throw new ValueRetrievalException(key, valueLoader,
-                    new IllegalStateException("캐시 재생성 대기 시간 초과 cache=" + name + " key=" + key));
-        }
+    public Object lookup(Object key) {
+        Object value = read(key);
+        (value == null ? misses : hits).increment();
+        return value;
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T loadAcrossServers(Object key, Callable<T> valueLoader) {
+    public <T> T loadAcrossServers(Object key, Callable<T> valueLoader) {
         String lockKey = lockKey(key);
         String token = UUID.randomUUID().toString();
         long deadline = System.nanoTime() + lockSettings.waitTimeout().toNanos();
@@ -216,6 +119,42 @@ public class DistributedSingleFlightCache implements Cache {
         }
     }
 
+    public void put(Object key, Object value) {
+        if (value == null) {
+            return;
+        }
+        redis.opsForValue().set(cacheKey(key), serializer.serialize(value), ttl.next());
+        stored.increment();
+    }
+
+    public void evict(Object key) {
+        redis.delete(cacheKey(key));
+    }
+
+    public void clear() {
+        try (Cursor<String> keys = redis.scan(ScanOptions.scanOptions().match(cacheKeyPrefix + "*").count(500).build())) {
+            keys.forEachRemaining(redis::delete);
+        }
+    }
+
+    public RedisTemplate<String, byte[]> template() {
+        return redis;
+    }
+
+    public Object read(Object key) {
+        if (redisSkipped()) {
+            return null;
+        }
+        try {
+            byte[] bytes = redis.opsForValue().get(cacheKey(key));
+            return bytes == null ? null : serializer.deserialize(bytes);
+        } catch (RuntimeException e) {
+            skipRedisForAWhile();
+            log.warn("캐시 조회 실패, 캐시 없이 진행합니다 cache={} key={} cause={}", name, key, e.toString());
+            return null;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private <T> T loadUnderLock(Object key, Callable<T> valueLoader, String lockKey, String token) {
         try {
@@ -224,7 +163,9 @@ public class DistributedSingleFlightCache implements Cache {
                 return (T) cached;
             }
             T value = compute(key, valueLoader);
-            storeIfOwner(key, value, lockKey, token);
+            if (!storeIfOwner(key, value, lockKey, token)) {
+                storeIfAbsent(key, value);
+            }
             return value;
         } finally {
             release(lockKey, token);
@@ -247,23 +188,24 @@ public class DistributedSingleFlightCache implements Cache {
         }
     }
 
-    private void storeIfOwner(Object key, Object value, String lockKey, String token) {
+    private boolean storeIfOwner(Object key, Object value, String lockKey, String token) {
         if (value == null || redisSkipped()) {
-            return;
+            return false;
         }
         try {
             Long result = redis.execute(STORE_IF_OWNER, List.of(lockKey, cacheKey(key)),
                     bytes(token), serializer.serialize(value), bytes(String.valueOf(ttl.next().toMillis())));
             if (result != null && result == 1L) {
                 stored.increment();
-                return;
+                return true;
             }
             storeRejected.increment();
-            log.warn("락을 잃어 비어 있을 때만 저장합니다 cache={} key={}", name, key);
-            storeIfAbsent(key, value);
+            log.warn("락을 잃어 계산 결과를 락 소유자로 저장하지 못했습니다 cache={} key={}", name, key);
+            return false;
         } catch (RuntimeException e) {
             skipRedisForAWhile();
             log.warn("캐시 저장 실패 cache={} key={} cause={}", name, key, e.toString());
+            return false;
         }
     }
 
@@ -298,7 +240,7 @@ public class DistributedSingleFlightCache implements Cache {
         }
     }
 
-    private boolean redisSkipped() {
+    boolean redisSkipped() {
         long retryAt = redisRetryAt;
         return retryAt != 0 && System.nanoTime() - retryAt < 0;
     }
@@ -326,26 +268,6 @@ public class DistributedSingleFlightCache implements Cache {
         }
     }
 
-    private Object lookup(Object key) {
-        Object value = read(key);
-        (value == null ? misses : hits).increment();
-        return value;
-    }
-
-    private Object read(Object key) {
-        if (redisSkipped()) {
-            return null;
-        }
-        try {
-            byte[] bytes = redis.opsForValue().get(cacheKey(key));
-            return bytes == null ? null : serializer.deserialize(bytes);
-        } catch (RuntimeException e) {
-            skipRedisForAWhile();
-            log.warn("캐시 조회 실패, 캐시 없이 진행합니다 cache={} key={} cause={}", name, key, e.toString());
-            return null;
-        }
-    }
-
     private String cacheKey(Object key) {
         return cacheKeyPrefix + key;
     }
@@ -358,19 +280,7 @@ public class DistributedSingleFlightCache implements Cache {
         return value.getBytes(StandardCharsets.UTF_8);
     }
 
-    private Counter getCounter(MeterRegistry registry, String result) {
-        return Counter.builder("cache.gets")
-                .tag("cache", name)
-                .tag("name", name)
-                .tag("cache.manager", "cacheManager")
-                .tag("result", result)
-                .register(registry);
-    }
-
-    private Counter counter(MeterRegistry registry, String meter, String tagKey, String tagValue) {
-        return Counter.builder(meter)
-                .tag("cache", name)
-                .tag(tagKey, tagValue)
-                .register(registry);
+    private Counter counter(MeterRegistry registry, String meter, String result) {
+        return Counter.builder(meter).tag("cache", name).tag("result", result).register(registry);
     }
 }
