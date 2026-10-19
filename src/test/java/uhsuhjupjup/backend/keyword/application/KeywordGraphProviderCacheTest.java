@@ -1,5 +1,6 @@
 package uhsuhjupjup.backend.keyword.application;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,8 +8,9 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -17,12 +19,15 @@ import org.testcontainers.containers.GenericContainer;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
+import uhsuhjupjup.backend.common.cache.CacheLockSettings;
+import uhsuhjupjup.backend.common.cache.DistributedSingleFlightCache;
 import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.config.CacheConfig;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
 import uhsuhjupjup.backend.support.SharedTestContainers;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -98,18 +103,27 @@ class KeywordGraphProviderCacheTest {
 
     @Test
     void 다른_서버가_담아_둔_값을_계산_없이_그대로_쓴다() {
-        SimpleCacheManager otherServer = (SimpleCacheManager) new CacheConfig().cacheManager(connectionFactory);
-        otherServer.afterPropertiesSet();
-        Objects.requireNonNull(otherServer.getCache(CacheConfig.KEYWORD_GRAPH)).put(5L, graph(5L, "Redis"));
+        LettuceConnectionFactory otherConnection = new LettuceConnectionFactory(
+                new RedisStandaloneConfiguration(REDIS.getHost(), REDIS.getMappedPort(6379)));
+        otherConnection.afterPropertiesSet();
+        try {
+            DistributedSingleFlightCache otherServer = CacheConfig.keywordGraphCache(otherConnection,
+                    new SimpleMeterRegistry(),
+                    CacheConfig.keywordGraphTtl(Duration.ofMinutes(55), Duration.ofMinutes(60)),
+                    new CacheLockSettings(Duration.ofSeconds(10), Duration.ofSeconds(3), Duration.ofMillis(50), Duration.ofSeconds(10)));
+            otherServer.put(5L, graph(5L, "Redis"));
 
-        KeywordGraphResult result = provider.keywordGraph(5L);
+            KeywordGraphResult result = provider.keywordGraph(5L);
 
-        assertThat(result).isEqualTo(graph(5L, "Redis"));
-        verify(keywordService, never()).getGraph(5L);
+            assertThat(result).isEqualTo(graph(5L, "Redis"));
+            verify(keywordService, never()).getGraph(5L);
+        } finally {
+            otherConnection.destroy();
+        }
     }
 
     @Test
-    void Redis에_JSON으로_1시간_동안_담는다() {
+    void Redis에_JSON으로_55분에서_60분_사이_동안_담는다() {
         given(keywordService.getGraph(3L)).willReturn(graph(3L, "MySQL"));
 
         provider.keywordGraph(3L);
@@ -120,7 +134,7 @@ class KeywordGraphProviderCacheTest {
                 .contains("\"keywordId\":3")
                 .contains("\"keywordName\":\"MySQL\"")
                 .contains("\"name\":\"Redis\"");
-        assertThat(redis.getExpire(key, TimeUnit.SECONDS)).isBetween(3_590L, 3_600L);
+        assertThat(redis.getExpire(key, TimeUnit.SECONDS)).isBetween(3_290L, 3_600L);
     }
 
     @Test

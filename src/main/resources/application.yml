@@ -75,6 +75,15 @@ resilience4j:
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
 
+cache:
+  keyword-graph:
+    ttl-min: ${KEYWORD_GRAPH_CACHE_TTL_MIN:55m}
+    ttl-max: ${KEYWORD_GRAPH_CACHE_TTL_MAX:60m}
+    lock-ttl: ${KEYWORD_GRAPH_CACHE_LOCK_TTL:10s}
+    lock-wait-timeout: ${KEYWORD_GRAPH_CACHE_LOCK_WAIT_TIMEOUT:3s}
+    lock-retry-interval: ${KEYWORD_GRAPH_CACHE_LOCK_RETRY_INTERVAL:50ms}
+    redis-failure-backoff: ${KEYWORD_GRAPH_CACHE_REDIS_FAILURE_BACKOFF:10s}
+
 outbox:
   poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:60000}
   poll-initial-delay-ms: ${OUTBOX_POLL_INITIAL_DELAY_MS:60000}
