@@ -3,9 +3,17 @@ package uhsuhjupjup.backend.keyword.application;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.support.SimpleCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.containers.GenericContainer;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborLink;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighborhoodResult;
 import uhsuhjupjup.backend.article.application.dto.KeywordRelation;
@@ -13,26 +21,46 @@ import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.config.CacheConfig;
 import uhsuhjupjup.backend.keyword.application.dto.KeywordGraphResult;
+import uhsuhjupjup.backend.support.SharedTestContainers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest(
         classes = {CacheConfig.class, KeywordGraphProvider.class},
         webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@ImportAutoConfiguration(RedisAutoConfiguration.class)
 class KeywordGraphProviderCacheTest {
+
+    private static final GenericContainer<?> REDIS = SharedTestContainers.redis();
+
+    @DynamicPropertySource
+    static void redisProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+    }
 
     @Autowired
     private KeywordGraphProvider provider;
 
     @Autowired
     private CacheManager cacheManager;
+
+    @Autowired
+    private RedisConnectionFactory connectionFactory;
 
     @MockitoBean
     private KeywordService keywordService;
@@ -66,6 +94,58 @@ class KeywordGraphProviderCacheTest {
         assertThat(again.keywordName()).isEqualTo("Kafka");
         verify(keywordService, times(1)).getGraph(3L);
         verify(keywordService, times(1)).getGraph(7L);
+    }
+
+    @Test
+    void 다른_서버가_담아_둔_값을_계산_없이_그대로_쓴다() {
+        SimpleCacheManager otherServer = (SimpleCacheManager) new CacheConfig().cacheManager(connectionFactory);
+        otherServer.afterPropertiesSet();
+        Objects.requireNonNull(otherServer.getCache(CacheConfig.KEYWORD_GRAPH)).put(5L, graph(5L, "Redis"));
+
+        KeywordGraphResult result = provider.keywordGraph(5L);
+
+        assertThat(result).isEqualTo(graph(5L, "Redis"));
+        verify(keywordService, never()).getGraph(5L);
+    }
+
+    @Test
+    void Redis에_JSON으로_1시간_동안_담는다() {
+        given(keywordService.getGraph(3L)).willReturn(graph(3L, "MySQL"));
+
+        provider.keywordGraph(3L);
+
+        StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
+        String key = CacheConfig.KEY_PREFIX + CacheConfig.KEYWORD_GRAPH + "::3";
+        assertThat(redis.opsForValue().get(key))
+                .contains("\"keywordId\":3")
+                .contains("\"keywordName\":\"MySQL\"")
+                .contains("\"name\":\"Redis\"");
+        assertThat(redis.getExpire(key, TimeUnit.SECONDS)).isBetween(3_590L, 3_600L);
+    }
+
+    @Test
+    void 같은_키워드에_요청이_동시에_몰려도_집계는_한_번만_한다() throws Exception {
+        CountDownLatch release = new CountDownLatch(1);
+        given(keywordService.getGraph(3L)).willAnswer(invocation -> {
+            release.await(5, TimeUnit.SECONDS);
+            return graph(3L, "MySQL");
+        });
+        ExecutorService pool = Executors.newFixedThreadPool(8);
+        try {
+            List<Future<KeywordGraphResult>> results = new ArrayList<>();
+            for (int i = 0; i < 8; i++) {
+                results.add(pool.submit(() -> provider.keywordGraph(3L)));
+            }
+            Thread.sleep(300);
+            release.countDown();
+            for (Future<KeywordGraphResult> result : results) {
+                assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(graph(3L, "MySQL"));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        verify(keywordService, times(1)).getGraph(3L);
     }
 
     @Test
