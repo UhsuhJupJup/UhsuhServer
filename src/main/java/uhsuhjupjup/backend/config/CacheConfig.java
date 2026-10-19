@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
@@ -14,8 +15,13 @@ import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import uhsuhjupjup.backend.common.cache.CacheInvalidationListener;
+import uhsuhjupjup.backend.common.cache.CacheInvalidationPublisher;
 import uhsuhjupjup.backend.common.cache.CacheLockSettings;
 import uhsuhjupjup.backend.common.cache.LocalCache;
 import uhsuhjupjup.backend.common.cache.LocalCacheSettings;
@@ -63,6 +69,13 @@ public class CacheConfig implements CachingConfigurer {
         return cacheManager;
     }
 
+    @Bean
+    @ConditionalOnProperty(name = "cache.invalidation.listener-enabled", havingValue = "true", matchIfMissing = true)
+    public RedisMessageListenerContainer cacheInvalidationListenerContainer(RedisConnectionFactory connectionFactory,
+                                                                            List<TieredCache> caches) {
+        return invalidationListenerContainer(connectionFactory, caches);
+    }
+
     public static TieredCache keywordGraphCache(RedisConnectionFactory connectionFactory,
                                                 MeterRegistry meterRegistry,
                                                 TtlJitter remoteTtl,
@@ -72,7 +85,19 @@ public class CacheConfig implements CachingConfigurer {
         RedisCacheLayer remote = new RedisCacheLayer(KEYWORD_GRAPH, KEY_PREFIX, LOCK_PREFIX,
                 RedisCacheLayer.bytesTemplate(connectionFactory), keywordGraphSerializer(), lockSettings, remoteTtl,
                 meterRegistry);
-        return new TieredCache(KEYWORD_GRAPH, new LocalCache(localSettings, ticker), remote, lockSettings, meterRegistry);
+        StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
+        redis.afterPropertiesSet();
+        return new TieredCache(KEYWORD_GRAPH, new LocalCache(localSettings, ticker), remote, lockSettings,
+                new CacheInvalidationPublisher(redis), Long::valueOf, meterRegistry);
+    }
+
+    public static RedisMessageListenerContainer invalidationListenerContainer(RedisConnectionFactory connectionFactory,
+                                                                              List<TieredCache> caches) {
+        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
+        container.setConnectionFactory(connectionFactory);
+        container.addMessageListener(new CacheInvalidationListener(caches),
+                new ChannelTopic(CacheInvalidationPublisher.CHANNEL));
+        return container;
     }
 
     public static TtlJitter keywordGraphTtl(Duration min, Duration max) {

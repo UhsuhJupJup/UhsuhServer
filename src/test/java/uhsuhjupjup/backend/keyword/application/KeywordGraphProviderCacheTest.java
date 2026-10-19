@@ -48,7 +48,8 @@ import static org.mockito.Mockito.verify;
 
 @SpringBootTest(
         classes = {CacheConfig.class, KeywordGraphProvider.class},
-        webEnvironment = SpringBootTest.WebEnvironment.NONE)
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = "cache.invalidation.listener-enabled=false")
 @ImportAutoConfiguration(RedisAutoConfiguration.class)
 class KeywordGraphProviderCacheTest {
 

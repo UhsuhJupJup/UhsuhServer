@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
 
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,6 +15,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 @Slf4j
 public class TieredCache implements Cache {
@@ -21,18 +24,31 @@ public class TieredCache implements Cache {
     private final LocalCache local;
     private final RedisCacheLayer remote;
     private final CacheLockSettings lockSettings;
+    private final CacheInvalidationPublisher publisher;
+    private final Function<String, Object> keyParser;
     private final ConcurrentMap<Object, CompletableFuture<Object>> loading = new ConcurrentHashMap<>();
     private final Counter localHits;
     private final Counter localMisses;
+    private final Counter staleFillsSkipped;
+    private final Counter localInvalidations;
+    private final Map<RefreshOutcome, Counter> refreshes = new EnumMap<>(RefreshOutcome.class);
 
     public TieredCache(String name, LocalCache local, RedisCacheLayer remote, CacheLockSettings lockSettings,
+                       CacheInvalidationPublisher publisher, Function<String, Object> keyParser,
                        MeterRegistry meterRegistry) {
         this.name = name;
         this.local = local;
         this.remote = remote;
         this.lockSettings = lockSettings;
+        this.publisher = publisher;
+        this.keyParser = keyParser;
         this.localHits = counter(meterRegistry, "uhsuh.cache.local.gets", "hit");
         this.localMisses = counter(meterRegistry, "uhsuh.cache.local.gets", "miss");
+        this.staleFillsSkipped = counter(meterRegistry, "uhsuh.cache.local.puts", "skipped-stale");
+        this.localInvalidations = counter(meterRegistry, "uhsuh.cache.local.invalidations", "key");
+        for (RefreshOutcome outcome : RefreshOutcome.values()) {
+            refreshes.put(outcome, counter(meterRegistry, "uhsuh.cache.refreshes", outcome.name().toLowerCase()));
+        }
     }
 
     @Override
@@ -71,6 +87,7 @@ public class TieredCache implements Cache {
             return (T) cached;
         }
         localMisses.increment();
+        LocalCache.Stamp stamp = local.stamp(key);
         CompletableFuture<Object> mine = new CompletableFuture<>();
         CompletableFuture<Object> running = loading.putIfAbsent(key, mine);
         if (running != null) {
@@ -79,7 +96,7 @@ public class TieredCache implements Cache {
         try {
             Object fromRemote = remote.lookup(key);
             T value = fromRemote != null ? (T) fromRemote : remote.loadAcrossServers(key, valueLoader);
-            local.put(key, value);
+            fillLocal(key, value, stamp);
             mine.complete(value);
             return value;
         } catch (ValueRetrievalException e) {
@@ -111,6 +128,30 @@ public class TieredCache implements Cache {
         local.invalidateAll();
     }
 
+    public RefreshOutcome refresh(Object key, Callable<?> valueLoader) {
+        RefreshOutcome outcome = remote.refresh(key, valueLoader);
+        refreshes.get(outcome).increment();
+        if (outcome == RefreshOutcome.STORED) {
+            publisher.publishInvalidation(name, key);
+        } else if (outcome == RefreshOutcome.REDIS_UNAVAILABLE) {
+            invalidateLocal(key);
+        }
+        return outcome;
+    }
+
+    public void invalidateLocal(Object key) {
+        local.invalidate(key);
+        localInvalidations.increment();
+    }
+
+    public void invalidateLocal(String rawKey) {
+        invalidateLocal(keyParser.apply(rawKey));
+    }
+
+    public void clearLocal() {
+        local.invalidateAll();
+    }
+
     public Object localValue(Object key) {
         return local.get(key);
     }
@@ -122,9 +163,17 @@ public class TieredCache implements Cache {
             return cached;
         }
         localMisses.increment();
+        LocalCache.Stamp stamp = local.stamp(key);
         Object value = remote.lookup(key);
-        local.put(key, value);
+        fillLocal(key, value, stamp);
         return value;
+    }
+
+    private void fillLocal(Object key, Object value, LocalCache.Stamp stamp) {
+        if (value != null && !local.putIfUnchanged(key, value, stamp)) {
+            staleFillsSkipped.increment();
+            log.debug("조회 중 무효화가 있어 로컬 캐시에 담지 않았습니다 cache={} key={}", name, key);
+        }
     }
 
     private Object awaitLeader(Object key, Callable<?> valueLoader, CompletableFuture<Object> running) {

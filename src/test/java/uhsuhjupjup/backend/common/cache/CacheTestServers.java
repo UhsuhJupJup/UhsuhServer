@@ -6,8 +6,10 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializer;
+import uhsuhjupjup.backend.config.CacheConfig;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -30,6 +32,7 @@ class CacheTestServers implements AutoCloseable {
     private final String host;
     private final int port;
     private final List<LettuceConnectionFactory> factories = new ArrayList<>();
+    private final List<RedisMessageListenerContainer> containers = new ArrayList<>();
 
     CacheTestServers(String host, int port) {
         this.host = host;
@@ -69,8 +72,54 @@ class CacheTestServers implements AutoCloseable {
         AtomicLong nanos = new AtomicLong();
         RedisCacheLayer remote = new RedisCacheLayer(NAME, CACHE_PREFIX, LOCK_PREFIX,
                 RedisCacheLayer.bytesTemplate(factory), serializer, lock, REMOTE_TTL, registry);
-        TieredCache cache = new TieredCache(NAME, new LocalCache(local, nanos::get), remote, lock, registry);
+        StringRedisTemplate redis = new StringRedisTemplate(factory);
+        redis.afterPropertiesSet();
+        TieredCache cache = new TieredCache(NAME, new LocalCache(local, nanos::get), remote, lock,
+                new CacheInvalidationPublisher(redis), Long::valueOf, registry);
         return new Server(cache, registry, nanos, factory);
+    }
+
+    void listen(Server server) throws InterruptedException {
+        RedisMessageListenerContainer container = CacheConfig.invalidationListenerContainer(server.factory(), List.of(server.cache()));
+        container.afterPropertiesSet();
+        container.start();
+        containers.add(container);
+        awaitSubscribers(containers.size());
+    }
+
+    void awaitSubscribers(long expected) throws InterruptedException {
+        StringRedisTemplate redis = redis();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && subscribers(redis) < expected) {
+            Thread.sleep(20);
+        }
+        assertThat(subscribers(redis)).isGreaterThanOrEqualTo(expected);
+    }
+
+    @SuppressWarnings("unchecked")
+    private long subscribers(StringRedisTemplate redis) {
+        Long count = redis.execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+            var commands = (io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands<byte[], byte[]>) connection.getNativeConnection();
+            try {
+                return commands.pubsubNumsub(CacheInvalidationPublisher.CHANNEL.getBytes()).get(2, TimeUnit.SECONDS)
+                        .values().stream().mapToLong(Long::longValue).sum();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        return count == null ? 0 : count;
+    }
+
+    @SuppressWarnings("unchecked")
+    void killSubscriberConnections() {
+        redis().execute((org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+            var commands = (io.lettuce.core.cluster.api.async.RedisClusterAsyncCommands<byte[], byte[]>) connection.getNativeConnection();
+            try {
+                return commands.clientKill(io.lettuce.core.KillArgs.Builder.typePubsub()).get(2, TimeUnit.SECONDS);
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -88,6 +137,13 @@ class CacheTestServers implements AutoCloseable {
 
     @Override
     public void close() {
+        containers.forEach(container -> {
+            try {
+                container.stop();
+                container.destroy();
+            } catch (Exception ignored) {
+            }
+        });
         factories.forEach(LettuceConnectionFactory::destroy);
     }
 
