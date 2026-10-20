@@ -1,12 +1,15 @@
 package uhsuhjupjup.backend.common.cache;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.FunctionCounter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -27,10 +30,13 @@ public class TieredCache implements Cache {
     private final CacheInvalidationPublisher publisher;
     private final Function<String, Object> keyParser;
     private final ConcurrentMap<Object, CompletableFuture<Object>> loading = new ConcurrentHashMap<>();
+    private final CacheMetrics metrics;
     private final Counter localHits;
     private final Counter localMisses;
+    private final Counter localStored;
     private final Counter staleFillsSkipped;
-    private final Counter localInvalidations;
+    private final Counter leaders;
+    private final Counter followers;
     private final Map<RefreshOutcome, Counter> refreshes = new EnumMap<>(RefreshOutcome.class);
 
     public TieredCache(String name, LocalCache local, RedisCacheLayer remote, CacheLockSettings lockSettings,
@@ -42,13 +48,26 @@ public class TieredCache implements Cache {
         this.lockSettings = lockSettings;
         this.publisher = publisher;
         this.keyParser = keyParser;
-        this.localHits = counter(meterRegistry, "uhsuh.cache.local.gets", "hit");
-        this.localMisses = counter(meterRegistry, "uhsuh.cache.local.gets", "miss");
-        this.staleFillsSkipped = counter(meterRegistry, "uhsuh.cache.local.puts", "skipped-stale");
-        this.localInvalidations = counter(meterRegistry, "uhsuh.cache.local.invalidations", "key");
+        this.metrics = new CacheMetrics(name, meterRegistry);
+        this.localHits = metrics.counter("uhsuh.cache.local.gets", "result", "hit");
+        this.localMisses = metrics.counter("uhsuh.cache.local.gets", "result", "miss");
+        this.localStored = metrics.counter("uhsuh.cache.local.puts", "result", "stored");
+        this.staleFillsSkipped = metrics.counter("uhsuh.cache.local.puts", "result", "skipped-stale");
+        this.leaders = metrics.counter("uhsuh.cache.local.loads", "role", "leader");
+        this.followers = metrics.counter("uhsuh.cache.local.loads", "role", "follower");
         for (RefreshOutcome outcome : RefreshOutcome.values()) {
-            refreshes.put(outcome, counter(meterRegistry, "uhsuh.cache.refreshes", outcome.name().toLowerCase()));
+            refreshes.put(outcome, metrics.counter("uhsuh.cache.refreshes", "result", outcome.name().toLowerCase()));
         }
+        for (String reason : List.of("message", "redis_unavailable")) {
+            metrics.counter("uhsuh.cache.local.invalidations", "reason", reason);
+        }
+        for (String reason : List.of("resubscribe", "clear")) {
+            metrics.counter("uhsuh.cache.local.clears", "reason", reason);
+        }
+        publisher.register(name);
+        Gauge.builder("uhsuh.cache.local.size", local, LocalCache::size).tag("cache", name).register(meterRegistry);
+        FunctionCounter.builder("uhsuh.cache.local.evictions", local, LocalCache::evictionCount).tag("cache", name)
+                .register(meterRegistry);
     }
 
     @Override
@@ -91,8 +110,10 @@ public class TieredCache implements Cache {
         CompletableFuture<Object> mine = new CompletableFuture<>();
         CompletableFuture<Object> running = loading.putIfAbsent(key, mine);
         if (running != null) {
+            followers.increment();
             return (T) awaitLeader(key, valueLoader, running);
         }
+        leaders.increment();
         try {
             Object fromRemote = remote.lookup(key);
             T value = fromRemote != null ? (T) fromRemote : remote.loadAcrossServers(key, valueLoader);
@@ -126,6 +147,7 @@ public class TieredCache implements Cache {
     public void clear() {
         remote.clear();
         local.invalidateAll();
+        metrics.counter("uhsuh.cache.local.clears", "reason", "clear").increment();
     }
 
     public RefreshOutcome refresh(Object key, Callable<?> valueLoader) {
@@ -134,22 +156,27 @@ public class TieredCache implements Cache {
         if (outcome == RefreshOutcome.STORED) {
             publisher.publishInvalidation(name, key);
         } else if (outcome == RefreshOutcome.REDIS_UNAVAILABLE) {
-            invalidateLocal(key);
+            invalidateLocal(key, "redis_unavailable");
         }
         return outcome;
     }
 
     public void invalidateLocal(Object key) {
-        local.invalidate(key);
-        localInvalidations.increment();
+        invalidateLocal(key, "message");
     }
 
     public void invalidateLocal(String rawKey) {
-        invalidateLocal(keyParser.apply(rawKey));
+        invalidateLocal(keyParser.apply(rawKey), "message");
     }
 
     public void clearLocal() {
         local.invalidateAll();
+        metrics.counter("uhsuh.cache.local.clears", "reason", "resubscribe").increment();
+    }
+
+    private void invalidateLocal(Object key, String reason) {
+        local.invalidate(key);
+        metrics.counter("uhsuh.cache.local.invalidations", "reason", reason).increment();
     }
 
     public Object localValue(Object key) {
@@ -170,7 +197,12 @@ public class TieredCache implements Cache {
     }
 
     private void fillLocal(Object key, Object value, LocalCache.Stamp stamp) {
-        if (value != null && !local.putIfUnchanged(key, value, stamp)) {
+        if (value == null) {
+            return;
+        }
+        if (local.putIfUnchanged(key, value, stamp)) {
+            localStored.increment();
+        } else {
             staleFillsSkipped.increment();
             log.debug("조회 중 무효화가 있어 로컬 캐시에 담지 않았습니다 cache={} key={}", name, key);
         }
@@ -199,9 +231,5 @@ public class TieredCache implements Cache {
             throw new ValueRetrievalException(key, valueLoader,
                     new IllegalStateException("캐시 재생성 대기 시간 초과 cache=" + name + " key=" + key));
         }
-    }
-
-    private Counter counter(MeterRegistry registry, String meter, String result) {
-        return Counter.builder(meter).tag("cache", name).tag("result", result).register(registry);
     }
 }

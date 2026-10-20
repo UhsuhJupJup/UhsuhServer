@@ -136,6 +136,9 @@ management:
     distribution:
       slo:
         http.server.requests: 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
+        uhsuh.cache.redis.commands: 1ms, 2ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s
+        uhsuh.cache.loads: 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
+        uhsuh.cache.lock.wait: 1ms, 5ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 3s, 5s
       percentiles-histogram:
         http.server.requests: false
 

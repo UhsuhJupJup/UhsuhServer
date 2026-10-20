@@ -22,6 +22,7 @@ public class LocalCache {
                 .maximumSize(settings.maximumSize())
                 .expireAfter(new JitterExpiry(settings.ttl()))
                 .ticker(ticker)
+                .recordStats()
                 .build();
     }
 
@@ -94,6 +95,10 @@ public class LocalCache {
     public long size() {
         store.cleanUp();
         return store.estimatedSize();
+    }
+
+    public long evictionCount() {
+        return store.stats().evictionCount();
     }
 
     public record Stamp(long epoch, long generation) {
