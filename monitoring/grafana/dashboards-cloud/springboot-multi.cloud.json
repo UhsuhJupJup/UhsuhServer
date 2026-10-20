@@ -1808,7 +1808,7 @@
     },
     {
       "type": "row",
-      "title": "♻️ 캐시 (keywordArticles)",
+      "title": "♻️ 캐시 (keywordGraph L1)",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1821,8 +1821,8 @@
     },
     {
       "type": "stat",
-      "title": "캐시 히트율 %",
-      "description": "keyword→글 후보 캐시 적중률 hit/(hit+miss) (5분). 높을수록 좋음. 트래픽·워밍업에 따라 변동.",
+      "title": "L1 적중률 %",
+      "description": "키워드 그래프 L1 적중 / L1 조회(5분). 자세한 것은 '어서줍줍 키워드 그래프 캐시' 대시보드.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1836,8 +1836,9 @@
       "id": 301,
       "targets": [
         {
-          "expr": "100 * sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", result=\"hit\"}[5m])) / clamp_min(sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"}[5m])), 0.001)",
-          "refId": "A"
+          "refId": "A",
+          "expr": "100 * sum(rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[5m])) / clamp_min(sum(rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[5m])), 0.001)",
+          "legendFormat": ""
         }
       ],
       "options": {
@@ -1880,8 +1881,8 @@
     },
     {
       "type": "stat",
-      "title": "캐시 점유 (/ 2000)",
-      "description": "현재 캐시된 키워드 수 cache_size. 상한 2000(maximumSize) 근처면 축출 발생.",
+      "title": "L1 점유 (/ 1000)",
+      "description": "L1 에 들어 있는 키 수(인스턴스 합). 인스턴스마다 상한 1000.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1895,8 +1896,9 @@
       "id": 302,
       "targets": [
         {
-          "expr": "sum(cache_size{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"})",
-          "refId": "A"
+          "refId": "A",
+          "expr": "sum(uhsuh_cache_local_size{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"})",
+          "legendFormat": ""
         }
       ],
       "options": {
@@ -1937,8 +1939,8 @@
     },
     {
       "type": "timeseries",
-      "title": "캐시 히트 vs 미스 (rate)",
-      "description": "초당 캐시 조회를 hit/miss로 분리. miss 지속이면 캐시가 잘 안 채워짐(낮은 재사용·TTL 만료).",
+      "title": "L1 적중 vs 미스 (rate)",
+      "description": "초당 L1 적중과 미스. 미스는 대표 요청만 Redis 로 간다.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1952,13 +1954,13 @@
       "id": 303,
       "targets": [
         {
-          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", result=\"hit\"}[1m]))",
           "refId": "A",
+          "expr": "sum(rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[1m]))",
           "legendFormat": "hit"
         },
         {
-          "expr": "sum(rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\", result=\"miss\"}[1m]))",
           "refId": "B",
+          "expr": "sum(rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"miss\"}[1m]))",
           "legendFormat": "miss"
         }
       ],
@@ -2023,8 +2025,8 @@
     },
     {
       "type": "timeseries",
-      "title": "캐시 축출 (rate)",
-      "description": "초당 축출 건수 cache_evictions_total. 꾸준히 높으면 maximumSize 상향 검토.",
+      "title": "L1 축출 (rate)",
+      "description": "크기 초과나 TTL 만료로 L1 에서 빠진 초당 키 수(무효화 메시지로 지운 것은 빠짐).",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -2038,8 +2040,8 @@
       "id": 304,
       "targets": [
         {
-          "expr": "sum(rate(cache_evictions_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordArticles\"}[5m]))",
           "refId": "A",
+          "expr": "sum(rate(uhsuh_cache_local_evictions_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[5m]))",
           "legendFormat": "evictions"
         }
       ],
@@ -2073,7 +2075,7 @@
     {
       "id": 900,
       "type": "row",
-      "title": "캐시 (Caffeine)",
+      "title": "캐시 (Redis L2 조회, cache별)",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -2086,7 +2088,7 @@
     {
       "id": 901,
       "type": "timeseries",
-      "title": "캐시 히트율 (cache별)",
+      "title": "Redis(L2) 적중률 (cache별)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -2146,12 +2148,13 @@
           "expr": "sum by (cache) (rate(cache_gets_total{result=\"hit\", instance=~\"$instance\"}[5m])) / clamp_min(sum by (cache) (rate(cache_gets_total{instance=~\"$instance\"}[5m])), 0.001)",
           "legendFormat": "{{cache}}"
         }
-      ]
+      ],
+      "description": "cache_gets 는 L1 미스 뒤 Redis 조회만 센다(L1 적중은 들어가지 않는다)."
     },
     {
       "id": 902,
       "type": "timeseries",
-      "title": "캐시 조회 (hit/miss, req/s)",
+      "title": "Redis(L2) 조회 (hit/miss, req/s)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -2193,12 +2196,13 @@
           "expr": "sum by (cache, result) (rate(cache_gets_total{instance=~\"$instance\"}[5m]))",
           "legendFormat": "{{cache}} · {{result}}"
         }
-      ]
+      ],
+      "description": "cache_gets 는 L1 미스 뒤 Redis 조회만 센다."
     },
     {
       "id": 903,
       "type": "timeseries",
-      "title": "캐시 엔트리 수 (cache별)",
+      "title": "L1 엔트리 수 (cache별)",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -2220,15 +2224,16 @@
       },
       "targets": [
         {
-          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (cache) (cache_size{instance=~\"$instance\"})",
+          "refId": "A",
+          "expr": "sum by (cache) (uhsuh_cache_local_size{instance=~\"$instance\"})",
           "legendFormat": "{{cache}}"
         }
-      ]
+      ],
+      "description": "L1 에 들어 있는 키 수."
     }
   ],
   "refresh": "30s",
