@@ -29,6 +29,14 @@ public final class LlmClients {
         return withLimits(builder, limits).build();
     }
 
+    public static Optional<String> anthropicApiKey() {
+        return strippedApiKeyFromEnv(ANTHROPIC_API_KEY_PROPERTY, ANTHROPIC_API_KEY_ENV);
+    }
+
+    public static Optional<String> openAiApiKey() {
+        return strippedApiKeyFromEnv(OPENAI_API_KEY_PROPERTY, OPENAI_API_KEY_ENV);
+    }
+
     private static Optional<String> strippedApiKeyFromEnv(String systemProperty, String environmentVariable) {
         return Optional.ofNullable(System.getProperty(systemProperty))
                 .or(() -> Optional.ofNullable(System.getenv(environmentVariable)))
