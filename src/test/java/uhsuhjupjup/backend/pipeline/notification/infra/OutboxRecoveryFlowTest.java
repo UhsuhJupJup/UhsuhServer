@@ -80,7 +80,7 @@ class OutboxRecoveryFlowTest {
         redisTemplate.delete(OutboxStream.KEY);
         emailSender.sent().clear();
         consumer = new RedisStreamOutboxConsumer(connectionFactory, redisTemplate, handler, "server-a",
-                Duration.ofMillis(200), 5);
+                Duration.ofMillis(200), 5, Duration.ofMinutes(5), 10);
         consumer.start();
     }
 
