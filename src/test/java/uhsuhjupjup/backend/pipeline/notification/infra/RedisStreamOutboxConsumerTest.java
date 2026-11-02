@@ -105,19 +105,80 @@ class RedisStreamOutboxConsumerTest {
         assertThat(pendingCount()).isZero();
     }
 
-    private OutboxMessageHandler recordingHandler(OutboxMessageOutcome outcome) {
+    @Test
+    void 한_서버가_ACK_없이_멈춘_메시지를_기준_시간이_지나면_다른_서버가_가져가_처리한다() throws InterruptedException {
+        serverA = consumer("server-a", recordingHandler(OutboxMessageOutcome.KEEP));
+        serverA.start();
+        new RedisStreamOutboxMessageQueue(redisTemplate).publish(7L);
+        awaitUntil(() -> pendingCount() == 1);
+        serverA.stop();
+        Map<Long, AtomicInteger> handledByB = new ConcurrentHashMap<>();
+        RedisStreamOutboxConsumer reclaimer = new RedisStreamOutboxConsumer(connectionFactory, redisTemplate,
+                countingHandler(handledByB, OutboxMessageOutcome.DONE), "server-b",
+                Duration.ofMillis(200), 5, Duration.ofMillis(300), 10);
+        Thread.sleep(400);
+
+        int reclaimed = reclaimer.reclaim();
+
+        assertThat(reclaimed).isEqualTo(1);
+        assertThat(handledByB).containsOnlyKeys(7L);
+        assertThat(pendingCount()).isZero();
+        assertThat(streamLength()).isZero();
+    }
+
+    @Test
+    void 기준_시간이_지나지_않은_메시지는_가져가지_않는다() {
+        serverA = consumer("server-a", recordingHandler(OutboxMessageOutcome.KEEP));
+        serverA.start();
+        new RedisStreamOutboxMessageQueue(redisTemplate).publish(7L);
+        awaitUntil(() -> pendingCount() == 1);
+        Map<Long, AtomicInteger> handledByB = new ConcurrentHashMap<>();
+        RedisStreamOutboxConsumer reclaimer = new RedisStreamOutboxConsumer(connectionFactory, redisTemplate,
+                countingHandler(handledByB, OutboxMessageOutcome.DONE), "server-b",
+                Duration.ofMillis(200), 5, Duration.ofMinutes(1), 10);
+
+        assertThat(reclaimer.reclaim()).isZero();
+        assertThat(handledByB).isEmpty();
+        assertThat(pendingCount()).isEqualTo(1);
+    }
+
+    @Test
+    void 재전달_상한을_넘은_메시지는_처리하지_않고_정리한다() throws InterruptedException {
+        serverA = consumer("server-a", recordingHandler(OutboxMessageOutcome.KEEP));
+        serverA.start();
+        new RedisStreamOutboxMessageQueue(redisTemplate).publish(7L);
+        awaitUntil(() -> pendingCount() == 1);
+        serverA.stop();
+        Map<Long, AtomicInteger> handledByB = new ConcurrentHashMap<>();
+        RedisStreamOutboxConsumer reclaimer = new RedisStreamOutboxConsumer(connectionFactory, redisTemplate,
+                countingHandler(handledByB, OutboxMessageOutcome.DONE), "server-b",
+                Duration.ofMillis(200), 5, Duration.ofMillis(300), 1);
+        Thread.sleep(400);
+
+        reclaimer.reclaim();
+
+        assertThat(handledByB).isEmpty();
+        assertThat(pendingCount()).isZero();
+        assertThat(streamLength()).isZero();
+    }
+
+    private OutboxMessageHandler countingHandler(Map<Long, AtomicInteger> counts, OutboxMessageOutcome outcome) {
         OutboxMessageHandler handler = mock(OutboxMessageHandler.class);
         given(handler.handle(anyLong())).willAnswer(invocation -> {
             Long id = invocation.getArgument(0);
-            handled.computeIfAbsent(id, key -> new AtomicInteger()).incrementAndGet();
+            counts.computeIfAbsent(id, key -> new AtomicInteger()).incrementAndGet();
             return outcome;
         });
         return handler;
     }
 
+    private OutboxMessageHandler recordingHandler(OutboxMessageOutcome outcome) {
+        return countingHandler(handled, outcome);
+    }
+
     private RedisStreamOutboxConsumer consumer(String name, OutboxMessageHandler handler) {
         return new RedisStreamOutboxConsumer(connectionFactory, redisTemplate, handler, name,
-                Duration.ofMillis(200), 5);
+                Duration.ofMillis(200), 5, Duration.ofMinutes(5), 10);
     }
 
     private long streamLength() {
