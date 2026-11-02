@@ -21,6 +21,10 @@ public class OutboxMetrics {
                         repository -> repository.countByStatus(OutboxStatus.PENDING))
                 .description("발송 대기 중인 아웃박스 행 수")
                 .register(meterRegistry);
+        Gauge.builder("notification.outbox.processing", notificationOutboxRepository,
+                        repository -> repository.countByStatus(OutboxStatus.PROCESSING))
+                .description("서버가 선점해 발송 중인 아웃박스 행 수")
+                .register(meterRegistry);
         Gauge.builder("notification.outbox.failed", notificationOutboxRepository,
                         repository -> repository.countByStatus(OutboxStatus.FAILED))
                 .description("최대 재시도 초과로 격리(dead-letter)된 아웃박스 행 수")

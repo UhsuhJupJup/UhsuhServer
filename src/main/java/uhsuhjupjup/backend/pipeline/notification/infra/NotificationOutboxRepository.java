@@ -2,6 +2,7 @@ package uhsuhjupjup.backend.pipeline.notification.infra;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
@@ -32,10 +33,38 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
             + " order by logDate desc", nativeQuery = true)
     List<NotificationOutboxDailyRow> findDailySentSummary();
 
-    @Query("select o from NotificationOutbox o"
-            + " where o.status = :status and o.nextAttemptAt <= :now"
-            + " order by o.nextAttemptAt asc")
-    List<NotificationOutbox> findDue(@Param("status") OutboxStatus status,
-                                     @Param("now") LocalDateTime now,
-                                     Pageable pageable);
+    @Query(value = "select id from notification_outbox"
+            + " where status = :status and next_attempt_at <= :now"
+            + " order by next_attempt_at asc"
+            + " limit :limit"
+            + " for update skip locked", nativeQuery = true)
+    List<Long> lockDueIds(@Param("status") String status,
+                          @Param("now") LocalDateTime now,
+                          @Param("limit") int limit);
+
+    @Query("select o.id from NotificationOutbox o where o.id in :ids and o.attempts >= :maxAttempts")
+    List<Long> findIdsReachedAttempts(@Param("ids") List<Long> ids, @Param("maxAttempts") int maxAttempts);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update NotificationOutbox o"
+            + " set o.status = :status, o.attempts = o.attempts + 1, o.nextAttemptAt = :leaseUntil"
+            + " where o.id in :ids")
+    int claimAll(@Param("ids") List<Long> ids,
+                 @Param("status") OutboxStatus status,
+                 @Param("leaseUntil") LocalDateTime leaseUntil);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update NotificationOutbox o set o.status = :status, o.lastError = :error where o.id in :ids")
+    int failAll(@Param("ids") List<Long> ids,
+                @Param("status") OutboxStatus status,
+                @Param("error") String error);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update NotificationOutbox o"
+            + " set o.status = :to, o.attempts = o.attempts - 1, o.nextAttemptAt = :now"
+            + " where o.id in :ids and o.status = :from")
+    int releaseAll(@Param("ids") List<Long> ids,
+                   @Param("from") OutboxStatus from,
+                   @Param("to") OutboxStatus to,
+                   @Param("now") LocalDateTime now);
 }

@@ -92,15 +92,18 @@ public class NotificationOutbox {
     }
 
     public void markRetry(String error, LocalDateTime nextAttemptAt) {
-        this.attempts++;
+        this.status = OutboxStatus.PENDING;
         this.lastError = truncate(error);
         this.nextAttemptAt = nextAttemptAt;
     }
 
     public void markFailed(String error) {
-        this.attempts++;
         this.lastError = truncate(error);
         this.status = OutboxStatus.FAILED;
+    }
+
+    public boolean isProcessing() {
+        return this.status == OutboxStatus.PROCESSING;
     }
 
     public void requeue(LocalDateTime at) {
