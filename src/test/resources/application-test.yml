@@ -9,3 +9,7 @@ firebase:
 cache:
   invalidation:
     listener-enabled: false
+
+outbox:
+  stream:
+    enabled: false
