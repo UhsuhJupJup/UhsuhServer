@@ -41,9 +41,13 @@ class OutboxMessageHandlerTest {
     @Autowired
     private FakeEmailSender emailSender;
 
+    @Autowired
+    private FakeOutboxSendLock sendLock;
+
     @BeforeEach
     void setUp() {
         emailSender.sent().clear();
+        sendLock.clear();
     }
 
     @AfterEach
@@ -118,6 +122,28 @@ class OutboxMessageHandlerTest {
     }
 
     @Test
+    void 다른_서버가_같은_아웃박스의_락을_잡고_있으면_보내지_않고_메시지를_남겨_둔다() {
+        Long id = save("a@example.com");
+        sendLock.holdByOtherServer(id);
+
+        OutboxMessageOutcome outcome = handler.handle(id);
+
+        assertThat(outcome).isEqualTo(OutboxMessageOutcome.KEEP);
+        assertThat(emailSender.sent()).isEmpty();
+        assertThat(notificationOutboxRepository.findById(id).orElseThrow().getStatus())
+                .isEqualTo(OutboxStatus.PENDING);
+    }
+
+    @Test
+    void 발송을_마치면_락을_푼다() {
+        Long id = save("a@example.com");
+
+        handler.handle(id);
+
+        assertThat(sendLock.isHeld(id)).isFalse();
+    }
+
+    @Test
     void 아웃박스_행이_없으면_메시지를_정리한다() {
         assertThat(handler.handle(999_999L)).isEqualTo(OutboxMessageOutcome.DONE);
         assertThat(emailSender.sent()).isEmpty();
@@ -151,6 +177,11 @@ class OutboxMessageHandlerTest {
         @Bean
         FakeEmailSender fakeEmailSender() {
             return new FakeEmailSender();
+        }
+
+        @Bean
+        FakeOutboxSendLock fakeOutboxSendLock() {
+            return new FakeOutboxSendLock();
         }
     }
 }
