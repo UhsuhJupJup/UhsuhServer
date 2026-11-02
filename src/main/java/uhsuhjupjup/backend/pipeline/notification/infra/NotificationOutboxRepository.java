@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
 import uhsuhjupjup.backend.pipeline.notification.domain.OutboxStatus;
 
@@ -98,4 +99,12 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
                    @Param("from") OutboxStatus from,
                    @Param("to") OutboxStatus to,
                    @Param("now") LocalDateTime now);
+
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "delete from notification_outbox"
+            + " where status = 'SENT' and sent_at < :before"
+            + " order by sent_at asc"
+            + " limit :limit", nativeQuery = true)
+    int deleteSentBefore(@Param("before") LocalDateTime before, @Param("limit") int limit);
 }
