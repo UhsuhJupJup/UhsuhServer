@@ -54,6 +54,19 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
                  @Param("leaseUntil") LocalDateTime leaseUntil);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update NotificationOutbox o"
+            + " set o.status = :processing, o.attempts = o.attempts + 1, o.nextAttemptAt = :leaseUntil"
+            + " where o.id = :id and ("
+            + " (o.status = :pending and (o.attempts = 0 or o.nextAttemptAt <= :now))"
+            + " or (o.status = :processing and o.nextAttemptAt <= :now and o.attempts < :maxAttempts))")
+    int claimOne(@Param("id") Long id,
+                 @Param("pending") OutboxStatus pending,
+                 @Param("processing") OutboxStatus processing,
+                 @Param("now") LocalDateTime now,
+                 @Param("leaseUntil") LocalDateTime leaseUntil,
+                 @Param("maxAttempts") int maxAttempts);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update NotificationOutbox o set o.status = :status, o.lastError = :error where o.id in :ids")
     int failAll(@Param("ids") List<Long> ids,
                 @Param("status") OutboxStatus status,
