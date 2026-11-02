@@ -73,6 +73,8 @@ resilience4j:
         wait-duration-in-open-state: 30s                         # OPEN 후 30초간 Claude 건너뛰고 GPT 폴백, 죽은 API 반복 호출 차단
         permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
         automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - io.github.resilience4j.bulkhead.BulkheadFullException
       keywordClassifierGpt:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 20                                  # GPT 폴백 경로의 실패율 판정
@@ -81,6 +83,13 @@ resilience4j:
         wait-duration-in-open-state: 30s                         # OPEN 후 30초간 GPT 건너뛰기, Claude, GPT 모두 OPEN이면 분류 예외
         permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
         automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+  bulkhead:
+    instances:
+      noteKeywordAnalysis:
+        max-concurrent-calls: ${NOTE_AI_MAX_CONCURRENT_CALLS:20}
+        max-wait-duration: 0
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
