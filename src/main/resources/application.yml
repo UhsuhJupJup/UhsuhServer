@@ -95,7 +95,7 @@ resilience4j:
 
 note:
   recommendation:
-    timeout: ${NOTE_RECOMMENDATION_TIMEOUT:PT30S}
+    timeout: ${NOTE_RECOMMENDATION_TIMEOUT:PT15S}
   async:
     db-threads: ${NOTE_ASYNC_DB_THREADS:8}
     db-queue: ${NOTE_ASYNC_DB_QUEUE:200}
