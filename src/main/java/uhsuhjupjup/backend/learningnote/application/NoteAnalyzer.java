@@ -3,13 +3,19 @@ package uhsuhjupjup.backend.learningnote.application;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.reactor.bulkhead.operator.BulkheadOperator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import uhsuhjupjup.backend.config.NoteAsyncConfig;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
+import uhsuhjupjup.backend.pipeline.matching.application.AsyncKeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
@@ -31,22 +37,48 @@ public class NoteAnalyzer {
     private final KeywordRepository keywordRepository;
     private final KeywordAliasRepository keywordAliasRepository;
     private final KeywordClassifier keywordClassifier;
+    private final AsyncKeywordClassifier asyncKeywordClassifier;
     private final KeywordMatcher keywordMatcher;
     private final NoteKeywordSaver noteKeywordSaver;
     private final Bulkhead aiBulkhead;
+    private final Scheduler noteDbScheduler;
 
     public NoteAnalyzer(KeywordRepository keywordRepository,
                         KeywordAliasRepository keywordAliasRepository,
                         KeywordClassifier keywordClassifier,
+                        AsyncKeywordClassifier asyncKeywordClassifier,
                         KeywordMatcher keywordMatcher,
                         NoteKeywordSaver noteKeywordSaver,
-                        BulkheadRegistry bulkheadRegistry) {
+                        BulkheadRegistry bulkheadRegistry,
+                        @Qualifier(NoteAsyncConfig.NOTE_DB_SCHEDULER) Scheduler noteDbScheduler) {
         this.keywordRepository = keywordRepository;
         this.keywordAliasRepository = keywordAliasRepository;
         this.keywordClassifier = keywordClassifier;
+        this.asyncKeywordClassifier = asyncKeywordClassifier;
         this.keywordMatcher = keywordMatcher;
         this.noteKeywordSaver = noteKeywordSaver;
         this.aiBulkhead = bulkheadRegistry.bulkhead(AI_BULKHEAD);
+        this.noteDbScheduler = noteDbScheduler;
+    }
+
+    public Mono<NoteAnalysis> analyzeAsync(LearningNote note) {
+        List<Keyword> keywords = keywordRepository.findAll();
+        MatchCatalog catalog = MatchCatalog.from(keywords, keywordAliasRepository.findAll());
+        return Mono.defer(() -> asyncKeywordClassifier.classify(note.getTitle(), note.getContent(), catalog))
+                .transformDeferred(BulkheadOperator.of(aiBulkhead))
+                .publishOn(noteDbScheduler)
+                .map(matches -> {
+                    noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
+                    return NoteAnalysis.saved();
+                })
+                .onErrorResume(BulkheadFullException.class, e -> {
+                    log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
+                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
+                })
+                .onErrorResume(KeywordClassificationException.class, e -> {
+                    log.warn("노트 AI 분석 실패, 문자열 기반 추출로 폴백 noteId={} 사유={}", note.getId(), e.toString());
+                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
+                });
     }
 
     public NoteAnalysis analyze(LearningNote note) {
