@@ -13,6 +13,9 @@ import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.member.domain.Member;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import uhsuhjupjup.backend.pipeline.matching.application.AsyncKeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
@@ -41,6 +44,8 @@ class NoteAnalyzerTest {
     @Mock
     private KeywordClassifier keywordClassifier;
     @Mock
+    private AsyncKeywordClassifier asyncKeywordClassifier;
+    @Mock
     private KeywordMatcher keywordMatcher;
     @Mock
     private NoteKeywordSaver noteKeywordSaver;
@@ -50,8 +55,9 @@ class NoteAnalyzerTest {
 
     @BeforeEach
     void setUp() {
-        noteAnalyzer = new NoteAnalyzer(keywordRepository, keywordAliasRepository, keywordClassifier, keywordMatcher,
-                noteKeywordSaver, BulkheadRegistry.ofDefaults());
+        noteAnalyzer = new NoteAnalyzer(keywordRepository, keywordAliasRepository, keywordClassifier,
+                asyncKeywordClassifier, keywordMatcher, noteKeywordSaver, BulkheadRegistry.ofDefaults(),
+                Schedulers.immediate());
         note = LearningNote.create(Member.create("github", "uid", "e@e.com"), "Redis 캐싱", "TTL 정리");
         ReflectionTestUtils.setField(note, "id", 1L);
         given(keywordAliasRepository.findAll()).willReturn(List.of());
@@ -87,6 +93,35 @@ class NoteAnalyzerTest {
         assertThat(analysis.fallback()).isTrue();
         assertThat(analysis.keywordIds()).containsExactly(10L, 20L);
         assertThat(analysis.keywordNames()).containsExactly("Redis", "TTL");
+        verifyNoInteractions(noteKeywordSaver);
+    }
+
+    @Test
+    void 비동기로_분류하고_저장에_위임한다() {
+        List<KeywordMatch> matches = List.of(new KeywordMatch(10L, "ai"));
+        given(keywordRepository.findAll()).willReturn(List.of());
+        given(asyncKeywordClassifier.classify(eq("Redis 캐싱"), eq("TTL 정리"), any(MatchCatalog.class)))
+                .willReturn(Mono.just(matches));
+
+        NoteAnalysis analysis = noteAnalyzer.analyzeAsync(note).block();
+
+        assertThat(analysis.fallback()).isFalse();
+        verify(noteKeywordSaver).replaceKeywords(eq(1L), eq(matches), any(LocalDateTime.class));
+    }
+
+    @Test
+    void 비동기_분류가_모두_실패하면_문자열로_폴백하고_저장하지_않는다() {
+        Keyword redis = keyword(10L, "Redis");
+        given(keywordRepository.findAll()).willReturn(List.of(redis));
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.error(new KeywordClassificationException("모두 실패", new RuntimeException())));
+        given(keywordMatcher.match(anyString(), any(MatchCatalog.class)))
+                .willReturn(List.of(new KeywordMatch(10L, "title")));
+
+        NoteAnalysis analysis = noteAnalyzer.analyzeAsync(note).block();
+
+        assertThat(analysis.fallback()).isTrue();
+        assertThat(analysis.keywordNames()).containsExactly("Redis");
         verifyNoInteractions(noteKeywordSaver);
     }
 

@@ -1,13 +1,16 @@
 package uhsuhjupjup.backend.learningnote.application;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import uhsuhjupjup.backend.article.application.KeywordArticleQueryService;
 import uhsuhjupjup.backend.article.application.dto.KeywordNeighbor;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
+import uhsuhjupjup.backend.config.NoteAsyncConfig;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
 import uhsuhjupjup.backend.learningnote.application.dto.RecommendedArticleResult;
@@ -24,7 +27,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class NoteRecommendationService {
 
     private static final int MAX_RECOMMENDATIONS = 5;
@@ -38,6 +40,35 @@ public class NoteRecommendationService {
     private final ArticleKeywordRepository articleKeywordRepository;
     private final ArticleRepository articleRepository;
     private final KeywordArticleQueryService keywordArticleQueryService;
+    private final Scheduler noteDbScheduler;
+
+    public NoteRecommendationService(NoteService noteService,
+                                     NoteAnalyzer noteAnalyzer,
+                                     NoteKeywordRepository noteKeywordRepository,
+                                     ArticleKeywordRepository articleKeywordRepository,
+                                     ArticleRepository articleRepository,
+                                     KeywordArticleQueryService keywordArticleQueryService,
+                                     @Qualifier(NoteAsyncConfig.NOTE_DB_SCHEDULER) Scheduler noteDbScheduler) {
+        this.noteService = noteService;
+        this.noteAnalyzer = noteAnalyzer;
+        this.noteKeywordRepository = noteKeywordRepository;
+        this.articleKeywordRepository = articleKeywordRepository;
+        this.articleRepository = articleRepository;
+        this.keywordArticleQueryService = keywordArticleQueryService;
+        this.noteDbScheduler = noteDbScheduler;
+    }
+
+    public Mono<NoteRecommendationResult> recommendAsync(Long noteId, Long memberId) {
+        LearningNote note = noteService.get(noteId, memberId);
+        if (note.getAnalyzedAt() != null) {
+            return Mono.fromCallable(() -> recommendSaved(noteId)).subscribeOn(noteDbScheduler);
+        }
+        return noteAnalyzer.analyzeAsync(note)
+                .publishOn(noteDbScheduler)
+                .map(analysis -> analysis.fallback()
+                        ? recommendFor(analysis.keywordNames(), analysis.keywordIds())
+                        : recommendSaved(noteId));
+    }
 
     public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
@@ -47,6 +78,10 @@ public class NoteRecommendationService {
                 return recommendFor(analysis.keywordNames(), analysis.keywordIds());
             }
         }
+        return recommendSaved(noteId);
+    }
+
+    private NoteRecommendationResult recommendSaved(Long noteId) {
         return recommendFor(noteKeywordRepository.findKeywordNamesByNoteId(noteId),
                 noteKeywordRepository.findKeywordIdsByNoteId(noteId));
     }

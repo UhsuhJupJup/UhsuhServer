@@ -45,6 +45,7 @@ firebase:
 claude:
   enabled: ${CLAUDE_ENABLED:false}
   model: ${CLAUDE_MODEL:claude-haiku-4-5}
+  base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com}
   timeout:
     connect: ${CLAUDE_TIMEOUT_CONNECT:PT5S}   # 연결 수립 상한
     call: ${CLAUDE_TIMEOUT_CALL:PT10S}        # 요청 1건 전체(읽기 포함) 상한, 노트추천 요청 스레드가 오래 붙잡히지 않게
@@ -55,6 +56,7 @@ claude:
 gpt:
   enabled: ${GPT_ENABLED:false}               # Claude 실패/서킷 OPEN 시 폴백, 키 없으면 false 유지
   model: ${GPT_MODEL:gpt-4o-mini}             # OpenAI 모델, 더 최신 mini급으로 환경변수(GPT_MODEL)로 교체
+  base-url: ${GPT_BASE_URL:https://api.openai.com}
   timeout:
     connect: ${GPT_TIMEOUT_CONNECT:PT5S}      # 연결 수립 상한
     call: ${GPT_TIMEOUT_CALL:PT10S}           # 요청 1건 전체(읽기 포함) 상한
@@ -90,6 +92,13 @@ resilience4j:
       noteKeywordAnalysis:
         max-concurrent-calls: ${NOTE_AI_MAX_CONCURRENT_CALLS:20}
         max-wait-duration: 0
+
+note:
+  recommendation:
+    timeout: ${NOTE_RECOMMENDATION_TIMEOUT:PT30S}
+  async:
+    db-threads: ${NOTE_ASYNC_DB_THREADS:8}
+    db-queue: ${NOTE_ASYNC_DB_QUEUE:200}
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
