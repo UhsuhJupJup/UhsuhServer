@@ -4,6 +4,7 @@ import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import jakarta.servlet.AsyncListener;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockAsyncContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -43,6 +45,7 @@ import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -223,6 +226,29 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.keywords[0]").value("Redis"))
                 .andExpect(jsonPath("$.articles.length()").value(2));
+    }
+
+    @Test
+    void 추천_요청_시간이_끝나면_AI_호출을_취소하고_문자열_기반으로_응답한다() throws Exception {
+        AtomicBoolean cancelled = new AtomicBoolean();
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.<List<KeywordMatch>>never().doOnCancel(() -> cancelled.set(true)));
+
+        MvcResult started = mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+        MockAsyncContext asyncContext = (MockAsyncContext) started.getRequest().getAsyncContext();
+        for (AsyncListener listener : asyncContext.getListeners()) {
+            listener.onTimeout(null);
+        }
+
+        mockMvc.perform(asyncDispatch(started))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
+                .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()));
+        assertThat(cancelled).isTrue();
+        assertThat(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getBulkheadConfig().getMaxConcurrentCalls());
     }
 
     @Test
