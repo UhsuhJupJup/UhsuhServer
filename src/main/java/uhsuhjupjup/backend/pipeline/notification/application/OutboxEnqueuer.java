@@ -1,6 +1,8 @@
 package uhsuhjupjup.backend.pipeline.notification.application;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,6 +10,7 @@ import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
 import uhsuhjupjup.backend.pipeline.notification.domain.RecipientType;
 import uhsuhjupjup.backend.pipeline.notification.infra.NotificationOutboxRepository;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -18,6 +21,10 @@ public class OutboxEnqueuer {
     private final NotificationOutboxRepository notificationOutboxRepository;
     private final NotificationSaver notificationSaver;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<OutboxMessageQueue> outboxMessageQueue;
+
+    @Value("${outbox.republish-delay:PT10M}")
+    private Duration republishDelay;
 
     @Transactional
     public int enqueueForMember(String email, int articleCount, String subject, String html,
@@ -38,6 +45,9 @@ public class OutboxEnqueuer {
     }
 
     private void save(NotificationOutbox outbox) {
+        if (outboxMessageQueue.getIfAvailable() != null) {
+            outbox.deferRepublish(outbox.getNextAttemptAt().plus(republishDelay));
+        }
         NotificationOutbox saved = notificationOutboxRepository.save(outbox);
         eventPublisher.publishEvent(new OutboxCreatedEvent(saved.getId()));
     }

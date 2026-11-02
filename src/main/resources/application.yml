@@ -104,6 +104,9 @@ outbox:
   poll-initial-delay-ms: ${OUTBOX_POLL_INITIAL_DELAY_MS:60000}
   batch-size: ${OUTBOX_BATCH_SIZE:5000}
   claim-lease: ${OUTBOX_CLAIM_LEASE:PT1H}
+  message-claim-lease: ${OUTBOX_MESSAGE_CLAIM_LEASE:PT10M}
+  republish-delay: ${OUTBOX_REPUBLISH_DELAY:PT10M}
+  recovery-lock-at-most-for: ${OUTBOX_RECOVERY_LOCK_AT_MOST_FOR:PT5M}
   max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
   retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}

@@ -42,6 +42,24 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
                           @Param("now") LocalDateTime now,
                           @Param("limit") int limit);
 
+    @Query(value = "select id from notification_outbox"
+            + " where status = 'PENDING' and republish_at <= :now"
+            + " order by republish_at asc"
+            + " limit :limit"
+            + " for update skip locked", nativeQuery = true)
+    List<Long> lockRepublishablePendingIds(@Param("now") LocalDateTime now, @Param("limit") int limit);
+
+    @Query(value = "select id from notification_outbox"
+            + " where status = 'PROCESSING' and next_attempt_at <= :now and republish_at <= :now"
+            + " order by next_attempt_at asc"
+            + " limit :limit"
+            + " for update skip locked", nativeQuery = true)
+    List<Long> lockExpiredProcessingIds(@Param("now") LocalDateTime now, @Param("limit") int limit);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update NotificationOutbox o set o.republishAt = :at where o.id in :ids")
+    int deferRepublishAll(@Param("ids") List<Long> ids, @Param("at") LocalDateTime at);
+
     @Query("select o.id from NotificationOutbox o where o.id in :ids and o.attempts >= :maxAttempts")
     List<Long> findIdsReachedAttempts(@Param("ids") List<Long> ids, @Param("maxAttempts") int maxAttempts);
 
@@ -74,7 +92,7 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update NotificationOutbox o"
-            + " set o.status = :to, o.attempts = o.attempts - 1, o.nextAttemptAt = :now"
+            + " set o.status = :to, o.attempts = o.attempts - 1, o.nextAttemptAt = :now, o.republishAt = :now"
             + " where o.id in :ids and o.status = :from")
     int releaseAll(@Param("ids") List<Long> ids,
                    @Param("from") OutboxStatus from,
