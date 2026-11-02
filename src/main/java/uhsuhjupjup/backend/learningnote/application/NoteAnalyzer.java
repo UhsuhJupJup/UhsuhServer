@@ -98,6 +98,11 @@ public class NoteAnalyzer {
         }
     }
 
+    public NoteAnalysis analyzeWithoutAi(LearningNote note) {
+        List<Keyword> keywords = keywordRepository.findAll();
+        return fallback(note, keywords, MatchCatalog.from(keywords, keywordAliasRepository.findAll()));
+    }
+
     private NoteAnalysis fallback(LearningNote note, List<Keyword> keywords, MatchCatalog catalog) {
         Map<Long, String> nameById = keywords.stream()
                 .collect(Collectors.toMap(Keyword::getId, Keyword::getName, (first, second) -> first));

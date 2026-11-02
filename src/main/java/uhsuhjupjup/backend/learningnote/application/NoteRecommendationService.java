@@ -70,6 +70,15 @@ public class NoteRecommendationService {
                         : recommendSaved(noteId));
     }
 
+    public NoteRecommendationResult recommendWithoutAi(Long noteId, Long memberId) {
+        LearningNote note = noteService.get(noteId, memberId);
+        if (note.getAnalyzedAt() != null) {
+            return recommendSaved(noteId);
+        }
+        NoteAnalysis analysis = noteAnalyzer.analyzeWithoutAi(note);
+        return recommendFor(analysis.keywordNames(), analysis.keywordIds());
+    }
+
     public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
         if (note.getAnalyzedAt() == null) {

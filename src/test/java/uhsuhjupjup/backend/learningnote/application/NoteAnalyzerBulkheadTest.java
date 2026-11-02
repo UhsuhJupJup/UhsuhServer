@@ -109,6 +109,20 @@ class NoteAnalyzerBulkheadTest {
                 .isEqualTo(1);
     }
 
+    @Test
+    void 비동기_호출을_취소하면_허가를_돌려준다() {
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.never());
+        var call = noteAnalyzer.analyzeAsync(note(1L)).subscribe();
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isZero();
+
+        call.dispose();
+
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(1);
+    }
+
     private static LearningNote note(Long id) {
         LearningNote note = LearningNote.create(Member.create("github", "uid", "e@e.com"), "제목", "본문");
         ReflectionTestUtils.setField(note, "id", id);

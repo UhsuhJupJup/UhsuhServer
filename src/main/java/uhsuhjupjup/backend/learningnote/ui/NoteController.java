@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.learningnote.ui;
 
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.async.DeferredResult;
+import reactor.core.Disposable;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.learningnote.application.NoteGraphService;
 import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
@@ -26,6 +28,7 @@ import uhsuhjupjup.backend.member.domain.Member;
 import java.time.Duration;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/notes")
 public class NoteController implements NoteControllerApi {
@@ -38,7 +41,7 @@ public class NoteController implements NoteControllerApi {
     public NoteController(NoteService noteService,
                           NoteRecommendationService noteRecommendationService,
                           NoteGraphService noteGraphService,
-                          @Value("${note.recommendation.timeout:PT30S}") Duration recommendationTimeout) {
+                          @Value("${note.recommendation.timeout:PT15S}") Duration recommendationTimeout) {
         this.noteService = noteService;
         this.noteRecommendationService = noteRecommendationService;
         this.noteGraphService = noteGraphService;
@@ -85,9 +88,16 @@ public class NoteController implements NoteControllerApi {
     public DeferredResult<NoteRecommendationResponse> recommendations(@LoginMember Member member,
                                                                       @PathVariable Long id) {
         DeferredResult<NoteRecommendationResponse> result = new DeferredResult<>(recommendationTimeout.toMillis());
-        noteRecommendationService.recommendAsync(id, member.getId())
+        Disposable aiCall = noteRecommendationService.recommendAsync(id, member.getId())
                 .map(NoteRecommendationResponse::from)
                 .subscribe(result::setResult, result::setErrorResult);
+        result.onTimeout(() -> {
+            aiCall.dispose();
+            log.warn("노트 추천 시간 초과, AI 호출 취소 후 문자열 기반 추천 noteId={}", id);
+            result.setResult(NoteRecommendationResponse.from(
+                    noteRecommendationService.recommendWithoutAi(id, member.getId())));
+        });
+        result.onError(error -> aiCall.dispose());
         return result;
     }
 
