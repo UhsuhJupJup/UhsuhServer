@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import reactor.core.Disposable;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
@@ -117,6 +118,23 @@ class WebClientKeywordClassifierTest {
                 .isInstanceOf(KeywordClassificationException.class);
     }
 
+    @Test
+    void 구독을_취소하면_Claude가_실패해도_GPT를_부르지_않고_서킷에_실패로_남기지_않는다() throws InterruptedException {
+        server.reply(CLAUDE_PATH, new StubLlmServer.Reply(500, "{}", Duration.ofMillis(800)));
+        server.reply(GPT_PATH, new StubLlmServer.Reply(200, GPT_OK, Duration.ZERO));
+        CircuitBreakerRegistry registry = CircuitBreakerRegistry.ofDefaults();
+        ResilientAsyncKeywordClassifier classifier = resilient(claude(Duration.ofSeconds(2)), registry);
+
+        Disposable call = classifier.classify("제목", "본문", CATALOG).subscribe();
+        Thread.sleep(200);
+        call.dispose();
+        Thread.sleep(1500);
+
+        assertThat(server.count(CLAUDE_PATH)).isEqualTo(1);
+        assertThat(server.count(GPT_PATH)).isZero();
+        assertThat(registry.circuitBreaker("keywordClassifier").getMetrics().getNumberOfFailedCalls()).isZero();
+    }
+
     private ClaudeWebClientKeywordClassifier claude(Duration callTimeout) {
         return new ClaudeWebClientKeywordClassifier(server.baseUrl(), "claude-test", Duration.ofSeconds(1),
                 callTimeout, 1, Duration.ofMillis(500));
@@ -131,11 +149,16 @@ class WebClientKeywordClassifierTest {
         return resilient(claude(Duration.ofSeconds(2)));
     }
 
-    @SuppressWarnings("unchecked")
     private ResilientAsyncKeywordClassifier resilient(ClaudeWebClientKeywordClassifier claude) {
+        return resilient(claude, CircuitBreakerRegistry.ofDefaults());
+    }
+
+    @SuppressWarnings("unchecked")
+    private ResilientAsyncKeywordClassifier resilient(ClaudeWebClientKeywordClassifier claude,
+                                                      CircuitBreakerRegistry registry) {
         ObjectProvider<GptWebClientKeywordClassifier> gptProvider = mock(ObjectProvider.class);
         GptWebClientKeywordClassifier gpt = gpt();
         given(gptProvider.getIfAvailable()).willReturn(gpt);
-        return new ResilientAsyncKeywordClassifier(CircuitBreakerRegistry.ofDefaults(), claude, gptProvider);
+        return new ResilientAsyncKeywordClassifier(registry, claude, gptProvider);
     }
 }
