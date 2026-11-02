@@ -107,6 +107,10 @@ outbox:
   max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
   retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
+  stream:
+    enabled: ${OUTBOX_STREAM_ENABLED:true}
+    poll-timeout: ${OUTBOX_STREAM_POLL_TIMEOUT:500ms}
+    batch-size: ${OUTBOX_STREAM_BATCH_SIZE:10}
 
 classification:
   poll-delay-ms: ${CLASSIFICATION_POLL_DELAY_MS:600000}          # 미분류 글 재분류 폴러 주기(기본 10분)
