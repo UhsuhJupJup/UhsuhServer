@@ -1,7 +1,7 @@
 package uhsuhjupjup.backend.learningnote.ui;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.DeferredResult;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.learningnote.application.NoteGraphService;
 import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
@@ -22,16 +23,27 @@ import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 
+import java.time.Duration;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/notes")
-@RequiredArgsConstructor
 public class NoteController implements NoteControllerApi {
 
     private final NoteService noteService;
     private final NoteRecommendationService noteRecommendationService;
     private final NoteGraphService noteGraphService;
+    private final Duration recommendationTimeout;
+
+    public NoteController(NoteService noteService,
+                          NoteRecommendationService noteRecommendationService,
+                          NoteGraphService noteGraphService,
+                          @Value("${note.recommendation.timeout:PT30S}") Duration recommendationTimeout) {
+        this.noteService = noteService;
+        this.noteRecommendationService = noteRecommendationService;
+        this.noteGraphService = noteGraphService;
+        this.recommendationTimeout = recommendationTimeout;
+    }
 
     @Override
     @PostMapping
@@ -70,8 +82,13 @@ public class NoteController implements NoteControllerApi {
 
     @Override
     @GetMapping("/{id}/recommendations")
-    public NoteRecommendationResponse recommendations(@LoginMember Member member, @PathVariable Long id) {
-        return NoteRecommendationResponse.from(noteRecommendationService.recommend(id, member.getId()));
+    public DeferredResult<NoteRecommendationResponse> recommendations(@LoginMember Member member,
+                                                                      @PathVariable Long id) {
+        DeferredResult<NoteRecommendationResponse> result = new DeferredResult<>(recommendationTimeout.toMillis());
+        noteRecommendationService.recommendAsync(id, member.getId())
+                .map(NoteRecommendationResponse::from)
+                .subscribe(result::setResult, result::setErrorResult);
+        return result;
     }
 
     @Override
