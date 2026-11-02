@@ -24,6 +24,7 @@ import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.LearningNoteRepository;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.member.infra.MemberRepository;
+import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
@@ -32,6 +33,7 @@ import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItems;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -143,6 +145,19 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(jsonPath("$.keywords.length()").value(1))
                 .andExpect(jsonPath("$.keywords[0]").value("Kafka"))
                 .andExpect(jsonPath("$.articles.length()").value(0));
+    }
+
+    @Test
+    void 두_AI가_모두_실패하면_노트_제목과_본문의_문자열로_추천하고_분석_결과는_저장하지_않는다() throws Exception {
+        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willThrow(new KeywordClassificationException("Claude, GPT 키워드 분류 모두 실패", new RuntimeException()));
+
+        mockMvc.perform(get("/api/notes/" + noteId + "/recommendations").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
+                .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()));
+
+        assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNull();
     }
 
     @Test
