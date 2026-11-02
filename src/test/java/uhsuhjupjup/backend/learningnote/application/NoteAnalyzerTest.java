@@ -1,9 +1,9 @@
 package uhsuhjupjup.backend.learningnote.application;
 
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -44,13 +44,14 @@ class NoteAnalyzerTest {
     private KeywordMatcher keywordMatcher;
     @Mock
     private NoteKeywordSaver noteKeywordSaver;
-    @InjectMocks
     private NoteAnalyzer noteAnalyzer;
 
     private LearningNote note;
 
     @BeforeEach
     void setUp() {
+        noteAnalyzer = new NoteAnalyzer(keywordRepository, keywordAliasRepository, keywordClassifier, keywordMatcher,
+                noteKeywordSaver, BulkheadRegistry.ofDefaults());
         note = LearningNote.create(Member.create("github", "uid", "e@e.com"), "Redis 캐싱", "TTL 정리");
         ReflectionTestUtils.setField(note, "id", 1L);
         given(keywordAliasRepository.findAll()).willReturn(List.of());
