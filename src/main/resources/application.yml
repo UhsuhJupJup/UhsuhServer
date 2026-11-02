@@ -107,6 +107,7 @@ outbox:
   max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
   retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
+  send-lock-ttl: ${OUTBOX_SEND_LOCK_TTL:PT2M}
   stream:
     enabled: ${OUTBOX_STREAM_ENABLED:true}
     poll-timeout: ${OUTBOX_STREAM_POLL_TIMEOUT:500ms}
