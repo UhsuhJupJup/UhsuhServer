@@ -13,6 +13,7 @@ import uhsuhjupjup.backend.learningnote.ui.dto.NoteRecommendationResponse;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
 import uhsuhjupjup.backend.member.domain.Member;
+import org.springframework.web.context.request.async.DeferredResult;
 
 import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -319,8 +320,9 @@ public interface NoteControllerApi {
                                     }
                                     """)))
     })
-    NoteRecommendationResponse recommendations(@Parameter(hidden = true) Member member,
-                                               @Parameter(description = "노트 ID", example = "12", required = true) Long id);
+    DeferredResult<NoteRecommendationResponse> recommendations(
+            @Parameter(hidden = true) Member member,
+            @Parameter(description = "노트 ID", example = "12", required = true) Long id);
 
     @Operation(
             summary = "노트 지식 그래프 조회",
