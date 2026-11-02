@@ -1,5 +1,9 @@
 package uhsuhjupjup.backend.learningnote;
 
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +36,7 @@ import uhsuhjupjup.backend.support.SharedMySqlTestConfiguration;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItems;
@@ -66,6 +71,11 @@ class NoteRecommendationIntegrationTest {
     private ArticleRepository articleRepository;
     @Autowired
     private ArticleKeywordRepository articleKeywordRepository;
+
+    @Autowired
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+    @Autowired
+    private BulkheadRegistry bulkheadRegistry;
 
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
@@ -158,6 +168,21 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()));
 
         assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNull();
+    }
+
+    @Test
+    void 서킷_브레이커는_벌크헤드_거절을_실패로_세지_않는다() {
+        BulkheadFullException rejected = BulkheadFullException.createBulkheadFullException(
+                bulkheadRegistry.bulkhead("noteKeywordAnalysis"));
+
+        for (String name : List.of("keywordClassifier", "keywordClassifierGpt")) {
+            CircuitBreaker circuit = circuitBreakerRegistry.circuitBreaker(name);
+            long failedBefore = circuit.getMetrics().getNumberOfFailedCalls();
+
+            circuit.onError(0, TimeUnit.MILLISECONDS, rejected);
+
+            assertThat(circuit.getMetrics().getNumberOfFailedCalls()).isEqualTo(failedBefore);
+        }
     }
 
     @Test
