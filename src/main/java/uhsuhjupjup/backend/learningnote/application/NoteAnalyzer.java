@@ -1,6 +1,8 @@
 package uhsuhjupjup.backend.learningnote.application;
 
-import lombok.RequiredArgsConstructor;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import uhsuhjupjup.backend.keyword.domain.Keyword;
@@ -22,22 +24,42 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NoteAnalyzer {
+
+    static final String AI_BULKHEAD = "noteKeywordAnalysis";
 
     private final KeywordRepository keywordRepository;
     private final KeywordAliasRepository keywordAliasRepository;
     private final KeywordClassifier keywordClassifier;
     private final KeywordMatcher keywordMatcher;
     private final NoteKeywordSaver noteKeywordSaver;
+    private final Bulkhead aiBulkhead;
+
+    public NoteAnalyzer(KeywordRepository keywordRepository,
+                        KeywordAliasRepository keywordAliasRepository,
+                        KeywordClassifier keywordClassifier,
+                        KeywordMatcher keywordMatcher,
+                        NoteKeywordSaver noteKeywordSaver,
+                        BulkheadRegistry bulkheadRegistry) {
+        this.keywordRepository = keywordRepository;
+        this.keywordAliasRepository = keywordAliasRepository;
+        this.keywordClassifier = keywordClassifier;
+        this.keywordMatcher = keywordMatcher;
+        this.noteKeywordSaver = noteKeywordSaver;
+        this.aiBulkhead = bulkheadRegistry.bulkhead(AI_BULKHEAD);
+    }
 
     public NoteAnalysis analyze(LearningNote note) {
         List<Keyword> keywords = keywordRepository.findAll();
         MatchCatalog catalog = MatchCatalog.from(keywords, keywordAliasRepository.findAll());
         try {
-            List<KeywordMatch> matches = keywordClassifier.classify(note.getTitle(), note.getContent(), catalog);
+            List<KeywordMatch> matches = aiBulkhead.executeSupplier(
+                    () -> keywordClassifier.classify(note.getTitle(), note.getContent(), catalog));
             noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
             return NoteAnalysis.saved();
+        } catch (BulkheadFullException e) {
+            log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
+            return fallback(note, keywords, catalog);
         } catch (KeywordClassificationException e) {
             log.warn("노트 AI 분석 실패, 문자열 기반 추출로 폴백 noteId={} 사유={}", note.getId(), e.toString());
             return fallback(note, keywords, catalog);
