@@ -56,6 +56,9 @@ public class NotificationOutbox {
     @Column(name = "next_attempt_at", nullable = false)
     private LocalDateTime nextAttemptAt;
 
+    @Column(name = "republish_at", nullable = false)
+    private LocalDateTime republishAt;
+
     @Column(name = "last_error", length = MAX_ERROR_LENGTH)
     private String lastError;
 
@@ -77,12 +80,17 @@ public class NotificationOutbox {
         this.status = OutboxStatus.PENDING;
         this.attempts = 0;
         this.nextAttemptAt = nextAttemptAt;
+        this.republishAt = nextAttemptAt;
     }
 
     public static NotificationOutbox pending(String recipient, RecipientType recipientType, int articleCount,
                                              String subject, String body, String unsubscribeUrl,
                                              LocalDateTime sendAfter) {
         return new NotificationOutbox(recipient, recipientType, articleCount, subject, body, unsubscribeUrl, sendAfter);
+    }
+
+    public void deferRepublish(LocalDateTime at) {
+        this.republishAt = at;
     }
 
     public void markSent(LocalDateTime at) {
@@ -95,6 +103,7 @@ public class NotificationOutbox {
         this.status = OutboxStatus.PENDING;
         this.lastError = truncate(error);
         this.nextAttemptAt = nextAttemptAt;
+        this.republishAt = nextAttemptAt;
     }
 
     public void markFailed(String error) {
@@ -110,6 +119,7 @@ public class NotificationOutbox {
         this.status = OutboxStatus.PENDING;
         this.attempts = 0;
         this.nextAttemptAt = at;
+        this.republishAt = at;
         this.lastError = null;
     }
 
