@@ -28,6 +28,9 @@ public class OutboxClaimer {
     @Value("${outbox.claim-lease:PT1H}")
     private Duration claimLease;
 
+    @Value("${outbox.message-claim-lease:PT10M}")
+    private Duration messageClaimLease;
+
     @Transactional
     public List<Long> claim(int limit, LocalDateTime now) {
         List<Long> claimed = new ArrayList<>(
@@ -44,7 +47,7 @@ public class OutboxClaimer {
     @Transactional
     public boolean claimOne(Long id, LocalDateTime now) {
         return notificationOutboxRepository.claimOne(id, OutboxStatus.PENDING, OutboxStatus.PROCESSING, now,
-                now.plus(claimLease), maxAttempts) == 1;
+                now.plus(messageClaimLease), maxAttempts) == 1;
     }
 
     @Transactional
@@ -55,18 +58,24 @@ public class OutboxClaimer {
         return notificationOutboxRepository.releaseAll(ids, OutboxStatus.PROCESSING, OutboxStatus.PENDING, now);
     }
 
-    private List<Long> reclaimExpired(int limit, LocalDateTime now) {
-        List<Long> expired = new ArrayList<>(
-                notificationOutboxRepository.lockDueIds(OutboxStatus.PROCESSING.name(), now, limit));
-        if (expired.isEmpty()) {
-            return expired;
+    @Transactional
+    public List<Long> isolateExhausted(List<Long> expired) {
+        List<Long> remaining = new ArrayList<>(expired);
+        if (remaining.isEmpty()) {
+            return remaining;
         }
-        List<Long> exhausted = notificationOutboxRepository.findIdsReachedAttempts(expired, maxAttempts);
+        List<Long> exhausted = notificationOutboxRepository.findIdsReachedAttempts(remaining, maxAttempts);
         if (!exhausted.isEmpty()) {
             notificationOutboxRepository.failAll(exhausted, OutboxStatus.FAILED, LEASE_EXHAUSTED_ERROR);
-            expired.removeAll(exhausted);
+            remaining.removeAll(exhausted);
             log.warn("아웃박스 선점 만료 반복 격리 ids={}", exhausted);
         }
+        return remaining;
+    }
+
+    private List<Long> reclaimExpired(int limit, LocalDateTime now) {
+        List<Long> expired = isolateExhausted(
+                notificationOutboxRepository.lockDueIds(OutboxStatus.PROCESSING.name(), now, limit));
         if (!expired.isEmpty()) {
             log.warn("아웃박스 선점 만료 작업 다시 선점 ids={}", expired);
         }
