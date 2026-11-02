@@ -42,6 +42,12 @@ public class OutboxClaimer {
     }
 
     @Transactional
+    public boolean claimOne(Long id, LocalDateTime now) {
+        return notificationOutboxRepository.claimOne(id, OutboxStatus.PENDING, OutboxStatus.PROCESSING, now,
+                now.plus(claimLease), maxAttempts) == 1;
+    }
+
+    @Transactional
     public int release(List<Long> ids, LocalDateTime now) {
         if (ids.isEmpty()) {
             return 0;
