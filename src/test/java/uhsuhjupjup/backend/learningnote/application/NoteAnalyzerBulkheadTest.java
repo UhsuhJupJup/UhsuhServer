@@ -10,6 +10,10 @@ import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.member.domain.Member;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
+import uhsuhjupjup.backend.pipeline.matching.application.AsyncKeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatcher;
@@ -31,6 +35,7 @@ import static org.mockito.Mockito.mock;
 class NoteAnalyzerBulkheadTest {
 
     private final KeywordClassifier keywordClassifier = mock(KeywordClassifier.class);
+    private final AsyncKeywordClassifier asyncKeywordClassifier = mock(AsyncKeywordClassifier.class);
     private final KeywordMatcher keywordMatcher = mock(KeywordMatcher.class);
     private final NoteKeywordSaver noteKeywordSaver = mock(NoteKeywordSaver.class);
     private final CountDownLatch firstCallStarted = new CountDownLatch(1);
@@ -56,8 +61,8 @@ class NoteAnalyzerBulkheadTest {
                 .maxConcurrentCalls(1)
                 .maxWaitDuration(Duration.ZERO)
                 .build());
-        noteAnalyzer = new NoteAnalyzer(keywordRepository, keywordAliasRepository, keywordClassifier, keywordMatcher,
-                noteKeywordSaver, bulkheadRegistry);
+        noteAnalyzer = new NoteAnalyzer(keywordRepository, keywordAliasRepository, keywordClassifier,
+                asyncKeywordClassifier, keywordMatcher, noteKeywordSaver, bulkheadRegistry, Schedulers.immediate());
     }
 
     @Test
@@ -82,6 +87,26 @@ class NoteAnalyzerBulkheadTest {
         assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
                 .isEqualTo(1);
         assertThat(noteAnalyzer.analyze(note(2L)).fallback()).isFalse();
+    }
+
+    @Test
+    void 비동기_호출도_허가를_넘으면_AI를_부르지_않고_폴백하고_끝나면_허가를_돌려준다() {
+        Sinks.One<List<KeywordMatch>> pending = Sinks.one();
+        AtomicInteger asyncCalls = new AtomicInteger();
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class))).willAnswer(invocation -> {
+            asyncCalls.incrementAndGet();
+            return pending.asMono();
+        });
+        var first = noteAnalyzer.analyzeAsync(note(1L)).toFuture();
+
+        NoteAnalysis overflow = noteAnalyzer.analyzeAsync(note(2L)).block();
+        pending.tryEmitValue(List.of(new KeywordMatch(1L, "ai")));
+
+        assertThat(overflow.fallback()).isTrue();
+        assertThat(first.join().fallback()).isFalse();
+        assertThat(asyncCalls).hasValue(1);
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(1);
     }
 
     private static LearningNote note(Long id) {
