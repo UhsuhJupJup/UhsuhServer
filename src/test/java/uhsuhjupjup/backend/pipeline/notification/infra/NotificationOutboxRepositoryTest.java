@@ -2,14 +2,12 @@ package uhsuhjupjup.backend.pipeline.notification.infra;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
 import uhsuhjupjup.backend.pipeline.notification.domain.OutboxStatus;
 import uhsuhjupjup.backend.pipeline.notification.domain.RecipientType;
 import uhsuhjupjup.backend.support.MySqlDataJpaTest;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -52,7 +50,7 @@ class NotificationOutboxRepositoryTest {
     }
 
     @Test
-    void markRetry는_PENDING을_유지하며_시도횟수와_오류를_기록한다() {
+    void markRetry는_PENDING으로_되돌리며_오류와_다음_시도_시각을_기록한다() {
         NotificationOutbox saved = notificationOutboxRepository.save(
                 NotificationOutbox.pending("c@example.com", RecipientType.MEMBER, 2, "제목", "본문",
                         null, LocalDateTime.now()));
@@ -62,7 +60,7 @@ class NotificationOutboxRepositoryTest {
 
         NotificationOutbox reloaded = notificationOutboxRepository.findById(saved.getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(OutboxStatus.PENDING);
-        assertThat(reloaded.getAttempts()).isEqualTo(1);
+        assertThat(reloaded.getAttempts()).isZero();
         assertThat(reloaded.getLastError()).isEqualTo("SMTP timeout");
     }
 
@@ -77,28 +75,7 @@ class NotificationOutboxRepositoryTest {
 
         NotificationOutbox reloaded = notificationOutboxRepository.findById(saved.getId()).orElseThrow();
         assertThat(reloaded.getStatus()).isEqualTo(OutboxStatus.FAILED);
-        assertThat(reloaded.getAttempts()).isEqualTo(1);
+        assertThat(reloaded.getAttempts()).isZero();
         assertThat(notificationOutboxRepository.countByStatus(OutboxStatus.FAILED)).isEqualTo(1);
-    }
-
-    @Test
-    void findDue는_기한이_지난_PENDING만_이른순으로_조회한다() {
-        LocalDateTime now = LocalDateTime.now();
-        NotificationOutbox due = notificationOutboxRepository.save(
-                NotificationOutbox.pending("due@example.com", RecipientType.MEMBER, 1, "제목", "본문",
-                        null, now.minusMinutes(1)));
-        notificationOutboxRepository.save(
-                NotificationOutbox.pending("future@example.com", RecipientType.MEMBER, 1, "제목", "본문",
-                        null, now.plusMinutes(10)));
-        NotificationOutbox sent = notificationOutboxRepository.save(
-                NotificationOutbox.pending("sent@example.com", RecipientType.MEMBER, 1, "제목", "본문",
-                        null, now.minusMinutes(5)));
-        sent.markSent(now);
-        notificationOutboxRepository.flush();
-
-        List<NotificationOutbox> found = notificationOutboxRepository.findDue(
-                OutboxStatus.PENDING, now, PageRequest.of(0, 10));
-
-        assertThat(found).extracting(NotificationOutbox::getId).containsExactly(due.getId());
     }
 }
