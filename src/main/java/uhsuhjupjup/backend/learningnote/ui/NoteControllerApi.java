@@ -394,9 +394,10 @@ public interface NoteControllerApi {
                     - `keyword` — 키워드입니다. `id`는 `kw:{키워드ID}`이며, `inNote`가 `true`면 노트에서 직접 추출된 키워드입니다.
                     - `article` — 추천된 글입니다. `id`는 `art:{글ID}`이며 `rank`가 추천 순위입니다.
 
-                    ### 응답 시간
+                    ### 분석 전 노트
 
-                    - 추천과 같은 분석을 사용하므로 첫 호출은 이 엔드포인트도 느릴 수 있습니다.
+                    - 이 엔드포인트는 AI를 부르지 않고 저장된 분석 결과만 읽습니다.
+                    - 아직 분석되지 않은 노트는 `note` 노드만 돌려줍니다. 분석은 `GET /api/notes/{id}/recommendations`로 시작합니다.
                     """,
             security = @SecurityRequirement(name = "firebaseIdToken"))
     @ApiResponses({
