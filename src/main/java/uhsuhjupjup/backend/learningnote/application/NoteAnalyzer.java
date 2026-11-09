@@ -61,24 +61,18 @@ public class NoteAnalyzer {
         this.noteDbScheduler = noteDbScheduler;
     }
 
-    public Mono<NoteAnalysis> analyzeAsync(LearningNote note) {
-        List<Keyword> keywords = keywordRepository.findAll();
-        MatchCatalog catalog = MatchCatalog.from(keywords, keywordAliasRepository.findAll());
-        return Mono.defer(() -> asyncKeywordClassifier.classify(note.getTitle(), note.getContent(), catalog))
+    public Mono<Boolean> analyzeAsync(LearningNote note) {
+        long revision = note.getContentRevision();
+        return classifyAsync(note.getTitle(), note.getContent())
                 .transformDeferred(BulkheadOperator.of(aiBulkhead))
                 .publishOn(noteDbScheduler)
-                .map(matches -> {
-                    noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
-                    return NoteAnalysis.saved();
-                })
-                .onErrorResume(BulkheadFullException.class, e -> {
-                    log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
-                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
-                })
-                .onErrorResume(KeywordClassificationException.class, e -> {
-                    log.warn("노트 AI 분석 실패, 문자열 기반 추출로 폴백 noteId={} 사유={}", note.getId(), e.toString());
-                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
-                });
+                .map(matches -> noteKeywordSaver.replaceKeywords(note.getId(), revision, matches, LocalDateTime.now()));
+    }
+
+    public Mono<List<KeywordMatch>> classifyAsync(String title, String content) {
+        MatchCatalog catalog = MatchCatalog.from(keywordRepository.findAll(), keywordAliasRepository.findAll());
+        return Mono.defer(() -> asyncKeywordClassifier.classify(title, content, catalog))
+                .switchIfEmpty(Mono.error(() -> new KeywordClassificationException("AI 분류 응답이 비었습니다", null)));
     }
 
     public NoteAnalysis analyze(LearningNote note) {
@@ -87,8 +81,11 @@ public class NoteAnalyzer {
         try {
             List<KeywordMatch> matches = aiBulkhead.executeSupplier(
                     () -> keywordClassifier.classify(note.getTitle(), note.getContent(), catalog));
-            noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
-            return NoteAnalysis.saved();
+            if (noteKeywordSaver.replaceKeywords(note.getId(), note.getContentRevision(), matches, LocalDateTime.now())) {
+                return NoteAnalysis.saved();
+            }
+            log.info("노트 분석 중 내용이 바뀌어 결과를 저장하지 않음 noteId={}", note.getId());
+            return fallback(note, keywords, catalog);
         } catch (BulkheadFullException e) {
             log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
             return fallback(note, keywords, catalog);
