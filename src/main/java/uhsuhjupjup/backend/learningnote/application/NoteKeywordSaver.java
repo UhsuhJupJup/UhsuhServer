@@ -22,14 +22,18 @@ public class NoteKeywordSaver {
     private final KeywordRepository keywordRepository;
 
     @Transactional
-    public void replaceKeywords(Long noteId, List<KeywordMatch> matches, LocalDateTime analyzedAt) {
+    public boolean replaceKeywords(Long noteId, long expectedRevision, List<KeywordMatch> matches,
+                                   LocalDateTime analyzedAt) {
+        LearningNote note = learningNoteRepository.findByIdForUpdate(noteId).orElse(null);
+        if (note == null || !note.isRevision(expectedRevision)) {
+            return false;
+        }
         noteKeywordRepository.deleteByNoteId(noteId);
-        LearningNote note = learningNoteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalStateException("분석 대상 노트를 찾을 수 없습니다: " + noteId));
         List<NoteKeyword> toSave = matches.stream()
                 .map(match -> NoteKeyword.of(note, keywordRepository.getReferenceById(match.keywordId())))
                 .toList();
         noteKeywordRepository.saveAll(toSave);
         note.markAnalyzed(analyzedAt);
+        return true;
     }
 }
