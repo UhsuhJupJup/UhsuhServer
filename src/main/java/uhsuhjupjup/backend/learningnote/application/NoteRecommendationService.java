@@ -13,7 +13,6 @@ import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
 import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.config.NoteAsyncConfig;
-import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysisState;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysisStatus;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
@@ -123,13 +122,7 @@ public class NoteRecommendationService {
     public NoteRecommendationResult recommend(Long noteId, Long memberId) {
         LearningNote note = noteService.get(noteId, memberId);
         if (note.getAnalyzedAt() == null) {
-            NoteAnalysisState state = NoteAnalysisState.of(note, analysisJobs.find(noteId).orElse(null));
-            NoteAnalysis analysis = state.status() == NoteAnalysisStatus.NONE
-                    ? noteAnalyzer.analyze(note)
-                    : noteAnalyzer.analyzeWithoutAi(note);
-            if (analysis.fallback()) {
-                return recommendFor(analysis.keywordNames(), analysis.keywordIds());
-            }
+            return new NoteRecommendationResult(List.of(), List.of());
         }
         return recommendSaved(noteId);
     }
