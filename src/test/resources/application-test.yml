@@ -13,3 +13,8 @@ cache:
 outbox:
   stream:
     enabled: false
+
+note:
+  analysis:
+    poller:
+      enabled: false
