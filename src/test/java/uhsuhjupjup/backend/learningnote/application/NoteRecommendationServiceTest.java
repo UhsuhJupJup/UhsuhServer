@@ -14,7 +14,6 @@ import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
-import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +24,6 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
@@ -185,34 +183,15 @@ class NoteRecommendationServiceTest {
     }
 
     @Test
-    void 아직_분석되지_않은_노트는_분석을_먼저_수행한다() {
+    void 아직_분석되지_않은_노트는_AI를_부르지_않고_빈_추천을_반환한다() {
         LearningNote coldNote = mock(LearningNote.class);
         given(coldNote.getAnalyzedAt()).willReturn(null);
         given(noteService.get(1L, 1L)).willReturn(coldNote);
-        given(noteAnalyzer.analyze(coldNote)).willReturn(NoteAnalysis.saved());
-        given(noteKeywordRepository.findKeywordNamesByNoteId(1L)).willReturn(List.of());
-        given(noteKeywordRepository.findKeywordIdsByNoteId(1L)).willReturn(List.of());
-
-        noteRecommendationService.recommend(1L, 1L);
-
-        verify(noteAnalyzer).analyze(coldNote);
-    }
-
-    @Test
-    void AI_분석이_실패하면_문자열_폴백_키워드로_추천하고_저장된_키워드는_읽지_않는다() {
-        LearningNote coldNote = mock(LearningNote.class);
-        given(coldNote.getAnalyzedAt()).willReturn(null);
-        given(noteService.get(1L, 1L)).willReturn(coldNote);
-        given(noteAnalyzer.analyze(coldNote)).willReturn(NoteAnalysis.fallback(List.of(100L), List.of("Redis")));
-        Article article1 = article(1L, LocalDateTime.now().minusDays(1));
-        given(keywordArticleQueryService.candidateArticleIds(100L)).willReturn(List.of(1L));
-        given(articleRepository.findWithBlogByIdIn(anyCollection())).willReturn(List.of(article1));
-        given(articleKeywordRepository.findWithKeywordByArticleIdIn(anyCollection())).willReturn(List.of());
 
         NoteRecommendationResult result = noteRecommendationService.recommend(1L, 1L);
 
-        assertThat(result.keywords()).containsExactly("Redis");
-        assertThat(result.articles()).hasSize(1);
-        verifyNoInteractions(noteKeywordRepository);
+        assertThat(result.keywords()).isEmpty();
+        assertThat(result.articles()).isEmpty();
+        verifyNoInteractions(noteAnalyzer, noteKeywordRepository);
     }
 }
