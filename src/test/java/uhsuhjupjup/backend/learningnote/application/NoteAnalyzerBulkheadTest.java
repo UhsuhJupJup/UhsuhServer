@@ -1,5 +1,11 @@
 package uhsuhjupjup.backend.learningnote.application;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import java.time.LocalDateTime;
+
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +63,8 @@ class NoteAnalyzerBulkheadTest {
             releaseFirstCall.await(10, TimeUnit.SECONDS);
             return List.of(new KeywordMatch(1L, "ai"));
         });
+        given(noteKeywordSaver.replaceKeywords(anyLong(), anyLong(), anyList(), any(LocalDateTime.class)))
+                .willReturn(true);
         bulkheadRegistry = BulkheadRegistry.of(BulkheadConfig.custom()
                 .maxConcurrentCalls(1)
                 .maxWaitDuration(Duration.ZERO)
@@ -90,7 +98,7 @@ class NoteAnalyzerBulkheadTest {
     }
 
     @Test
-    void 비동기_호출도_허가를_넘으면_AI를_부르지_않고_폴백하고_끝나면_허가를_돌려준다() {
+    void 비동기_호출도_허가를_넘으면_AI를_부르지_않고_한도_초과를_알리고_끝나면_허가를_돌려준다() {
         Sinks.One<List<KeywordMatch>> pending = Sinks.one();
         AtomicInteger asyncCalls = new AtomicInteger();
         given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class))).willAnswer(invocation -> {
@@ -99,11 +107,11 @@ class NoteAnalyzerBulkheadTest {
         });
         var first = noteAnalyzer.analyzeAsync(note(1L)).toFuture();
 
-        NoteAnalysis overflow = noteAnalyzer.analyzeAsync(note(2L)).block();
+        assertThatThrownBy(() -> noteAnalyzer.analyzeAsync(note(2L)).block())
+                .isInstanceOf(BulkheadFullException.class);
         pending.tryEmitValue(List.of(new KeywordMatch(1L, "ai")));
 
-        assertThat(overflow.fallback()).isTrue();
-        assertThat(first.join().fallback()).isFalse();
+        assertThat(first.join()).isTrue();
         assertThat(asyncCalls).hasValue(1);
         assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
                 .isEqualTo(1);
