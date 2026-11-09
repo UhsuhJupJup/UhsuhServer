@@ -50,7 +50,7 @@ class NoteKeywordSaverTest {
 
     @Test
     void 키워드를_저장하고_분석시각을_남긴다() {
-        noteKeywordSaver.replaceKeywords(noteId,
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
                 List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")),
                 LocalDateTime.now());
 
@@ -61,11 +61,11 @@ class NoteKeywordSaverTest {
 
     @Test
     void 재분석하면_겹치는_키워드가_있어도_교체된다() {
-        noteKeywordSaver.replaceKeywords(noteId,
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
                 List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")),
                 LocalDateTime.now());
 
-        noteKeywordSaver.replaceKeywords(noteId,
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
                 List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(jpa.getId(), "ai")),
                 LocalDateTime.now());
 
@@ -75,9 +75,23 @@ class NoteKeywordSaverTest {
 
     @Test
     void 키워드가_없어도_분석시각은_남긴다() {
-        noteKeywordSaver.replaceKeywords(noteId, List.of(), LocalDateTime.now());
+        noteKeywordSaver.replaceKeywords(noteId, 0L, List.of(), LocalDateTime.now());
 
         assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).isEmpty();
         assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNotNull();
+    }
+
+    @Test
+    void 분석을_시작한_뒤_노트가_수정됐으면_저장하지_않는다() {
+        LearningNote note = learningNoteRepository.findById(noteId).orElseThrow();
+        note.update("새 제목", "새 본문");
+        learningNoteRepository.saveAndFlush(note);
+
+        boolean saved = noteKeywordSaver.replaceKeywords(noteId, 0L,
+                List.of(new KeywordMatch(redis.getId(), "ai")), LocalDateTime.now());
+
+        assertThat(saved).isFalse();
+        assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).isEmpty();
+        assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNull();
     }
 }
