@@ -280,6 +280,13 @@ public interface NoteControllerApi {
                     - 두 번째 호출부터는 분석 결과를 재사용해 빠릅니다.
                     - 클라이언트는 첫 호출에 로딩 상태를 반드시 표시해야 합니다.
 
+                    ### 상태(`status`)
+
+                    - `READY`: 분석이 끝나 `keywords`와 `articles`를 담았습니다.
+                    - `PENDING`: AI 동시 호출 한도를 넘었거나, 15초 안에 끝나지 않았거나, AI가 일시적으로 실패해 분석 작업으로 남겼습니다. `keywords`와 `articles`는 빈 배열입니다. 서버가 나중에 다시 분석하므로 같은 API를 다시 조회하면 됩니다. 대기 중에는 다시 조회해도 AI를 새로 부르지 않습니다.
+                    - `FAILED`: 다시 시도할 시간이나 횟수를 넘겨 분석을 끝내지 못했습니다. `POST /api/notes/{id}/recommendations/retry`로 다시 맡길 수 있습니다.
+                    - 분석 작업이 끝난 결과를 처음 `READY`로 받으면 그 노트의 `recommendationReady`가 `false`로 바뀝니다.
+
                     ### 응답 구성
 
                     - `keywords`는 노트에서 추출한 키워드입니다.
@@ -321,6 +328,55 @@ public interface NoteControllerApi {
                                     """)))
     })
     DeferredResult<NoteRecommendationResponse> recommendations(
+            @Parameter(hidden = true) Member member,
+            @Parameter(description = "노트 ID", example = "12", required = true) Long id);
+
+    @Operation(
+            summary = "실패한 노트 추천 분석 다시 맡기기",
+            description = """
+                    ### 인증
+
+                    - 로그인이 필요하며 본인 노트만 다룰 수 있습니다.
+
+                    ### 동작
+
+                    - 지금 내용의 분석 작업이 `FAILED`일 때만 다시 대기 상태로 돌립니다.
+                    - 실패한 작업이 없으면 아무것도 바꾸지 않고 204를 반환합니다.
+                    - 결과는 `GET /api/notes/{id}/recommendations`로 확인합니다.
+                    """,
+            security = @SecurityRequirement(name = "firebaseIdToken"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "처리 완료"),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "인증 필요",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "UNAUTHORIZED",
+                                      "message": "인증이 필요합니다.",
+                                      "status": 401,
+                                      "path": "/api/notes/12/recommendations/retry",
+                                      "timestamp": "2026-11-09T14:20:11.482"
+                                    }
+                                    """))),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "노트가 없거나 내 노트가 아님",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "NOTE_NOT_FOUND",
+                                      "message": "노트를 찾을 수 없습니다.",
+                                      "status": 404,
+                                      "path": "/api/notes/12/recommendations/retry",
+                                      "timestamp": "2026-11-09T14:20:11.482"
+                                    }
+                                    """)))
+    })
+    void retryRecommendations(
             @Parameter(hidden = true) Member member,
             @Parameter(description = "노트 ID", example = "12", required = true) Long id);
 
