@@ -339,9 +339,9 @@ class NoteRecommendationIntegrationTest {
     }
 
     @Test
-    void 노트_그래프는_노트_키워드_추천글_노드와_간선을_반환한다() throws Exception {
-        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
-                .willReturn(List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")));
+    void 노트_그래프는_분석된_노트의_키워드_추천글_노드와_간선을_반환한다() throws Exception {
+        aiReturns(redis, caching);
+        recommendations().andExpect(jsonPath("$.status").value("READY"));
 
         mockMvc.perform(get("/api/notes/" + noteId + "/graph").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
@@ -351,6 +351,17 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(jsonPath("$.nodes[?(@.id=='kw:" + redis.getId() + "')]").exists())
                 .andExpect(jsonPath("$.nodes[?(@.type=='article')]").exists())
                 .andExpect(jsonPath("$.edges[?(@.source=='note:" + noteId + "')]").exists());
+    }
+
+    @Test
+    void 분석되지_않은_노트의_그래프는_AI를_부르지_않고_노트_노드만_반환한다() throws Exception {
+        mockMvc.perform(get("/api/notes/" + noteId + "/graph").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes.length()").value(1))
+                .andExpect(jsonPath("$.nodes[0].id").value("note:" + noteId))
+                .andExpect(jsonPath("$.edges.length()").value(0));
+
+        verifyNoInteractions(asyncKeywordClassifier, keywordClassifier);
     }
 
     @Test
