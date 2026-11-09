@@ -37,6 +37,9 @@ public class LearningNote extends BaseEntity {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "content_revision", nullable = false)
+    private long contentRevision;
+
     @Column(name = "analyzed_at")
     private LocalDateTime analyzedAt;
 
@@ -54,6 +57,11 @@ public class LearningNote extends BaseEntity {
         this.title = title;
         this.content = content;
         this.analyzedAt = null;
+        this.contentRevision++;
+    }
+
+    public boolean isRevision(long revision) {
+        return contentRevision == revision;
     }
 
     public void markAnalyzed(LocalDateTime at) {
