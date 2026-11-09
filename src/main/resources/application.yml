@@ -99,6 +99,20 @@ note:
   async:
     db-threads: ${NOTE_ASYNC_DB_THREADS:8}
     db-queue: ${NOTE_ASYNC_DB_QUEUE:200}
+  analysis:
+    poller:
+      enabled: ${NOTE_ANALYSIS_POLLER_ENABLED:true}
+      delay-ms: ${NOTE_ANALYSIS_POLL_DELAY_MS:5000}
+      initial-delay-ms: ${NOTE_ANALYSIS_POLL_INITIAL_DELAY_MS:30000}
+    job:
+      lease: ${NOTE_ANALYSIS_JOB_LEASE:PT3M}
+      timeout: ${NOTE_ANALYSIS_JOB_TIMEOUT:PT2M}
+    retry:
+      base-delay: ${NOTE_ANALYSIS_RETRY_BASE_DELAY:PT30S}
+      max-delay: ${NOTE_ANALYSIS_RETRY_MAX_DELAY:PT15M}
+      horizon: ${NOTE_ANALYSIS_RETRY_HORIZON:PT6H}
+      max-attempts: ${NOTE_ANALYSIS_RETRY_MAX_ATTEMPTS:20}
+      circuit-open-delay: ${NOTE_ANALYSIS_RETRY_CIRCUIT_OPEN_DELAY:PT30S}
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
