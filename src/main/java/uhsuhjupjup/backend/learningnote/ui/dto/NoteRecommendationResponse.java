@@ -1,15 +1,17 @@
 package uhsuhjupjup.backend.learningnote.ui.dto;
 
-import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
+import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationView;
 
 import java.util.List;
 
-public record NoteRecommendationResponse(List<String> keywords, List<RecommendedArticleResponse> articles) {
+public record NoteRecommendationResponse(String status, List<String> keywords,
+                                         List<RecommendedArticleResponse> articles) {
 
-    public static NoteRecommendationResponse from(NoteRecommendationResult result) {
+    public static NoteRecommendationResponse from(NoteRecommendationView view) {
         return new NoteRecommendationResponse(
-                result.keywords(),
-                result.articles().stream().map(RecommendedArticleResponse::from).toList()
+                view.status().name(),
+                view.result().keywords(),
+                view.result().articles().stream().map(RecommendedArticleResponse::from).toList()
         );
     }
 }
