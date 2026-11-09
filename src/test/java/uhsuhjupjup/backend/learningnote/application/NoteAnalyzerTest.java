@@ -26,7 +26,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -69,12 +71,28 @@ class NoteAnalyzerTest {
         given(keywordRepository.findAll()).willReturn(List.of());
         given(keywordClassifier.classify(eq("Redis 캐싱"), eq("TTL 정리"), any(MatchCatalog.class)))
                 .willReturn(matches);
+        given(noteKeywordSaver.replaceKeywords(eq(1L), eq(0L), eq(matches), any(LocalDateTime.class))).willReturn(true);
 
         NoteAnalysis analysis = noteAnalyzer.analyze(note);
 
         assertThat(analysis.fallback()).isFalse();
-        verify(noteKeywordSaver).replaceKeywords(eq(1L), eq(matches), any(LocalDateTime.class));
         verifyNoInteractions(keywordMatcher);
+    }
+
+    @Test
+    void 분석하는_사이에_노트가_바뀌어_저장하지_못하면_문자열로_추천한다() {
+        Keyword redis = keyword(10L, "Redis");
+        given(keywordRepository.findAll()).willReturn(List.of(redis));
+        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(List.of(new KeywordMatch(10L, "ai")));
+        given(noteKeywordSaver.replaceKeywords(eq(1L), eq(0L), anyList(), any(LocalDateTime.class))).willReturn(false);
+        given(keywordMatcher.match(anyString(), any(MatchCatalog.class)))
+                .willReturn(List.of(new KeywordMatch(10L, "title")));
+
+        NoteAnalysis analysis = noteAnalyzer.analyze(note);
+
+        assertThat(analysis.fallback()).isTrue();
+        assertThat(analysis.keywordNames()).containsExactly("Redis");
     }
 
     @Test
@@ -102,27 +120,22 @@ class NoteAnalyzerTest {
         given(keywordRepository.findAll()).willReturn(List.of());
         given(asyncKeywordClassifier.classify(eq("Redis 캐싱"), eq("TTL 정리"), any(MatchCatalog.class)))
                 .willReturn(Mono.just(matches));
+        given(noteKeywordSaver.replaceKeywords(eq(1L), eq(0L), eq(matches), any(LocalDateTime.class))).willReturn(true);
 
-        NoteAnalysis analysis = noteAnalyzer.analyzeAsync(note).block();
+        Boolean saved = noteAnalyzer.analyzeAsync(note).block();
 
-        assertThat(analysis.fallback()).isFalse();
-        verify(noteKeywordSaver).replaceKeywords(eq(1L), eq(matches), any(LocalDateTime.class));
+        assertThat(saved).isTrue();
     }
 
     @Test
-    void 비동기_분류가_모두_실패하면_문자열로_폴백하고_저장하지_않는다() {
-        Keyword redis = keyword(10L, "Redis");
-        given(keywordRepository.findAll()).willReturn(List.of(redis));
+    void 비동기_분류가_모두_실패하면_문자열로_폴백하지_않고_실패를_그대로_돌려준다() {
+        given(keywordRepository.findAll()).willReturn(List.of());
         given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
                 .willReturn(Mono.error(new KeywordClassificationException("모두 실패", new RuntimeException())));
-        given(keywordMatcher.match(anyString(), any(MatchCatalog.class)))
-                .willReturn(List.of(new KeywordMatch(10L, "title")));
 
-        NoteAnalysis analysis = noteAnalyzer.analyzeAsync(note).block();
-
-        assertThat(analysis.fallback()).isTrue();
-        assertThat(analysis.keywordNames()).containsExactly("Redis");
-        verifyNoInteractions(noteKeywordSaver);
+        assertThatThrownBy(() -> noteAnalyzer.analyzeAsync(note).block())
+                .isInstanceOf(KeywordClassificationException.class);
+        verifyNoInteractions(noteKeywordSaver, keywordMatcher);
     }
 
     private static Keyword keyword(Long id, String name) {
