@@ -36,6 +36,8 @@ class NoteRecommendationServiceTest {
     @Mock
     private NoteAnalyzer noteAnalyzer;
     @Mock
+    private NoteAnalysisJobService noteAnalysisJobService;
+    @Mock
     private NoteKeywordRepository noteKeywordRepository;
     @Mock
     private KeywordArticleQueryService keywordArticleQueryService;
