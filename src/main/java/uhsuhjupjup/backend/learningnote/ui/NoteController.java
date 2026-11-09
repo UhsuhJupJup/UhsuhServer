@@ -93,12 +93,22 @@ public class NoteController implements NoteControllerApi {
                 .subscribe(result::setResult, result::setErrorResult);
         result.onTimeout(() -> {
             aiCall.dispose();
-            log.warn("노트 추천 시간 초과, AI 호출 취소 후 문자열 기반 추천 noteId={}", id);
-            result.setResult(NoteRecommendationResponse.from(
-                    noteRecommendationService.recommendWithoutAi(id, member.getId())));
+            log.warn("노트 추천 시간 초과, AI 호출 취소 후 분석 작업으로 보존 noteId={}", id);
+            try {
+                result.setResult(NoteRecommendationResponse.from(noteRecommendationService.queueAfterTimeout(id)));
+            } catch (RuntimeException e) {
+                result.setErrorResult(e);
+            }
         });
         result.onError(error -> aiCall.dispose());
         return result;
+    }
+
+    @Override
+    @PostMapping("/{id}/recommendations/retry")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void retryRecommendations(@LoginMember Member member, @PathVariable Long id) {
+        noteRecommendationService.retryFailed(id, member.getId());
     }
 
     @Override
