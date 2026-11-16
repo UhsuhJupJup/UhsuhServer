@@ -229,7 +229,7 @@ class NoteRecommendationIntegrationTest {
 
     @Test
     void 동시_호출_한도를_넘으면_AI를_부르지_않고_분석_작업으로_보존한다() throws Exception {
-        Bulkhead bulkhead = bulkheadRegistry.bulkhead("noteKeywordAnalysis");
+        Bulkhead bulkhead = bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest");
         int permits = bulkhead.getBulkheadConfig().getMaxConcurrentCalls();
         for (int i = 0; i < permits; i++) {
             assertThat(bulkhead.tryAcquirePermission()).isTrue();
@@ -300,8 +300,8 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.keywords.length()").value(0));
         assertThat(cancelled).isTrue();
-        assertThat(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getMetrics().getAvailableConcurrentCalls())
-                .isEqualTo(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getBulkheadConfig().getMaxConcurrentCalls());
+        assertThat(bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest").getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest").getBulkheadConfig().getMaxConcurrentCalls());
         NoteAnalysisJob job = noteAnalysisJobRepository.findById(noteId).orElseThrow();
         assertThat(job.getStatus()).isEqualTo(NoteAnalysisJobStatus.PENDING);
         assertThat(job.getLastReason()).isEqualTo(NoteAnalysisReason.REQUEST_TIMEOUT);
@@ -310,7 +310,7 @@ class NoteRecommendationIntegrationTest {
     @Test
     void 서킷_브레이커는_벌크헤드_거절을_실패로_세지_않는다() {
         BulkheadFullException rejected = BulkheadFullException.createBulkheadFullException(
-                bulkheadRegistry.bulkhead("noteKeywordAnalysis"));
+                bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest"));
 
         for (String name : List.of("keywordClassifier", "keywordClassifierGpt")) {
             CircuitBreaker circuit = circuitBreakerRegistry.circuitBreaker(name);
