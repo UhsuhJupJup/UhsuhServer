@@ -76,12 +76,12 @@ class CacheTestServers implements AutoCloseable {
         StringRedisTemplate redis = new StringRedisTemplate(factory);
         redis.afterPropertiesSet();
         TieredCache cache = new TieredCache(NAME, new LocalCache(local, nanos::get), remote, lock,
-                new CacheInvalidationPublisher(redis), Long::valueOf, registry);
+                new CacheInvalidationPublisher(redis, registry), Long::valueOf, registry);
         return new Server(cache, registry, nanos, factory);
     }
 
     void listen(Server server) throws InterruptedException {
-        RedisMessageListenerContainer container = CacheConfig.invalidationListenerContainer(server.factory(), List.of(server.cache()));
+        RedisMessageListenerContainer container = CacheConfig.invalidationListenerContainer(server.factory(), List.of(server.cache()), server.registry());
         container.afterPropertiesSet();
         container.start();
         containers.add(container);
@@ -154,12 +154,24 @@ class CacheTestServers implements AutoCloseable {
             return registry.find(meter).tag("result", result).counters().stream().mapToDouble(c -> c.count()).sum();
         }
 
+        double tagged(String meter, String tag, String value) {
+            return registry.find(meter).tag(tag, value).counters().stream().mapToDouble(c -> c.count()).sum();
+        }
+
+        double timed(String meter, String... tags) {
+            return registry.find(meter).tags(tags).timers().stream().mapToDouble(t -> t.count()).sum();
+        }
+
+        double invalidations(String reason) {
+            return tagged("uhsuh.cache.local.invalidations", "reason", reason);
+        }
+
         double remoteLookups() {
             return count("cache.gets", "hit") + count("cache.gets", "miss");
         }
 
         double loads() {
-            return count("uhsuh.cache.loads", "computed");
+            return registry.find("uhsuh.cache.loads").tag("result", "success").timers().stream().mapToDouble(t -> t.count()).sum();
         }
 
         void advance(Duration duration) {

@@ -1,0 +1,2614 @@
+{
+  "uid": "uhsuh-keyword-graph-cache",
+  "title": "어서줍줍 키워드 그래프 캐시",
+  "description": "키워드 그래프 캐시(L1 Caffeine, L2 Redis)의 적중, Redis 명령, DB 집계, 락, single-flight, 갱신과 무효화를 요청 처리량, 응답 시간, DB, Redis 와 같은 시간축에서 본다.",
+  "tags": [
+    "uhsuhjupjup",
+    "cache",
+    "multi-instance"
+  ],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "graphTooltip": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "loki",
+        "label": "Loki",
+        "type": "datasource",
+        "query": "loki",
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "instance",
+        "label": "Instance",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(up{job=\"uhsuhjupjup-backend\"}, instance)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "id": 2,
+      "title": "요청과 자원 (같은 시간축에서 비교)",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 3,
+      "title": "키워드 그래프 조회 처리량 (초당 요청)",
+      "description": "GET /api/keywords/{id}/graph 의 초당 요청 수다(헬스 체크 등 다른 요청은 들어가지 않는다). 최근 1분 평균, 앱마다 따로.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m]))",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m]))",
+          "legendFormat": "합계",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 4,
+      "title": "키워드 그래프 조회 응답 시간 p95, p99 (서버 지표)",
+      "description": "GET /api/keywords/{id}/graph 만 본다. 서버가 잰 응답 시간 분포(1ms ~ 5s 구간)에서 최근 1분 창으로 구한 백분위다. 구간 경계 사이 값은 보간이라 근삿값이고, 부하 생성기(k6)가 구간 전체로 잰 p95 와 다를 수 있다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))",
+          "legendFormat": "전체 p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))",
+          "legendFormat": "전체 p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.95, sum by (le, instance) (rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))",
+          "legendFormat": "{{instance}} p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "D",
+          "expr": "histogram_quantile(0.99, sum by (le, instance) (rate(http_server_requests_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))",
+          "legendFormat": "{{instance}} p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 5,
+      "title": "키워드 그래프 조회 오류율 (%)",
+      "description": "5xx 응답 수 / 전체 응답 수. 없는 키워드의 404 는 오류로 세지 않는다. 최근 1분.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * ((sum by (instance) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\", status=~\"5..\"}[1m])) or 0 * sum by (instance) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))) / (sum by (instance) (rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])) > 0)",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "100 * ((sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\", status=~\"5..\"}[1m])) or 0 * sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])))) / (sum(rate(http_server_requests_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", uri=\"/api/keywords/{id}/graph\"}[1m])) > 0)",
+          "legendFormat": "전체",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 6,
+      "title": "DB 서버 CPU와 MySQL 실행 중 쿼리",
+      "description": "DB 서버 CPU 는 테스트 환경에만 있다(node-exporter). Threads_running 은 쉴 때도 2 쯤 나온다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{instance=\"data\", mode=\"idle\"}[1m])))",
+          "legendFormat": "DB 서버 CPU %",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "mysql_global_status_threads_running",
+          "legendFormat": "MySQL 실행 중 쿼리 (개)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "수집 안 함 (테스트 환경에만 있는 지표)",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 9
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 7,
+      "title": "DB 커넥션 풀 (사용 중, 대기)",
+      "description": "HikariCP 의 사용 중 커넥션과 커넥션을 기다리는 스레드 수다. 앱마다 최대 10개.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active{job=\"uhsuhjupjup-backend\", instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} 사용 중",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "hikaricp_connections_pending{job=\"uhsuhjupjup-backend\", instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} 대기",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 9
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 8,
+      "title": "Redis 메모리와 축출",
+      "description": "redis_exporter 값이다(테스트 환경에만 있음). 축출은 maxmemory(128MB, allkeys-lru)를 넘어 Redis 가 지운 키의 초당 수다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "사용 중",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "maxmemory",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0,
+          "noValue": "수집 안 함 (테스트 환경에만 있는 지표)",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 16,
+        "y": 9
+      }
+    },
+    {
+      "type": "stat",
+      "id": 9,
+      "title": "Redis 축출 키 (고른 시간)",
+      "description": "evicted_keys 의 고른 시간 동안 증가량이다. 0 이 아니면 캐시가 아닌 키도 지워졌을 수 있다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(redis_evicted_keys_total[$__range]))",
+          "legendFormat": "축출",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "max(redis_connected_clients)",
+          "legendFormat": "연결 수",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "수집 안 함 (테스트 환경에만 있는 지표)",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 3,
+        "x": 21,
+        "y": 9
+      }
+    },
+    {
+      "type": "row",
+      "id": 10,
+      "title": "L1 (서버 메모리 캐시)",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 11,
+      "title": "L1 적중률 (%)",
+      "description": "L1 적중 / L1 조회. 분모 L1 조회는 키워드 그래프 캐시에 들어온 모든 조회(적중 + 미스)다. 최근 1분, 앱마다 따로.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[1m]))) / (sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])) > 0)",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 18
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 12,
+      "title": "L1 초당 적중과 미스",
+      "description": "L1 에서 바로 돌려준 조회(적중)와 L1 에 없던 조회(미스)다. 미스는 같은 서버의 대표 한 건만 Redis 로 간다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[1m]))",
+          "legendFormat": "{{instance}} 적중",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"miss\"}[1m]))",
+          "legendFormat": "{{instance}} 미스",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 18
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 13,
+      "title": "Redis 까지 간 조회 비율 (%)",
+      "description": "Redis 조회 / L1 조회. L1 이 적중하면 Redis 를 부르지 않으므로 이 값이 낮을수록 Redis 접근이 줄었다는 뜻이다. Redis 조회는 L1 미스 중 대표 요청이 한 GET 만 센다(락 대기 중 다시 읽는 GET 은 Redis 명령 패널에 따로).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum by (instance) (rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))) / (sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])) > 0)",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 14,
+      "title": "L1 저장과 낡은 값 건너뜀",
+      "description": "저장은 L1 에 새로 담은 횟수, 건너뜀은 조회 도중 무효화가 끼어 예전 값을 담지 않은 횟수다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (rate(uhsuh_cache_local_puts_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"stored\"}[1m]))",
+          "legendFormat": "{{instance}} 저장",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance) (rate(uhsuh_cache_local_puts_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"skipped-stale\"}[1m]))",
+          "legendFormat": "{{instance}} 낡은 값 건너뜀",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 26
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 15,
+      "title": "L1 크기와 축출",
+      "description": "L1 에 들어 있는 키 수(최대 1000)와, 크기 초과나 TTL 만료로 L1 에서 빠진 초당 키 수다. 무효화 메시지로 지운 것은 축출에 들어가지 않는다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (instance) (uhsuh_cache_local_size{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"})",
+          "legendFormat": "{{instance}} 크기",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance) (rate(uhsuh_cache_local_evictions_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} 축출 (초당)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 26
+      }
+    },
+    {
+      "type": "stat",
+      "id": 16,
+      "title": "고른 시간 전체 비율",
+      "description": "고른 시간 범위의 증가량으로 구한 값이다. L1 적중률 = L1 적중 / L1 조회, Redis 조회 비율 = Redis 조회 / L1 조회, DB 집계 비율 = 일반 조회의 DB 집계 / L1 조회.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[$__range]))) / (sum(increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[$__range])) > 0)",
+          "legendFormat": "L1 적중률 %",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "100 * (sum(increase(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[$__range]))) / (sum(increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[$__range])) > 0)",
+          "legendFormat": "Redis 조회 비율 %",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "100 * (sum(increase(uhsuh_cache_loads_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", source=\"read\"}[$__range]))) / (sum(increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[$__range])) > 0)",
+          "legendFormat": "DB 집계 비율 %",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "D",
+          "expr": "sum(increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[$__range]))",
+          "legendFormat": "L1 조회 수",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 26
+      }
+    },
+    {
+      "type": "row",
+      "id": 17,
+      "title": "L2 (Redis)",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 18,
+      "title": "Redis(L2) 적중률 (%)",
+      "description": "Redis 적중 / Redis 조회. 분모 Redis 조회는 L1 미스 중 대표 요청의 첫 GET 이다(L1 적중은 들어가지 않는다).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum by (instance) (rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"hit\"}[1m]))) / (sum by (instance) (rate(cache_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])) > 0)",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 35
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 19,
+      "title": "Redis 명령 초당 횟수 (명령별)",
+      "description": "캐시가 Redis 에 보낸 실제 명령 수다. get 은 첫 조회와 락 대기 중 다시 읽기를 모두 센다. lock 은 SET NX, store_if_owner 와 release 는 Lua 스크립트다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, command) (rate(uhsuh_cache_redis_commands_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"success\"}[1m]))",
+          "legendFormat": "{{instance}} {{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 35
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 20,
+      "title": "Redis 명령 응답 시간 p95, p99 (명령별)",
+      "description": "명령 하나의 왕복 시간 분포(1ms ~ 1s 구간)에서 구한 백분위다. 실패한 명령(타임아웃 1초 포함)도 들어간다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, command) (rate(uhsuh_cache_redis_commands_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{command}} p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum by (le, command) (rate(uhsuh_cache_redis_commands_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{command}} p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 35
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 21,
+      "title": "Redis 명령 오류와 건너뜀",
+      "description": "오류는 Redis 가 실패를 돌려주거나 1초 안에 답하지 않은 명령이다. 건너뜀은 오류 뒤 10초 동안 Redis 를 부르지 않고 넘어간 횟수다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, command) (rate(uhsuh_cache_redis_commands_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"error\"}[1m]))",
+          "legendFormat": "{{instance}} 오류 {{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance, command) (rate(uhsuh_cache_redis_skipped_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} 건너뜀 {{command}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 22,
+      "title": "Redis 저장 결과",
+      "description": "저장은 Redis 에 값을 쓴 횟수, 거절은 락을 잃어 락 소유자로 쓰지 못한 횟수(소유권 상실)다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (rate(uhsuh_cache_puts_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"stored\"}[1m]))",
+          "legendFormat": "{{instance}} 저장",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance) (rate(uhsuh_cache_puts_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"rejected\"}[1m]))",
+          "legendFormat": "{{instance}} 거절 (소유권 상실)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      }
+    },
+    {
+      "type": "row",
+      "id": 23,
+      "title": "DB 집계",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 24,
+      "title": "DB 집계 초당 횟수 (일반 조회, 수집 후 갱신)",
+      "description": "집계 함수(KeywordService.getGraph) 호출 수다. 호출 한 번에 SQL 여러 개가 나간다. read 는 캐시가 비어 조회가 직접 한 집계, refresh 는 매칭 커밋 뒤 갱신이 한 집계다. 한 호출은 한 번만 센다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, source) (rate(uhsuh_cache_loads_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"success\"}[1m]))",
+          "legendFormat": "{{instance}} {{source}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance, source) (rate(uhsuh_cache_loads_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"failure\"}[1m]))",
+          "legendFormat": "{{instance}} {{source}} 실패",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 52
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 25,
+      "title": "DB 집계 시간 p50, p95, p99",
+      "description": "집계 함수 한 번의 시간 분포(5ms ~ 5s 구간)에서 구한 백분위다. 실패한 집계도 들어간다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le, source) (rate(uhsuh_cache_loads_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{source}} p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le, source) (rate(uhsuh_cache_loads_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{source}} p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le, source) (rate(uhsuh_cache_loads_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{source}} p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 52
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 26,
+      "title": "MySQL 초당 쿼리 (실제 SQL 수)",
+      "description": "MySQL 의 Questions 증가율이다. 앱 전체와 지표 수집 쿼리까지 모두 포함한다. 집계 함수 호출 수와 비교할 때 쓴다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(mysql_global_status_questions[1m])",
+          "legendFormat": "MySQL 쿼리",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 52
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 27,
+      "title": "요청 대비 DB 집계 비율 (%)",
+      "description": "일반 조회의 DB 집계 수 / L1 조회 수. 같은 키에 요청이 몰려도 집계가 몇 번 돌았는지 본다. 최근 1분, 앱마다 따로.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum by (instance) (rate(uhsuh_cache_loads_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", source=\"read\"}[1m]))) / (sum by (instance) (rate(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])) > 0)",
+          "legendFormat": "{{instance}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 28,
+      "title": "락 없이 DB 로 넘어간 횟수 (원인별)",
+      "description": "redis_error 는 락을 얻다 Redis 오류가 난 경우, redis_skipped 는 오류 뒤 10초 동안 Redis 를 건너뛴 경우, lock_timeout 은 락을 3초 기다려도 못 얻은 경우다. 모두 DB 로 직접 집계한다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, reason) (rate(uhsuh_cache_fallbacks_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      }
+    },
+    {
+      "type": "row",
+      "id": 29,
+      "title": "분산 락과 서버 안 single-flight",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 30,
+      "title": "분산 락 결과 (조회, 갱신)",
+      "description": "acquired 는 락을 얻음, timeout 은 대기 시간 초과, error 는 Redis 오류다. purpose 가 read 면 일반 조회, refresh 면 수집 후 갱신이다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, purpose, result) (rate(uhsuh_cache_lock_attempts_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} {{purpose}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 69
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 31,
+      "title": "락 대기가 끝난 이유",
+      "description": "value_found 는 기다리는 동안 다른 서버가 저장한 값을 찾아 계산하지 않은 경우다. skipped 는 Redis 를 건너뛰는 중이라 기다리지 않은 경우다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (purpose, result) (rate(uhsuh_cache_lock_wait_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{purpose}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 69
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 32,
+      "title": "락 대기 시간 p95",
+      "description": "락을 얻으려 기다리기 시작해서 끝날 때까지의 시간 분포(1ms ~ 5s 구간)다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, purpose, result) (rate(uhsuh_cache_lock_wait_seconds_bucket{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m])))",
+          "legendFormat": "{{purpose}} {{result}} p95",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "요청 없음",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 69
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 33,
+      "title": "서버 안 single-flight (대표, 대기)",
+      "description": "L1 미스가 난 요청 중 대표(leader)만 Redis 와 DB 로 가고 나머지(follower)는 대표의 결과를 기다린다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, role) (rate(uhsuh_cache_local_loads_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} {{role}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 77
+      }
+    },
+    {
+      "type": "stat",
+      "id": 34,
+      "title": "같은 키 동시 요청 대비 DB 집계 (고른 시간)",
+      "description": "고른 시간 동안의 증가량이다. L1 미스 요청 수, 그중 대표 수, 일반 조회의 DB 집계 수를 견준다. 집계 수가 대표 수보다 작으면 나머지는 Redis 나 다른 서버의 값으로 끝난 것이다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance) (increase(uhsuh_cache_local_gets_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"miss\"}[$__range]))",
+          "legendFormat": "{{instance}} L1 미스",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance) (increase(uhsuh_cache_local_loads_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", role=\"leader\"}[$__range]))",
+          "legendFormat": "{{instance}} 대표",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (instance) (increase(uhsuh_cache_loads_seconds_count{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", source=\"read\"}[$__range]))",
+          "legendFormat": "{{instance}} DB 집계",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 77
+      }
+    },
+    {
+      "type": "row",
+      "id": 35,
+      "title": "수집 후 갱신과 무효화 (발행, 수신, 처리)",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 36,
+      "title": "수집 후 갱신 결과",
+      "description": "stored 는 다시 계산해 Redis 에 저장함, lock_timeout 과 lost_lock 은 건너뜀, redis_unavailable 은 Redis 가 안 돼 자기 L1 만 비움, failed 는 계산 실패다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, result) (increase(uhsuh_cache_refreshes_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 37,
+      "title": "무효화 발행 (발행한 서버)",
+      "description": "Redis 저장이 확인된 키만 발행한다. success 는 Redis 가 PUBLISH 를 받았다는 뜻이지 모든 서버가 처리했다는 뜻이 아니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, result) (increase(uhsuh_cache_invalidation_published_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 86
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 38,
+      "title": "무효화 수신과 L1 처리 (서버별)",
+      "description": "processed 는 메시지를 받아 그 키의 L1 을 지움, failed 는 처리 중 오류다. L1 무효화는 message(메시지로 지움)와 redis_unavailable(갱신 때 Redis 가 안 돼 자기 L1 을 지움)로 나뉜다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, result) (increase(uhsuh_cache_invalidation_received_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{instance}} 수신 {{result}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance, reason) (increase(uhsuh_cache_local_invalidations_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} L1 무효화 {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 86
+      }
+    },
+    {
+      "type": "stat",
+      "id": 39,
+      "title": "발행 대비 서버별 처리 (고른 시간)",
+      "description": "발행 성공 수와 서버마다 처리한 수를 견준다. 서버마다 처리 수가 발행 수와 같아야 모든 서버가 받은 것이다(발행 성공이나 구독자 수만으로는 알 수 없다).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(uhsuh_cache_invalidation_published_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"success\"}[$__range]))",
+          "legendFormat": "발행 성공 (전체)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(increase(uhsuh_cache_invalidation_published_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"failure\"}[$__range]))",
+          "legendFormat": "발행 실패 (전체)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (instance) (increase(uhsuh_cache_invalidation_received_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\", result=\"processed\"}[$__range]))",
+          "legendFormat": "{{instance}} 처리",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "D",
+          "expr": "sum by (instance) (increase(uhsuh_cache_invalidation_received_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", result=~\"failed|malformed|unknown_cache\"}[$__range]))",
+          "legendFormat": "{{instance}} 처리 못함",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "orientation": "horizontal",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 94
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 40,
+      "title": "구독 연결과 재연결 시 L1 비움",
+      "description": "initial 은 처음 구독, resubscribed 는 연결이 끊겼다가 다시 구독한 것(끊김은 다시 구독할 때 드러난다), unsubscribed 는 구독을 스스로 끝낸 것이다. 재연결 때 놓친 메시지에 대비해 L1 을 비운다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (instance, event) (increase(uhsuh_cache_invalidation_subscriptions_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\"}[1m]))",
+          "legendFormat": "{{instance}} {{event}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (instance, reason) (increase(uhsuh_cache_local_clears_total{job=\"uhsuhjupjup-backend\", instance=~\"$instance\", cache=\"keywordGraph\"}[1m]))",
+          "legendFormat": "{{instance}} L1 전체 비움 {{reason}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 94
+      }
+    },
+    {
+      "type": "timeseries",
+      "id": 41,
+      "title": "Redis 의 구독 연결 수",
+      "description": "Redis 가 보는 PUB/SUB 연결 수다(redis_exporter, 테스트 환경에만 있음). 앱 2대가 구독 중이면 2 다. 이 값만으로 메시지 처리를 단정하지 않는다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_pubsub_clients",
+          "legendFormat": "구독 연결",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "redis_pubsub_channels",
+          "legendFormat": "채널",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "수집 안 함 (테스트 환경에만 있는 지표)",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 94
+      }
+    },
+    {
+      "type": "logs",
+      "id": 42,
+      "title": "갱신과 무효화 로그 (refreshId 로 묶어 보기)",
+      "description": "갱신 로그와 발행 로그에는 같은 refreshId 가 붙는다. 수신 로그는 키와 시각으로 맞춘다. 키워드 ID 는 로그에만 있고 지표 라벨에는 없다.",
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki}"
+          },
+          "expr": "{job=\"uhsuh\", container=\"uhsuh-server\", instance=~\"$instance\"} |~ \"키워드 그래프 갱신|로컬 캐시 무효화\" | json msg=\"message\", lvl=\"log.level\", rid=\"cacheRefreshId\" | line_format \"[{{.instance}}] {{.lvl}} {{if .rid}}refreshId={{.rid}} {{end}}{{.msg}}\""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 102
+      }
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 package uhsuhjupjup.backend.learningnote.ui;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.DeferredResult;
+import reactor.core.Disposable;
 import uhsuhjupjup.backend.common.auth.LoginMember;
 import uhsuhjupjup.backend.learningnote.application.NoteGraphService;
 import uhsuhjupjup.backend.learningnote.application.NoteRecommendationService;
@@ -22,16 +25,28 @@ import uhsuhjupjup.backend.learningnote.ui.dto.NoteRequest;
 import uhsuhjupjup.backend.learningnote.ui.dto.NoteResponse;
 import uhsuhjupjup.backend.member.domain.Member;
 
+import java.time.Duration;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/notes")
-@RequiredArgsConstructor
 public class NoteController implements NoteControllerApi {
 
     private final NoteService noteService;
     private final NoteRecommendationService noteRecommendationService;
     private final NoteGraphService noteGraphService;
+    private final Duration recommendationTimeout;
+
+    public NoteController(NoteService noteService,
+                          NoteRecommendationService noteRecommendationService,
+                          NoteGraphService noteGraphService,
+                          @Value("${note.recommendation.timeout:PT15S}") Duration recommendationTimeout) {
+        this.noteService = noteService;
+        this.noteRecommendationService = noteRecommendationService;
+        this.noteGraphService = noteGraphService;
+        this.recommendationTimeout = recommendationTimeout;
+    }
 
     @Override
     @PostMapping
@@ -70,8 +85,30 @@ public class NoteController implements NoteControllerApi {
 
     @Override
     @GetMapping("/{id}/recommendations")
-    public NoteRecommendationResponse recommendations(@LoginMember Member member, @PathVariable Long id) {
-        return NoteRecommendationResponse.from(noteRecommendationService.recommend(id, member.getId()));
+    public DeferredResult<NoteRecommendationResponse> recommendations(@LoginMember Member member,
+                                                                      @PathVariable Long id) {
+        DeferredResult<NoteRecommendationResponse> result = new DeferredResult<>(recommendationTimeout.toMillis());
+        Disposable aiCall = noteRecommendationService.recommendAsync(id, member.getId())
+                .map(NoteRecommendationResponse::from)
+                .subscribe(result::setResult, result::setErrorResult);
+        result.onTimeout(() -> {
+            aiCall.dispose();
+            log.warn("노트 추천 시간 초과, AI 호출 취소 후 분석 작업으로 보존 noteId={}", id);
+            try {
+                result.setResult(NoteRecommendationResponse.from(noteRecommendationService.queueAfterTimeout(id)));
+            } catch (RuntimeException e) {
+                result.setErrorResult(e);
+            }
+        });
+        result.onError(error -> aiCall.dispose());
+        return result;
+    }
+
+    @Override
+    @PostMapping("/{id}/recommendations/retry")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void retryRecommendations(@LoginMember Member member, @PathVariable Long id) {
+        noteRecommendationService.retryFailed(id, member.getId());
     }
 
     @Override

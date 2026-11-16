@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -28,9 +29,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static uhsuhjupjup.backend.common.cache.CacheTestServers.LOCAL;
 import static uhsuhjupjup.backend.common.cache.CacheTestServers.LOCK;
 import static uhsuhjupjup.backend.common.cache.CacheTestServers.cacheKey;
+import static uhsuhjupjup.backend.common.cache.CacheTestServers.lockKey;
 
 class TieredCacheLayersTest {
 
@@ -175,6 +178,104 @@ class TieredCacheLayersTest {
     }
 
     @Test
+    void Redis가_멈춘_채로_계산이_실패하면_기다리던_요청도_실패하고_다음_요청은_다시_계산한다() throws Exception {
+        Server server = servers.server(LOCK, LOCAL, servers.connectionFactory("127.0.0.1", 1), CacheTestServers.serializer());
+        AtomicInteger computed = new AtomicInteger();
+        IllegalStateException failure = new IllegalStateException("집계 실패");
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<String> failing = () -> {
+            computed.incrementAndGet();
+            Thread.sleep(300);
+            throw failure;
+        };
+
+        List<Future<String>> results = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            results.add(pool.submit(() -> { start.await(); return server.cache().get(16L, failing); }));
+        }
+        start.countDown();
+        for (Future<String> result : results) {
+            assertThatThrownBy(() -> result.get(10, TimeUnit.SECONDS)).hasRootCause(failure);
+        }
+        assertThat(computed).hasValue(1);
+        assertThat(server.cache().localValue(16L)).isNull();
+
+        String retried = server.cache().get(16L, () -> {
+            computed.incrementAndGet();
+            return "graph-16";
+        });
+
+        assertThat(retried).isEqualTo("graph-16");
+        assertThat(computed).hasValue(2);
+        assertThat(server.cache().localValue(16L)).isEqualTo("graph-16");
+    }
+
+    @Test
+    void Redis가_멈춰도_서로_다른_키는_한_서버_안에서_동시에_계산한다() throws Exception {
+        Server server = servers.server(LOCK, LOCAL, servers.connectionFactory("127.0.0.1", 1), CacheTestServers.serializer());
+        CyclicBarrier bothInside = new CyclicBarrier(2);
+
+        Future<String> seventeen = pool.submit(() -> server.cache().get(17L, () -> {
+            bothInside.await(5, TimeUnit.SECONDS);
+            return "graph-17";
+        }));
+        Future<String> eighteen = pool.submit(() -> server.cache().get(18L, () -> {
+            bothInside.await(5, TimeUnit.SECONDS);
+            return "graph-18";
+        }));
+
+        assertThat(seventeen.get(10, TimeUnit.SECONDS)).isEqualTo("graph-17");
+        assertThat(eighteen.get(10, TimeUnit.SECONDS)).isEqualTo("graph-18");
+        assertThat(server.cache().localValue(17L)).isEqualTo("graph-17");
+        assertThat(server.cache().localValue(18L)).isEqualTo("graph-18");
+    }
+
+    @Test
+    void 원본_변경_없이_TTL이_지나_다시_계산할_때는_무효화_메시지를_보내지_않는다() throws Exception {
+        Server first = servers.server();
+        Server second = servers.server();
+        servers.listen(first);
+        servers.listen(second);
+        RedisMessageListenerContainer probe = probeContainer();
+        first.cache().get(19L, () -> "graph-19");
+        second.cache().get(19L, () -> "never");
+
+        redis.delete(cacheKey(19L));
+        first.advance(Duration.ofMinutes(6));
+        String recomputed = first.cache().get(19L, () -> "graph-19-again");
+        Thread.sleep(300);
+
+        assertThat(recomputed).isEqualTo("graph-19-again");
+        assertThat(first.loads()).isEqualTo(2.0);
+        assertThat(messages).isEmpty();
+        assertThat(second.cache().localValue(19L)).isEqualTo("graph-19");
+        assertThat(redis.opsForValue().get(cacheKey(19L))).isEqualTo("\"graph-19-again\"");
+        probe.stop();
+    }
+
+    @Test
+    void 갱신_락을_다른_서버가_오래_쥐고_있으면_이번_갱신은_건너뛰고_메시지를_보내지_않는다() throws Exception {
+        Server server = servers.server(new CacheLockSettings(Duration.ofMillis(200), Duration.ofMillis(100),
+                Duration.ofMillis(20), Duration.ofSeconds(10)));
+        servers.listen(server);
+        RedisMessageListenerContainer probe = probeContainer();
+        server.cache().get(20L, () -> "old-graph");
+        redis.opsForValue().set(lockKey(20L), "other-server", Duration.ofSeconds(30));
+        AtomicInteger computed = new AtomicInteger();
+
+        RefreshOutcome outcome = server.cache().refresh(20L, () -> "new-" + computed.incrementAndGet());
+        Thread.sleep(300);
+
+        assertThat(outcome).isEqualTo(RefreshOutcome.LOCK_TIMEOUT);
+        assertThat(computed).hasValue(0);
+        assertThat(messages).isEmpty();
+        assertThat(redis.opsForValue().get(cacheKey(20L))).isEqualTo("\"old-graph\"");
+        assertThat(redis.opsForValue().get(lockKey(20L))).isEqualTo("other-server");
+        assertThat(server.cache().localValue(20L)).isEqualTo("old-graph");
+        probe.stop();
+    }
+
+    @Test
     void 무효화_메시지를_놓쳐도_로컬_TTL이_지나면_Redis의_새_값을_읽는다() {
         Server server = servers.server();
         server.cache().get(7L, () -> "old-graph");
@@ -234,7 +335,7 @@ class TieredCacheLayersTest {
         Future<String> slowRead = pool.submit(() -> reader.cache().get(9L, () -> "computed"));
         assertThat(blocking.awaitReadStarted()).isTrue();
         assertThat(writer.cache().refresh(9L, () -> "new-graph")).isEqualTo(RefreshOutcome.STORED);
-        awaitCount(reader, "uhsuh.cache.local.invalidations", "key", 1);
+        awaitInvalidations(reader, 1);
         blocking.release();
 
         assertThat(slowRead.get(10, TimeUnit.SECONDS)).isEqualTo("old-graph");
@@ -346,12 +447,12 @@ class TieredCacheLayersTest {
         }
     }
 
-    private void awaitCount(Server server, String meter, String result, double expected) throws InterruptedException {
+    private void awaitInvalidations(Server server, double expected) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (server.count(meter, result) < expected && System.nanoTime() < deadline) {
+        while (server.invalidations("message") < expected && System.nanoTime() < deadline) {
             Thread.sleep(10);
         }
-        assertThat(server.count(meter, result)).isGreaterThanOrEqualTo(expected);
+        assertThat(server.invalidations("message")).isGreaterThanOrEqualTo(expected);
     }
 
     private static final class BlockingSerializer implements RedisSerializer<Object> {

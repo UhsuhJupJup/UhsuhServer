@@ -30,25 +30,28 @@ class OutboxDispatcherTest {
     @BeforeEach
     void setUp() {
         emailSender = new FakeEmailSender();
-        dispatcher = new OutboxDispatcher(notificationOutboxRepository, emailSender);
-        ReflectionTestUtils.setField(dispatcher, "maxAttempts", 5);
-        ReflectionTestUtils.setField(dispatcher, "retryBackoffBase", Duration.ofMinutes(1));
-        ReflectionTestUtils.setField(dispatcher, "retryBackoffCap", Duration.ofMinutes(30));
+        OutboxResultRecorder recorder = new OutboxResultRecorder(notificationOutboxRepository);
+        ReflectionTestUtils.setField(recorder, "maxAttempts", 5);
+        ReflectionTestUtils.setField(recorder, "retryBackoffBase", Duration.ofMinutes(1));
+        ReflectionTestUtils.setField(recorder, "retryBackoffCap", Duration.ofMinutes(30));
+        dispatcher = new OutboxDispatcher(notificationOutboxRepository, emailSender, recorder);
     }
 
-    private NotificationOutbox outbox(String recipient) {
+    private NotificationOutbox claimed(String recipient, int attempts) {
         NotificationOutbox row = NotificationOutbox.pending(recipient, RecipientType.MEMBER, 2,
                 "제목", "<html>", "https://uhsuh/u", LocalDateTime.now());
         ReflectionTestUtils.setField(row, "id", 1L);
+        ReflectionTestUtils.setField(row, "status", OutboxStatus.PROCESSING);
+        ReflectionTestUtils.setField(row, "attempts", attempts);
+        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
         return row;
     }
 
     @Test
     void 발송_성공하면_SENT로_전이한다() {
-        NotificationOutbox row = outbox("a@test.com");
-        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
+        NotificationOutbox row = claimed("a@test.com", 1);
 
-        boolean result = dispatcher.dispatchOne(1L);
+        boolean result = dispatcher.dispatchClaimed(1L);
 
         assertThat(result).isTrue();
         assertThat(row.getStatus()).isEqualTo(OutboxStatus.SENT);
@@ -58,27 +61,37 @@ class OutboxDispatcherTest {
     }
 
     @Test
-    void 발송_실패하면_재시도로_예약하고_PENDING을_유지한다() {
-        NotificationOutbox row = outbox("fail@test.com");
+    void 첫_실패는_기본_간격_뒤로_재시도를_예약하고_PENDING으로_되돌린다() {
+        NotificationOutbox row = claimed("fail@test.com", 1);
         emailSender.failFor("fail@test.com");
-        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
+        LocalDateTime before = LocalDateTime.now();
 
-        boolean result = dispatcher.dispatchOne(1L);
+        boolean result = dispatcher.dispatchClaimed(1L);
 
         assertThat(result).isFalse();
         assertThat(row.getStatus()).isEqualTo(OutboxStatus.PENDING);
         assertThat(row.getAttempts()).isEqualTo(1);
-        assertThat(row.getNextAttemptAt()).isAfter(LocalDateTime.now());
+        assertThat(row.getNextAttemptAt()).isBetween(before.plusMinutes(1), LocalDateTime.now().plusMinutes(1));
         assertThat(row.getLastError()).contains("boom");
     }
 
     @Test
-    void 영구_오류는_재시도없이_즉시_FAILED로_전이한다() {
-        NotificationOutbox row = outbox("bad@test.com");
-        emailSender.failPermanentlyFor("bad@test.com");
-        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
+    void 실패가_쌓이면_간격이_두_배씩_늘어난다() {
+        NotificationOutbox row = claimed("fail@test.com", 3);
+        emailSender.failFor("fail@test.com");
+        LocalDateTime before = LocalDateTime.now();
 
-        boolean result = dispatcher.dispatchOne(1L);
+        dispatcher.dispatchClaimed(1L);
+
+        assertThat(row.getNextAttemptAt()).isBetween(before.plusMinutes(4), LocalDateTime.now().plusMinutes(4));
+    }
+
+    @Test
+    void 영구_오류는_재시도없이_즉시_FAILED로_전이한다() {
+        NotificationOutbox row = claimed("bad@test.com", 1);
+        emailSender.failPermanentlyFor("bad@test.com");
+
+        boolean result = dispatcher.dispatchClaimed(1L);
 
         assertThat(result).isFalse();
         assertThat(row.getStatus()).isEqualTo(OutboxStatus.FAILED);
@@ -87,12 +100,10 @@ class OutboxDispatcherTest {
 
     @Test
     void 최대_시도에_도달하면_FAILED로_전이한다() {
-        NotificationOutbox row = outbox("fail@test.com");
-        ReflectionTestUtils.setField(row, "attempts", 4);
+        NotificationOutbox row = claimed("fail@test.com", 5);
         emailSender.failFor("fail@test.com");
-        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
 
-        boolean result = dispatcher.dispatchOne(1L);
+        boolean result = dispatcher.dispatchClaimed(1L);
 
         assertThat(result).isFalse();
         assertThat(row.getStatus()).isEqualTo(OutboxStatus.FAILED);
@@ -100,12 +111,11 @@ class OutboxDispatcherTest {
     }
 
     @Test
-    void 이미_처리된_행은_건너뛴다() {
-        NotificationOutbox row = outbox("a@test.com");
+    void 선점하지_않은_행은_건너뛴다() {
+        NotificationOutbox row = claimed("a@test.com", 1);
         row.markSent(LocalDateTime.now());
-        given(notificationOutboxRepository.findById(1L)).willReturn(Optional.of(row));
 
-        boolean result = dispatcher.dispatchOne(1L);
+        boolean result = dispatcher.dispatchClaimed(1L);
 
         assertThat(result).isFalse();
         assertThat(emailSender.sent()).isEmpty();
@@ -115,7 +125,7 @@ class OutboxDispatcherTest {
     void 존재하지_않는_행은_false를_반환한다() {
         given(notificationOutboxRepository.findById(99L)).willReturn(Optional.empty());
 
-        boolean result = dispatcher.dispatchOne(99L);
+        boolean result = dispatcher.dispatchClaimed(99L);
 
         assertThat(result).isFalse();
         assertThat(emailSender.sent()).isEmpty();

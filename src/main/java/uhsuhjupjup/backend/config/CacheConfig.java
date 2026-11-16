@@ -73,8 +73,9 @@ public class CacheConfig implements CachingConfigurer {
     @Bean
     @ConditionalOnProperty(name = "cache.invalidation.listener-enabled", havingValue = "true", matchIfMissing = true)
     public RedisMessageListenerContainer cacheInvalidationListenerContainer(RedisConnectionFactory connectionFactory,
-                                                                            List<TieredCache> caches) {
-        return invalidationListenerContainer(connectionFactory, caches);
+                                                                            List<TieredCache> caches,
+                                                                            ObjectProvider<MeterRegistry> meterRegistry) {
+        return invalidationListenerContainer(connectionFactory, caches, meterRegistry.getIfAvailable(SimpleMeterRegistry::new));
     }
 
     public static TieredCache keywordGraphCache(RedisConnectionFactory connectionFactory,
@@ -89,15 +90,16 @@ public class CacheConfig implements CachingConfigurer {
         StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
         redis.afterPropertiesSet();
         return new TieredCache(KEYWORD_GRAPH, new LocalCache(localSettings, ticker), remote, lockSettings,
-                new CacheInvalidationPublisher(redis), Long::valueOf, meterRegistry);
+                new CacheInvalidationPublisher(redis, meterRegistry), Long::valueOf, meterRegistry);
     }
 
     public static RedisMessageListenerContainer invalidationListenerContainer(RedisConnectionFactory connectionFactory,
-                                                                              List<TieredCache> caches) {
+                                                                              List<TieredCache> caches,
+                                                                              MeterRegistry meterRegistry) {
+        CacheInvalidationListener listener = new CacheInvalidationListener(caches, meterRegistry);
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(new CacheInvalidationListener(caches),
-                new ChannelTopic(CacheInvalidationPublisher.CHANNEL));
+        container.addMessageListener(listener, new ChannelTopic(CacheInvalidationPublisher.CHANNEL));
         return container;
     }
 

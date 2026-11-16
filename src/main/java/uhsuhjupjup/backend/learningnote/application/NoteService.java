@@ -7,6 +7,8 @@ import uhsuhjupjup.backend.common.exception.BusinessException;
 import uhsuhjupjup.backend.common.exception.ErrorCode;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteResult;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
+import uhsuhjupjup.backend.learningnote.domain.NoteAnalysisJob;
+import uhsuhjupjup.backend.learningnote.infra.NoteAnalysisJobRepository;
 import uhsuhjupjup.backend.learningnote.infra.LearningNoteRepository;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository.NoteKeywordName;
@@ -14,6 +16,7 @@ import uhsuhjupjup.backend.member.domain.Member;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,6 +26,7 @@ public class NoteService {
 
     private final LearningNoteRepository learningNoteRepository;
     private final NoteKeywordRepository noteKeywordRepository;
+    private final NoteAnalysisJobRepository noteAnalysisJobRepository;
 
     @Transactional
     public LearningNote create(Member member, String title, String content) {
@@ -40,8 +44,12 @@ public class NoteService {
                         .collect(Collectors.groupingBy(
                                 NoteKeywordName::getNoteId,
                                 Collectors.mapping(NoteKeywordName::getName, Collectors.toList())));
+        Map<Long, NoteAnalysisJob> jobsByNote = notes.isEmpty() ? Map.of()
+                : noteAnalysisJobRepository.findByNoteIdIn(notes.stream().map(LearningNote::getId).toList()).stream()
+                        .collect(Collectors.toMap(NoteAnalysisJob::getNoteId, Function.identity()));
         return notes.stream()
-                .map(note -> new NoteResult(note, keywordsByNote.getOrDefault(note.getId(), List.of())))
+                .map(note -> NoteResult.of(note, keywordsByNote.getOrDefault(note.getId(), List.of()),
+                        jobsByNote.get(note.getId())))
                 .toList();
     }
 
@@ -49,7 +57,7 @@ public class NoteService {
         LearningNote note = findOwned(id, memberId);
         List<String> keywords = note.getAnalyzedAt() == null ? List.of()
                 : noteKeywordRepository.findKeywordNamesByNoteId(note.getId());
-        return new NoteResult(note, keywords);
+        return NoteResult.of(note, keywords, noteAnalysisJobRepository.findById(note.getId()).orElse(null));
     }
 
     public LearningNote get(Long id, Long memberId) {
@@ -58,7 +66,9 @@ public class NoteService {
 
     @Transactional
     public LearningNote update(Long id, Long memberId, String title, String content) {
-        LearningNote note = findOwned(id, memberId);
+        LearningNote note = learningNoteRepository.findByIdForUpdate(id)
+                .filter(found -> found.getMember().getId().equals(memberId))
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         note.update(title, content);
         return note;
     }

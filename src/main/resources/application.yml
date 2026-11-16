@@ -25,6 +25,16 @@ spring:
   flyway:
     baseline-on-migrate: true
     baseline-version: 1
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_PHASE_TIMEOUT:8s}
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: ${SCHEDULING_AWAIT_TERMINATION:8s}
+
+server:
+  shutdown: graceful
 
 app:
   instance-name: ${INSTANCE_NAME:local}
@@ -35,6 +45,7 @@ firebase:
 claude:
   enabled: ${CLAUDE_ENABLED:false}
   model: ${CLAUDE_MODEL:claude-haiku-4-5}
+  base-url: ${CLAUDE_BASE_URL:https://api.anthropic.com}
   timeout:
     connect: ${CLAUDE_TIMEOUT_CONNECT:PT5S}   # 연결 수립 상한
     call: ${CLAUDE_TIMEOUT_CALL:PT10S}        # 요청 1건 전체(읽기 포함) 상한, 노트추천 요청 스레드가 오래 붙잡히지 않게
@@ -45,6 +56,7 @@ claude:
 gpt:
   enabled: ${GPT_ENABLED:false}               # Claude 실패/서킷 OPEN 시 폴백, 키 없으면 false 유지
   model: ${GPT_MODEL:gpt-4o-mini}             # OpenAI 모델, 더 최신 mini급으로 환경변수(GPT_MODEL)로 교체
+  base-url: ${GPT_BASE_URL:https://api.openai.com}
   timeout:
     connect: ${GPT_TIMEOUT_CONNECT:PT5S}      # 연결 수립 상한
     call: ${GPT_TIMEOUT_CALL:PT10S}           # 요청 1건 전체(읽기 포함) 상한
@@ -63,6 +75,8 @@ resilience4j:
         wait-duration-in-open-state: 30s                         # OPEN 후 30초간 Claude 건너뛰고 GPT 폴백, 죽은 API 반복 호출 차단
         permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
         automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - io.github.resilience4j.bulkhead.BulkheadFullException
       keywordClassifierGpt:
         sliding-window-type: COUNT_BASED
         sliding-window-size: 20                                  # GPT 폴백 경로의 실패율 판정
@@ -71,6 +85,37 @@ resilience4j:
         wait-duration-in-open-state: 30s                         # OPEN 후 30초간 GPT 건너뛰기, Claude, GPT 모두 OPEN이면 분류 예외
         permitted-number-of-calls-in-half-open-state: 3          # HALF_OPEN 복귀 시 3건으로 회복 확인
         automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - io.github.resilience4j.bulkhead.BulkheadFullException
+  bulkhead:
+    instances:
+      noteKeywordAnalysisRequest:
+        max-concurrent-calls: ${NOTE_AI_REQUEST_MAX_CONCURRENT_CALLS:15}
+        max-wait-duration: 0
+      noteKeywordAnalysisRetry:
+        max-concurrent-calls: ${NOTE_AI_RETRY_MAX_CONCURRENT_CALLS:5}
+        max-wait-duration: 0
+
+note:
+  recommendation:
+    timeout: ${NOTE_RECOMMENDATION_TIMEOUT:PT15S}
+  async:
+    db-threads: ${NOTE_ASYNC_DB_THREADS:8}
+    db-queue: ${NOTE_ASYNC_DB_QUEUE:200}
+  analysis:
+    poller:
+      enabled: ${NOTE_ANALYSIS_POLLER_ENABLED:true}
+      delay-ms: ${NOTE_ANALYSIS_POLL_DELAY_MS:5000}
+      initial-delay-ms: ${NOTE_ANALYSIS_POLL_INITIAL_DELAY_MS:30000}
+    job:
+      lease: ${NOTE_ANALYSIS_JOB_LEASE:PT3M}
+      timeout: ${NOTE_ANALYSIS_JOB_TIMEOUT:PT2M}
+    retry:
+      base-delay: ${NOTE_ANALYSIS_RETRY_BASE_DELAY:PT30S}
+      max-delay: ${NOTE_ANALYSIS_RETRY_MAX_DELAY:PT15M}
+      horizon: ${NOTE_ANALYSIS_RETRY_HORIZON:PT6H}
+      max-attempts: ${NOTE_ANALYSIS_RETRY_MAX_ATTEMPTS:20}
+      circuit-open-delay: ${NOTE_ANALYSIS_RETRY_CIRCUIT_OPEN_DELAY:PT30S}
 
 notification:
   max-per-member: ${NOTIFICATION_MAX_PER_MEMBER:5}
@@ -92,11 +137,25 @@ cache:
 outbox:
   poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:60000}
   poll-initial-delay-ms: ${OUTBOX_POLL_INITIAL_DELAY_MS:60000}
-  batch-size: ${OUTBOX_BATCH_SIZE:50}
+  batch-size: ${OUTBOX_BATCH_SIZE:5000}
+  claim-lease: ${OUTBOX_CLAIM_LEASE:PT1H}
+  message-claim-lease: ${OUTBOX_MESSAGE_CLAIM_LEASE:PT10M}
+  republish-delay: ${OUTBOX_REPUBLISH_DELAY:PT10M}
+  recovery-lock-at-most-for: ${OUTBOX_RECOVERY_LOCK_AT_MOST_FOR:PT5M}
   max-attempts: ${OUTBOX_MAX_ATTEMPTS:15}
   retry-backoff-base: ${OUTBOX_RETRY_BACKOFF_BASE:PT5M}
   retry-backoff-cap: ${OUTBOX_RETRY_BACKOFF_CAP:PT30M}
-  lock-at-most-for: ${OUTBOX_LOCK_AT_MOST_FOR:PT5M}
+  send-lock-ttl: ${OUTBOX_SEND_LOCK_TTL:PT2M}
+  cleanup-cron: ${OUTBOX_CLEANUP_CRON:0 0 4 * * *}
+  sent-retention: ${OUTBOX_SENT_RETENTION:P7D}
+  cleanup-chunk-size: ${OUTBOX_CLEANUP_CHUNK_SIZE:1000}
+  stream:
+    enabled: ${OUTBOX_STREAM_ENABLED:true}
+    poll-timeout: ${OUTBOX_STREAM_POLL_TIMEOUT:500ms}
+    batch-size: ${OUTBOX_STREAM_BATCH_SIZE:10}
+    reclaim-delay-ms: ${OUTBOX_STREAM_RECLAIM_DELAY_MS:60000}
+    reclaim-min-idle: ${OUTBOX_STREAM_RECLAIM_MIN_IDLE:PT5M}
+    max-deliveries: ${OUTBOX_STREAM_MAX_DELIVERIES:10}
 
 classification:
   poll-delay-ms: ${CLASSIFICATION_POLL_DELAY_MS:600000}          # 미분류 글 재분류 폴러 주기(기본 10분)
@@ -136,6 +195,9 @@ management:
     distribution:
       slo:
         http.server.requests: 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
+        uhsuh.cache.redis.commands: 1ms, 2ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s
+        uhsuh.cache.loads: 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s
+        uhsuh.cache.lock.wait: 1ms, 5ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 3s, 5s
       percentiles-histogram:
         http.server.requests: false
 

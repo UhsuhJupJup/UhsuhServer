@@ -14,7 +14,6 @@ import uhsuhjupjup.backend.article.infra.ArticleRepository;
 import uhsuhjupjup.backend.learningnote.application.dto.NoteRecommendationResult;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.learningnote.infra.NoteKeywordRepository;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,10 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +33,8 @@ class NoteRecommendationServiceTest {
     private NoteService noteService;
     @Mock
     private NoteAnalyzer noteAnalyzer;
+    @Mock
+    private NoteAnalysisJobService noteAnalysisJobService;
     @Mock
     private NoteKeywordRepository noteKeywordRepository;
     @Mock
@@ -184,29 +183,15 @@ class NoteRecommendationServiceTest {
     }
 
     @Test
-    void 아직_분석되지_않은_노트는_분석을_먼저_수행한다() {
+    void 아직_분석되지_않은_노트는_AI를_부르지_않고_빈_추천을_반환한다() {
         LearningNote coldNote = mock(LearningNote.class);
         given(coldNote.getAnalyzedAt()).willReturn(null);
         given(noteService.get(1L, 1L)).willReturn(coldNote);
-        given(noteKeywordRepository.findKeywordNamesByNoteId(1L)).willReturn(List.of());
-        given(noteKeywordRepository.findKeywordIdsByNoteId(1L)).willReturn(List.of());
-
-        noteRecommendationService.recommend(1L, 1L);
-
-        verify(noteAnalyzer).analyze(coldNote);
-    }
-
-    @Test
-    void 분석_중_분류가_실패하면_빈_추천을_반환한다() {
-        LearningNote coldNote = mock(LearningNote.class);
-        given(coldNote.getAnalyzedAt()).willReturn(null);
-        given(noteService.get(1L, 1L)).willReturn(coldNote);
-        doThrow(new KeywordClassificationException("분류 실패", new RuntimeException()))
-                .when(noteAnalyzer).analyze(coldNote);
 
         NoteRecommendationResult result = noteRecommendationService.recommend(1L, 1L);
 
         assertThat(result.keywords()).isEmpty();
         assertThat(result.articles()).isEmpty();
+        verifyNoInteractions(noteAnalyzer, noteKeywordRepository);
     }
 }
