@@ -22,13 +22,13 @@ import java.util.List;
 @Service
 public class NoteAnalyzer {
 
-    static final String AI_BULKHEAD = "noteKeywordAnalysis";
+    static final String REQUEST_BULKHEAD = "noteKeywordAnalysisRequest";
 
     private final KeywordRepository keywordRepository;
     private final KeywordAliasRepository keywordAliasRepository;
     private final AsyncKeywordClassifier asyncKeywordClassifier;
     private final NoteKeywordSaver noteKeywordSaver;
-    private final Bulkhead aiBulkhead;
+    private final Bulkhead requestBulkhead;
     private final Scheduler noteDbScheduler;
 
     public NoteAnalyzer(KeywordRepository keywordRepository,
@@ -41,14 +41,14 @@ public class NoteAnalyzer {
         this.keywordAliasRepository = keywordAliasRepository;
         this.asyncKeywordClassifier = asyncKeywordClassifier;
         this.noteKeywordSaver = noteKeywordSaver;
-        this.aiBulkhead = bulkheadRegistry.bulkhead(AI_BULKHEAD);
+        this.requestBulkhead = bulkheadRegistry.bulkhead(REQUEST_BULKHEAD);
         this.noteDbScheduler = noteDbScheduler;
     }
 
     public Mono<Boolean> analyzeAsync(LearningNote note) {
         long revision = note.getContentRevision();
         return classifyAsync(note.getTitle(), note.getContent())
-                .transformDeferred(BulkheadOperator.of(aiBulkhead))
+                .transformDeferred(BulkheadOperator.of(requestBulkhead))
                 .publishOn(noteDbScheduler)
                 .map(matches -> noteKeywordSaver.replaceKeywords(note.getId(), revision, matches, LocalDateTime.now()));
     }
