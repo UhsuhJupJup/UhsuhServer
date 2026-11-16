@@ -89,8 +89,11 @@ resilience4j:
           - io.github.resilience4j.bulkhead.BulkheadFullException
   bulkhead:
     instances:
-      noteKeywordAnalysis:
-        max-concurrent-calls: ${NOTE_AI_MAX_CONCURRENT_CALLS:20}
+      noteKeywordAnalysisRequest:
+        max-concurrent-calls: ${NOTE_AI_REQUEST_MAX_CONCURRENT_CALLS:15}
+        max-wait-duration: 0
+      noteKeywordAnalysisRetry:
+        max-concurrent-calls: ${NOTE_AI_RETRY_MAX_CONCURRENT_CALLS:5}
         max-wait-duration: 0
 
 note:
