@@ -149,6 +149,7 @@ jobs:
       contents: read
       packages: read
     strategy:
+      max-parallel: 1
       matrix:
         include:
           - host_secret: APP1_HOST
@@ -201,4 +202,21 @@ jobs:
 
             docker compose -f docker-compose.app.yml pull
             docker compose -f docker-compose.app.yml up -d
+
+            healthy=false
+            for i in $(seq 1 36); do
+              if curl -fsS -m 3 http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+                healthy=true
+                break
+              fi
+              sleep 5
+            done
+            if [ "$healthy" != "true" ]; then
+              echo "${{ matrix.instance_name }} 헬스가 3분 안에 UP이 되지 않음"
+              docker logs --tail 80 uhsuh-server
+              exit 1
+            fi
+            echo "${{ matrix.instance_name }} 헬스 UP, ALB가 정상으로 볼 때까지 대기"
+            sleep 150
+
             docker image prune -f
