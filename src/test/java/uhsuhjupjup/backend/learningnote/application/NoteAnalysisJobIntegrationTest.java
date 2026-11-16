@@ -1,6 +1,7 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import uhsuhjupjup.backend.article.domain.Article;
 import uhsuhjupjup.backend.article.domain.ArticleKeyword;
 import uhsuhjupjup.backend.article.infra.ArticleKeywordRepository;
@@ -58,12 +60,16 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -118,6 +124,10 @@ class NoteAnalysisJobIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private NoteService noteService;
+    @Autowired
+    private NoteAnalyzer noteAnalyzer;
+    @Autowired
+    private NoteKeywordSaver noteKeywordSaver;
 
     @MockitoBean
     private FirebaseTokenVerifier firebaseTokenVerifier;
@@ -194,7 +204,7 @@ class NoteAnalysisJobIntegrationTest {
     @Test
     void 허가가_모두_쓰이고_있으면_폴러는_작업을_선점하지_않는다() {
         jobService.enqueue(noteId, NoteAnalysisReason.CAPACITY_EXCEEDED, LocalDateTime.now());
-        Bulkhead bulkhead = bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD);
+        Bulkhead bulkhead = bulkheadRegistry.bulkhead(NoteAnalysisJobRunner.RETRY_BULKHEAD);
         int permits = bulkhead.getBulkheadConfig().getMaxConcurrentCalls();
         for (int i = 0; i < permits; i++) {
             assertThat(bulkhead.tryAcquirePermission()).isTrue();
@@ -215,7 +225,7 @@ class NoteAnalysisJobIntegrationTest {
     void 작업이_끝나면_폴러가_받은_허가를_돌려준다() {
         jobService.enqueue(noteId, NoteAnalysisReason.CAPACITY_EXCEEDED, LocalDateTime.now());
         aiReturns(redis);
-        Bulkhead bulkhead = bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD);
+        Bulkhead bulkhead = bulkheadRegistry.bulkhead(NoteAnalysisJobRunner.RETRY_BULKHEAD);
         int permits = bulkhead.getBulkheadConfig().getMaxConcurrentCalls();
 
         runner.dispatch(LocalDateTime.now());
@@ -453,6 +463,188 @@ class NoteAnalysisJobIntegrationTest {
 
         assertThat(job().getAcknowledgedAt()).isNotNull();
         assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).isEmpty();
+    }
+
+    @Test
+    void 서버_한_대의_AI_동시_호출_자리는_즉시_요청_15개와_재처리_5개로_나뉜다() {
+        int request = bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getBulkheadConfig().getMaxConcurrentCalls();
+        int retry = bulkheadRegistry.bulkhead(NoteAnalysisJobRunner.RETRY_BULKHEAD).getBulkheadConfig().getMaxConcurrentCalls();
+
+        assertThat(request).isEqualTo(15);
+        assertThat(retry).isEqualTo(5);
+        assertThat(request + retry).isEqualTo(20);
+    }
+
+    @Test
+    void 즉시_요청_허가가_모두_쓰여도_폴러는_재처리_허가로_대기_작업을_처리한다() {
+        jobService.enqueue(noteId, NoteAnalysisReason.CAPACITY_EXCEEDED, LocalDateTime.now());
+        aiReturns(redis);
+        Bulkhead request = bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD);
+        int requestPermits = request.getBulkheadConfig().getMaxConcurrentCalls();
+        for (int i = 0; i < requestPermits; i++) {
+            assertThat(request.tryAcquirePermission()).isTrue();
+        }
+        try {
+            assertThat(runner.dispatch(LocalDateTime.now())).isEqualTo(1);
+            awaitStatus(NoteAnalysisJobStatus.DONE);
+            assertThat(request.getMetrics().getAvailableConcurrentCalls()).isZero();
+        } finally {
+            for (int i = 0; i < requestPermits; i++) {
+                request.releasePermission();
+            }
+        }
+    }
+
+    @Test
+    void 대기_작업이_재처리_한도보다_많으면_한도만큼만_AI를_부르고_끝난_뒤_나머지를_처리한다() {
+        Bulkhead retry = bulkheadRegistry.bulkhead(NoteAnalysisJobRunner.RETRY_BULKHEAD);
+        Bulkhead request = bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD);
+        int retryPermits = retry.getBulkheadConfig().getMaxConcurrentCalls();
+        List<Long> noteIds = queuedNotes(retryPermits + 3);
+        Sinks.One<List<KeywordMatch>> ai = Sinks.one();
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(ai.asMono());
+
+        assertThat(runner.dispatch(LocalDateTime.now())).isEqualTo(retryPermits);
+        assertThat(runner.dispatch(LocalDateTime.now())).isZero();
+
+        verify(asyncKeywordClassifier, times(retryPermits)).classify(anyString(), anyString(), any(MatchCatalog.class));
+        assertThat(retry.getMetrics().getAvailableConcurrentCalls()).isZero();
+        assertThat(request.getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(request.getBulkheadConfig().getMaxConcurrentCalls());
+
+        ai.tryEmitValue(List.of(new KeywordMatch(redis.getId(), "ai")));
+        await(() -> retry.getMetrics().getAvailableConcurrentCalls() == retryPermits);
+        assertThat(runner.dispatch(LocalDateTime.now())).isEqualTo(3);
+        await(() -> noteIds.stream().allMatch(id -> statusOf(id) == NoteAnalysisJobStatus.DONE));
+        await(() -> retry.getMetrics().getAvailableConcurrentCalls() == retryPermits);
+    }
+
+    @Test
+    void 즉시_요청이_계속_몰려도_대기_작업이_처리되고_각_경로는_자기_한도를_넘지_않는다() throws Exception {
+        Bulkhead request = bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD);
+        Bulkhead retry = bulkheadRegistry.bulkhead(NoteAnalysisJobRunner.RETRY_BULKHEAD);
+        int requestPermits = request.getBulkheadConfig().getMaxConcurrentCalls();
+        int retryPermits = retry.getBulkheadConfig().getMaxConcurrentCalls();
+        List<Long> jobNoteIds = queuedNotes(12);
+        Member member = memberRepository.findById(memberId).orElseThrow();
+        List<LearningNote> liveNotes = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            liveNotes.add(learningNoteRepository.save(LearningNote.create(member, "즉시-" + i, "Redis 정리")));
+        }
+        InFlight requestCalls = new InFlight();
+        InFlight retryCalls = new InFlight();
+        InFlight allCalls = new InFlight();
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class))).willAnswer(invocation -> {
+            InFlight path = invocation.<String>getArgument(0).startsWith("즉시-") ? requestCalls : retryCalls;
+            return Mono.defer(() -> {
+                        path.enter();
+                        allCalls.enter();
+                        return Mono.delay(Duration.ofMillis(80));
+                    })
+                    .map(tick -> List.of(new KeywordMatch(redis.getId(), "ai")))
+                    .doOnTerminate(() -> {
+                        path.leave();
+                        allCalls.leave();
+                    })
+                    .doOnCancel(() -> {
+                        path.leave();
+                        allCalls.leave();
+                    });
+        });
+        AtomicBoolean running = new AtomicBoolean(true);
+        AtomicInteger rejected = new AtomicInteger();
+        ExecutorService load = Executors.newFixedThreadPool(4);
+        try {
+            for (int worker = 0; worker < 4; worker++) {
+                LearningNote note = liveNotes.get(worker);
+                load.submit(() -> {
+                    while (running.get()) {
+                        try {
+                            noteAnalyzer.analyzeAsync(note).subscribe(ignored -> {
+                            }, error -> {
+                                if (error instanceof BulkheadFullException) {
+                                    rejected.incrementAndGet();
+                                }
+                            });
+                        } catch (RuntimeException ignored) {
+                        }
+                    }
+                });
+            }
+            await(() -> request.getMetrics().getAvailableConcurrentCalls() == 0);
+
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (!jobNoteIds.stream().allMatch(id -> statusOf(id) == NoteAnalysisJobStatus.DONE)) {
+                assertThat(System.nanoTime()).as("대기 작업이 20초 안에 모두 처리되어야 한다").isLessThan(deadline);
+                runner.dispatch(LocalDateTime.now());
+                Thread.sleep(20);
+            }
+        } finally {
+            running.set(false);
+            load.shutdown();
+            assertThat(load.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+
+        assertThat(rejected.get()).isPositive();
+        assertThat(requestCalls.max()).isPositive().isLessThanOrEqualTo(requestPermits);
+        assertThat(retryCalls.max()).isPositive().isLessThanOrEqualTo(retryPermits);
+        assertThat(allCalls.max()).isLessThanOrEqualTo(requestPermits + retryPermits);
+        await(() -> request.getMetrics().getAvailableConcurrentCalls() == requestPermits);
+        await(() -> retry.getMetrics().getAvailableConcurrentCalls() == retryPermits);
+    }
+
+    @Test
+    void 처음_분석하는_노트_여러_개의_결과를_동시에_저장해도_교착_없이_모두_저장된다() throws Exception {
+        Member member = memberRepository.findById(memberId).orElseThrow();
+        for (int round = 0; round < 5; round++) {
+            List<Long> ids = new ArrayList<>();
+            for (int i = 0; i < 16; i++) {
+                ids.add(learningNoteRepository.save(LearningNote.create(member, "동시-" + i, "Redis 정리")).getId());
+            }
+            AtomicInteger cursor = new AtomicInteger();
+
+            List<Boolean> saved = runConcurrently(16, () -> noteKeywordSaver.replaceKeywords(
+                    ids.get(cursor.getAndIncrement()), 0L,
+                    List.of(new KeywordMatch(redis.getId(), "ai")), LocalDateTime.now()));
+
+            assertThat(saved).containsOnly(true);
+            assertThat(ids).allSatisfy(id ->
+                    assertThat(noteKeywordRepository.findKeywordIdsByNoteId(id)).containsExactly(redis.getId()));
+        }
+    }
+
+    private List<Long> queuedNotes(int count) {
+        Member member = memberRepository.findById(memberId).orElseThrow();
+        List<Long> noteIds = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Long id = learningNoteRepository.save(LearningNote.create(member, "작업-" + i, "Redis 정리")).getId();
+            jobService.enqueue(id, NoteAnalysisReason.CAPACITY_EXCEEDED, LocalDateTime.now());
+            noteIds.add(id);
+        }
+        return noteIds;
+    }
+
+    private NoteAnalysisJobStatus statusOf(Long id) {
+        return jobRepository.findById(id).orElseThrow().getStatus();
+    }
+
+    private static final class InFlight {
+
+        private final AtomicInteger current = new AtomicInteger();
+        private final AtomicInteger max = new AtomicInteger();
+
+        void enter() {
+            max.accumulateAndGet(current.incrementAndGet(), Math::max);
+        }
+
+        void leave() {
+            current.decrementAndGet();
+        }
+
+        int max() {
+            return max.get();
+        }
     }
 
     private ResultActions recommendations() throws Exception {
