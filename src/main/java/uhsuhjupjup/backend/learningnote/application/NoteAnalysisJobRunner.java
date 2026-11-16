@@ -25,11 +25,13 @@ import java.util.Set;
 @Component
 public class NoteAnalysisJobRunner {
 
+    static final String RETRY_BULKHEAD = "noteKeywordAnalysisRetry";
+
     private final NoteAnalysisJobRepository jobRepository;
     private final NoteAnalysisJobClaimer claimer;
     private final NoteAnalysisJobRecorder recorder;
     private final NoteAnalyzer noteAnalyzer;
-    private final Bulkhead aiBulkhead;
+    private final Bulkhead retryBulkhead;
     private final Scheduler noteDbScheduler;
     private final Duration lease;
     private final Duration jobTimeout;
@@ -49,25 +51,25 @@ public class NoteAnalysisJobRunner {
         this.claimer = claimer;
         this.recorder = recorder;
         this.noteAnalyzer = noteAnalyzer;
-        this.aiBulkhead = bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD);
+        this.retryBulkhead = bulkheadRegistry.bulkhead(RETRY_BULKHEAD);
         this.noteDbScheduler = noteDbScheduler;
         this.lease = lease;
         this.jobTimeout = jobTimeout;
     }
 
     public int dispatch(LocalDateTime now) {
-        int capacity = aiBulkhead.getMetrics().getAvailableConcurrentCalls();
+        int capacity = retryBulkhead.getMetrics().getAvailableConcurrentCalls();
         if (capacity <= 0) {
             return 0;
         }
         int started = 0;
         for (Long noteId : candidates(now, capacity)) {
-            if (!aiBulkhead.tryAcquirePermission()) {
+            if (!retryBulkhead.tryAcquirePermission()) {
                 break;
             }
             Optional<NoteAnalysisClaim> claim = claimHoldingPermit(noteId, now);
             if (claim.isEmpty()) {
-                aiBulkhead.releasePermission();
+                retryBulkhead.releasePermission();
                 continue;
             }
             run(claim.get());
@@ -104,7 +106,7 @@ public class NoteAnalysisJobRunner {
                     log.warn("노트 분석 작업 실패 noteId={} 사유={}", claim.noteId(), error.toString());
                     return recorder.fail(claim, NoteAnalysisFailures.reasonOf(error), LocalDateTime.now());
                 }).subscribeOn(noteDbScheduler))
-                .doFinally(signal -> aiBulkhead.onComplete())
+                .doFinally(signal -> retryBulkhead.onComplete())
                 .subscribe(outcome -> logOutcome(claim, outcome),
                         error -> log.warn("노트 분석 작업 결과 기록 실패 noteId={} 사유={}", claim.noteId(), error.toString()));
     }
