@@ -3,6 +3,7 @@ services:
     image: ${BACKEND_IMAGE}
     container_name: uhsuh-server
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       SPRING_PROFILES_ACTIVE: prod
       TZ: Asia/Seoul
