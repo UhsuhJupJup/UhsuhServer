@@ -1,7 +1,6 @@
 package uhsuhjupjup.backend.learningnote.infra;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import uhsuhjupjup.backend.learningnote.domain.NoteKeyword;
 
@@ -23,14 +22,19 @@ public interface NoteKeywordRepository extends JpaRepository<NoteKeyword, Long> 
     @Query("select nk.note.id as noteId, nk.keyword.id as keywordId from NoteKeyword nk where nk.note.id in :noteIds")
     List<NoteKeywordId> findKeywordIdsByNoteIdIn(Collection<Long> noteIds);
 
-    @Modifying
-    @Query("delete from NoteKeyword nk where nk.note.id = :noteId")
-    void deleteByNoteId(Long noteId);
+    @Query("select nk.id as id, nk.keyword.id as keywordId from NoteKeyword nk where nk.note.id = :noteId")
+    List<NoteKeywordRow> findRowsByNoteId(Long noteId);
 
     interface NoteKeywordName {
         Long getNoteId();
 
         String getName();
+    }
+
+    interface NoteKeywordRow {
+        Long getId();
+
+        Long getKeywordId();
     }
 
     interface NoteKeywordId {

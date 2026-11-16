@@ -1,6 +1,14 @@
 package uhsuhjupjup.backend.learningnote;
 
 import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import uhsuhjupjup.backend.learningnote.domain.NoteAnalysisJob;
+import uhsuhjupjup.backend.learningnote.domain.NoteAnalysisJobStatus;
+import uhsuhjupjup.backend.learningnote.domain.NoteAnalysisReason;
+import uhsuhjupjup.backend.learningnote.infra.NoteAnalysisJobRepository;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -92,6 +100,8 @@ class NoteRecommendationIntegrationTest {
     private FirebaseTokenVerifier firebaseTokenVerifier;
     @Autowired
     private NoteKeywordRepository noteKeywordRepository;
+    @Autowired
+    private NoteAnalysisJobRepository noteAnalysisJobRepository;
 
     @MockitoBean
     private KeywordClassifier keywordClassifier;
@@ -133,6 +143,7 @@ class NoteRecommendationIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        noteAnalysisJobRepository.deleteAllInBatch();
         noteKeywordRepository.deleteAllInBatch();
         learningNoteRepository.deleteAllInBatch();
         articleKeywordRepository.deleteAllInBatch();
@@ -163,6 +174,7 @@ class NoteRecommendationIntegrationTest {
 
         recommendations()
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("READY"))
                 .andExpect(jsonPath("$.keywords.length()").value(2))
                 .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
                 .andExpect(jsonPath("$.articles.length()").value(2))
@@ -197,17 +209,58 @@ class NoteRecommendationIntegrationTest {
     }
 
     @Test
-    void 두_AI가_모두_실패하면_노트_제목과_본문의_문자열로_추천하고_분석_결과는_저장하지_않는다() throws Exception {
+    void 두_AI가_모두_실패하면_분석_작업으로_보존하고_대기_상태로_응답한다() throws Exception {
         given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
                 .willReturn(Mono.error(new KeywordClassificationException("Claude, GPT 키워드 분류 모두 실패",
                         new RuntimeException())));
 
         recommendations()
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
-                .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.keywords.length()").value(0))
+                .andExpect(jsonPath("$.articles.length()").value(0));
 
         assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNull();
+        NoteAnalysisJob job = noteAnalysisJobRepository.findById(noteId).orElseThrow();
+        assertThat(job.getStatus()).isEqualTo(NoteAnalysisJobStatus.PENDING);
+        assertThat(job.getLastReason()).isEqualTo(NoteAnalysisReason.AI_FAILED);
+        assertThat(job.getAttempts()).isEqualTo(1);
+    }
+
+    @Test
+    void 동시_호출_한도를_넘으면_AI를_부르지_않고_분석_작업으로_보존한다() throws Exception {
+        Bulkhead bulkhead = bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest");
+        int permits = bulkhead.getBulkheadConfig().getMaxConcurrentCalls();
+        for (int i = 0; i < permits; i++) {
+            assertThat(bulkhead.tryAcquirePermission()).isTrue();
+        }
+        try {
+            recommendations()
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("PENDING"));
+        } finally {
+            for (int i = 0; i < permits; i++) {
+                bulkhead.releasePermission();
+            }
+        }
+
+        verifyNoInteractions(asyncKeywordClassifier);
+        NoteAnalysisJob job = noteAnalysisJobRepository.findById(noteId).orElseThrow();
+        assertThat(job.getLastReason()).isEqualTo(NoteAnalysisReason.CAPACITY_EXCEEDED);
+        assertThat(job.getAttempts()).isZero();
+    }
+
+    @Test
+    void 대기_중인_작업이_있으면_다시_조회해도_AI를_부르지_않고_대기_상태를_돌려준다() throws Exception {
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.error(new KeywordClassificationException("모두 실패", new RuntimeException())));
+        recommendations().andExpect(jsonPath("$.status").value("PENDING"));
+
+        recommendations()
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        verify(asyncKeywordClassifier, times(1)).classify(anyString(), anyString(), any(MatchCatalog.class));
     }
 
     @Test
@@ -229,7 +282,7 @@ class NoteRecommendationIntegrationTest {
     }
 
     @Test
-    void 추천_요청_시간이_끝나면_AI_호출을_취소하고_문자열_기반으로_응답한다() throws Exception {
+    void 추천_요청_시간이_끝나면_AI_호출을_취소하고_분석_작업으로_보존한다() throws Exception {
         AtomicBoolean cancelled = new AtomicBoolean();
         given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
                 .willReturn(Mono.<List<KeywordMatch>>never().doOnCancel(() -> cancelled.set(true)));
@@ -244,17 +297,20 @@ class NoteRecommendationIntegrationTest {
 
         mockMvc.perform(asyncDispatch(started))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.keywords", hasItems("Redis", "캐싱")))
-                .andExpect(jsonPath("$.articles[0].articleId").value(redisCachingArticle.getId()));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.keywords.length()").value(0));
         assertThat(cancelled).isTrue();
-        assertThat(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getMetrics().getAvailableConcurrentCalls())
-                .isEqualTo(bulkheadRegistry.bulkhead("noteKeywordAnalysis").getBulkheadConfig().getMaxConcurrentCalls());
+        assertThat(bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest").getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest").getBulkheadConfig().getMaxConcurrentCalls());
+        NoteAnalysisJob job = noteAnalysisJobRepository.findById(noteId).orElseThrow();
+        assertThat(job.getStatus()).isEqualTo(NoteAnalysisJobStatus.PENDING);
+        assertThat(job.getLastReason()).isEqualTo(NoteAnalysisReason.REQUEST_TIMEOUT);
     }
 
     @Test
     void 서킷_브레이커는_벌크헤드_거절을_실패로_세지_않는다() {
         BulkheadFullException rejected = BulkheadFullException.createBulkheadFullException(
-                bulkheadRegistry.bulkhead("noteKeywordAnalysis"));
+                bulkheadRegistry.bulkhead("noteKeywordAnalysisRequest"));
 
         for (String name : List.of("keywordClassifier", "keywordClassifierGpt")) {
             CircuitBreaker circuit = circuitBreakerRegistry.circuitBreaker(name);
@@ -283,9 +339,9 @@ class NoteRecommendationIntegrationTest {
     }
 
     @Test
-    void 노트_그래프는_노트_키워드_추천글_노드와_간선을_반환한다() throws Exception {
-        given(keywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
-                .willReturn(List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")));
+    void 노트_그래프는_분석된_노트의_키워드_추천글_노드와_간선을_반환한다() throws Exception {
+        aiReturns(redis, caching);
+        recommendations().andExpect(jsonPath("$.status").value("READY"));
 
         mockMvc.perform(get("/api/notes/" + noteId + "/graph").header(AUTHORIZATION, BEARER))
                 .andExpect(status().isOk())
@@ -295,6 +351,17 @@ class NoteRecommendationIntegrationTest {
                 .andExpect(jsonPath("$.nodes[?(@.id=='kw:" + redis.getId() + "')]").exists())
                 .andExpect(jsonPath("$.nodes[?(@.type=='article')]").exists())
                 .andExpect(jsonPath("$.edges[?(@.source=='note:" + noteId + "')]").exists());
+    }
+
+    @Test
+    void 분석되지_않은_노트의_그래프는_AI를_부르지_않고_노트_노드만_반환한다() throws Exception {
+        mockMvc.perform(get("/api/notes/" + noteId + "/graph").header(AUTHORIZATION, BEARER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes.length()").value(1))
+                .andExpect(jsonPath("$.nodes[0].id").value("note:" + noteId))
+                .andExpect(jsonPath("$.edges.length()").value(0));
+
+        verifyNoInteractions(asyncKeywordClassifier, keywordClassifier);
     }
 
     @Test

@@ -1,124 +1,61 @@
 package uhsuhjupjup.backend.learningnote.application;
 
 import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.reactor.bulkhead.operator.BulkheadOperator;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import uhsuhjupjup.backend.config.NoteAsyncConfig;
-import uhsuhjupjup.backend.keyword.domain.Keyword;
 import uhsuhjupjup.backend.keyword.infra.KeywordAliasRepository;
 import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
-import uhsuhjupjup.backend.learningnote.application.dto.NoteAnalysis;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.pipeline.matching.application.AsyncKeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
-import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassifier;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
-import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatcher;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 public class NoteAnalyzer {
 
-    static final String AI_BULKHEAD = "noteKeywordAnalysis";
+    static final String REQUEST_BULKHEAD = "noteKeywordAnalysisRequest";
 
     private final KeywordRepository keywordRepository;
     private final KeywordAliasRepository keywordAliasRepository;
-    private final KeywordClassifier keywordClassifier;
     private final AsyncKeywordClassifier asyncKeywordClassifier;
-    private final KeywordMatcher keywordMatcher;
     private final NoteKeywordSaver noteKeywordSaver;
-    private final Bulkhead aiBulkhead;
+    private final Bulkhead requestBulkhead;
     private final Scheduler noteDbScheduler;
 
     public NoteAnalyzer(KeywordRepository keywordRepository,
                         KeywordAliasRepository keywordAliasRepository,
-                        KeywordClassifier keywordClassifier,
                         AsyncKeywordClassifier asyncKeywordClassifier,
-                        KeywordMatcher keywordMatcher,
                         NoteKeywordSaver noteKeywordSaver,
                         BulkheadRegistry bulkheadRegistry,
                         @Qualifier(NoteAsyncConfig.NOTE_DB_SCHEDULER) Scheduler noteDbScheduler) {
         this.keywordRepository = keywordRepository;
         this.keywordAliasRepository = keywordAliasRepository;
-        this.keywordClassifier = keywordClassifier;
         this.asyncKeywordClassifier = asyncKeywordClassifier;
-        this.keywordMatcher = keywordMatcher;
         this.noteKeywordSaver = noteKeywordSaver;
-        this.aiBulkhead = bulkheadRegistry.bulkhead(AI_BULKHEAD);
+        this.requestBulkhead = bulkheadRegistry.bulkhead(REQUEST_BULKHEAD);
         this.noteDbScheduler = noteDbScheduler;
     }
 
-    public Mono<NoteAnalysis> analyzeAsync(LearningNote note) {
-        List<Keyword> keywords = keywordRepository.findAll();
-        MatchCatalog catalog = MatchCatalog.from(keywords, keywordAliasRepository.findAll());
-        return Mono.defer(() -> asyncKeywordClassifier.classify(note.getTitle(), note.getContent(), catalog))
-                .transformDeferred(BulkheadOperator.of(aiBulkhead))
+    public Mono<Boolean> analyzeAsync(LearningNote note) {
+        long revision = note.getContentRevision();
+        return classifyAsync(note.getTitle(), note.getContent())
+                .transformDeferred(BulkheadOperator.of(requestBulkhead))
                 .publishOn(noteDbScheduler)
-                .map(matches -> {
-                    noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
-                    return NoteAnalysis.saved();
-                })
-                .onErrorResume(BulkheadFullException.class, e -> {
-                    log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
-                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
-                })
-                .onErrorResume(KeywordClassificationException.class, e -> {
-                    log.warn("노트 AI 분석 실패, 문자열 기반 추출로 폴백 noteId={} 사유={}", note.getId(), e.toString());
-                    return Mono.fromSupplier(() -> fallback(note, keywords, catalog));
-                });
+                .map(matches -> noteKeywordSaver.replaceKeywords(note.getId(), revision, matches, LocalDateTime.now()));
     }
 
-    public NoteAnalysis analyze(LearningNote note) {
-        List<Keyword> keywords = keywordRepository.findAll();
-        MatchCatalog catalog = MatchCatalog.from(keywords, keywordAliasRepository.findAll());
-        try {
-            List<KeywordMatch> matches = aiBulkhead.executeSupplier(
-                    () -> keywordClassifier.classify(note.getTitle(), note.getContent(), catalog));
-            noteKeywordSaver.replaceKeywords(note.getId(), matches, LocalDateTime.now());
-            return NoteAnalysis.saved();
-        } catch (BulkheadFullException e) {
-            log.warn("노트 AI 동시 호출 한도 초과, 문자열 기반 추출로 폴백 noteId={}", note.getId());
-            return fallback(note, keywords, catalog);
-        } catch (KeywordClassificationException e) {
-            log.warn("노트 AI 분석 실패, 문자열 기반 추출로 폴백 noteId={} 사유={}", note.getId(), e.toString());
-            return fallback(note, keywords, catalog);
-        }
-    }
-
-    public NoteAnalysis analyzeWithoutAi(LearningNote note) {
-        List<Keyword> keywords = keywordRepository.findAll();
-        return fallback(note, keywords, MatchCatalog.from(keywords, keywordAliasRepository.findAll()));
-    }
-
-    private NoteAnalysis fallback(LearningNote note, List<Keyword> keywords, MatchCatalog catalog) {
-        Map<Long, String> nameById = keywords.stream()
-                .collect(Collectors.toMap(Keyword::getId, Keyword::getName, (first, second) -> first));
-        List<Long> keywordIds = keywordMatcher.match(searchText(note), catalog).stream()
-                .map(KeywordMatch::keywordId)
-                .distinct()
-                .toList();
-        List<String> keywordNames = keywordIds.stream()
-                .map(nameById::get)
-                .filter(name -> name != null)
-                .toList();
-        return NoteAnalysis.fallback(keywordIds, keywordNames);
-    }
-
-    private static String searchText(LearningNote note) {
-        String content = note.getContent() == null ? "" : note.getContent();
-        return note.getTitle() + "\n" + content;
+    public Mono<List<KeywordMatch>> classifyAsync(String title, String content) {
+        MatchCatalog catalog = MatchCatalog.from(keywordRepository.findAll(), keywordAliasRepository.findAll());
+        return Mono.defer(() -> asyncKeywordClassifier.classify(title, content, catalog))
+                .switchIfEmpty(Mono.error(() -> new KeywordClassificationException("AI 분류 응답이 비었습니다", null)));
     }
 }

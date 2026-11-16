@@ -67,12 +67,17 @@ class NoteKeywordRepositoryTest {
     }
 
     @Test
-    void 노트별로_전체_삭제한다() {
-        noteKeywordRepository.save(NoteKeyword.of(note, redis));
-        noteKeywordRepository.save(NoteKeyword.of(note, caching));
+    void 노트의_키워드_행을_행_ID와_함께_조회한다() {
+        NoteKeyword first = noteKeywordRepository.save(NoteKeyword.of(note, redis));
+        NoteKeyword second = noteKeywordRepository.save(NoteKeyword.of(note, caching));
 
-        noteKeywordRepository.deleteByNoteId(note.getId());
+        List<NoteKeywordRepository.NoteKeywordRow> rows = noteKeywordRepository.findRowsByNoteId(note.getId());
 
-        assertThat(noteKeywordRepository.findKeywordIdsByNoteId(note.getId())).isEmpty();
+        assertThat(rows).extracting(
+                        NoteKeywordRepository.NoteKeywordRow::getId,
+                        NoteKeywordRepository.NoteKeywordRow::getKeywordId)
+                .containsExactlyInAnyOrder(
+                        tuple(first.getId(), redis.getId()),
+                        tuple(second.getId(), caching.getId()));
     }
 }
