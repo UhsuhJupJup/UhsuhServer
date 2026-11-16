@@ -74,6 +74,41 @@ class NoteKeywordSaverTest {
     }
 
     @Test
+    void 재분석에서_그대로인_키워드_행은_지우지_않고_빠진_키워드만_지운다() {
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
+                List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(caching.getId(), "ai")),
+                LocalDateTime.now());
+        Long redisRowId = rowIdOf(redis.getId());
+
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
+                List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(jpa.getId(), "ai")),
+                LocalDateTime.now());
+
+        assertThat(rowIdOf(redis.getId())).isEqualTo(redisRowId);
+        assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId))
+                .containsExactlyInAnyOrder(redis.getId(), jpa.getId());
+    }
+
+    @Test
+    void 같은_키워드가_여러_번_와도_한_번만_저장한다() {
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
+                List.of(new KeywordMatch(redis.getId(), "ai"), new KeywordMatch(redis.getId(), "alias")),
+                LocalDateTime.now());
+
+        assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).containsExactly(redis.getId());
+    }
+
+    @Test
+    void 다시_분석한_결과가_비면_기존_키워드를_모두_지운다() {
+        noteKeywordSaver.replaceKeywords(noteId, 0L,
+                List.of(new KeywordMatch(redis.getId(), "ai")), LocalDateTime.now());
+
+        noteKeywordSaver.replaceKeywords(noteId, 0L, List.of(), LocalDateTime.now());
+
+        assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).isEmpty();
+    }
+
+    @Test
     void 키워드가_없어도_분석시각은_남긴다() {
         noteKeywordSaver.replaceKeywords(noteId, 0L, List.of(), LocalDateTime.now());
 
@@ -93,5 +128,13 @@ class NoteKeywordSaverTest {
         assertThat(saved).isFalse();
         assertThat(noteKeywordRepository.findKeywordIdsByNoteId(noteId)).isEmpty();
         assertThat(learningNoteRepository.findById(noteId).orElseThrow().getAnalyzedAt()).isNull();
+    }
+
+    private Long rowIdOf(Long keywordId) {
+        return noteKeywordRepository.findRowsByNoteId(noteId).stream()
+                .filter(row -> row.getKeywordId().equals(keywordId))
+                .map(NoteKeywordRepository.NoteKeywordRow::getId)
+                .findFirst()
+                .orElseThrow();
     }
 }
