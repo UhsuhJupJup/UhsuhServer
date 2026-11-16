@@ -6,6 +6,7 @@ import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
@@ -14,11 +15,13 @@ import uhsuhjupjup.backend.keyword.infra.KeywordRepository;
 import uhsuhjupjup.backend.learningnote.domain.LearningNote;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.matching.application.AsyncKeywordClassifier;
+import uhsuhjupjup.backend.pipeline.matching.application.KeywordClassificationException;
 import uhsuhjupjup.backend.pipeline.matching.domain.KeywordMatch;
 import uhsuhjupjup.backend.pipeline.matching.domain.MatchCatalog;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,13 +38,13 @@ class NoteAnalyzerBulkheadTest {
 
     private final AsyncKeywordClassifier asyncKeywordClassifier = mock(AsyncKeywordClassifier.class);
     private final NoteKeywordSaver noteKeywordSaver = mock(NoteKeywordSaver.class);
+    private final KeywordRepository keywordRepository = mock(KeywordRepository.class);
+    private final KeywordAliasRepository keywordAliasRepository = mock(KeywordAliasRepository.class);
     private NoteAnalyzer noteAnalyzer;
     private BulkheadRegistry bulkheadRegistry;
 
     @BeforeEach
     void setUp() {
-        KeywordRepository keywordRepository = mock(KeywordRepository.class);
-        KeywordAliasRepository keywordAliasRepository = mock(KeywordAliasRepository.class);
         given(keywordRepository.findAll()).willReturn(List.of());
         given(keywordAliasRepository.findAll()).willReturn(List.of());
         given(noteKeywordSaver.replaceKeywords(anyLong(), anyLong(), anyList(), any(LocalDateTime.class)))
@@ -70,7 +73,7 @@ class NoteAnalyzerBulkheadTest {
 
         assertThat(first.join()).isTrue();
         assertThat(asyncCalls).hasValue(1);
-        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
                 .isEqualTo(1);
     }
 
@@ -79,12 +82,72 @@ class NoteAnalyzerBulkheadTest {
         given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
                 .willReturn(Mono.never());
         var call = noteAnalyzer.analyzeAsync(note(1L)).subscribe();
-        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
                 .isZero();
 
         call.dispose();
 
-        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.AI_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void 즉시_요청은_설정한_한도까지만_AI를_부르고_나머지는_바로_거절한다() {
+        int permits = 15;
+        BulkheadRegistry registry = BulkheadRegistry.ofDefaults();
+        registry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD, BulkheadConfig.custom()
+                .maxConcurrentCalls(permits)
+                .maxWaitDuration(Duration.ZERO)
+                .build());
+        NoteAnalyzer limited = new NoteAnalyzer(keywordRepository, keywordAliasRepository, asyncKeywordClassifier,
+                noteKeywordSaver, registry, Schedulers.immediate());
+        AtomicInteger asyncCalls = new AtomicInteger();
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class))).willAnswer(invocation -> {
+            asyncCalls.incrementAndGet();
+            return Mono.never();
+        });
+        AtomicInteger rejected = new AtomicInteger();
+        List<Disposable> calls = new ArrayList<>();
+
+        for (long id = 1; id <= permits + 5; id++) {
+            calls.add(limited.analyzeAsync(note(id)).subscribe(ignored -> {
+            }, error -> {
+                if (error instanceof BulkheadFullException) {
+                    rejected.incrementAndGet();
+                }
+            }));
+        }
+
+        assertThat(asyncCalls).hasValue(permits);
+        assertThat(rejected).hasValue(5);
+        calls.forEach(Disposable::dispose);
+        assertThat(registry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(permits);
+    }
+
+    @Test
+    void AI가_실패해도_허가를_돌려준다() {
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.error(new KeywordClassificationException("모두 실패", new RuntimeException("503"))));
+
+        assertThatThrownBy(() -> noteAnalyzer.analyzeAsync(note(1L)).block())
+                .isInstanceOf(KeywordClassificationException.class);
+
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
+                .isEqualTo(1);
+    }
+
+    @Test
+    void 결과_저장이_실패해도_허가를_돌려준다() {
+        given(asyncKeywordClassifier.classify(anyString(), anyString(), any(MatchCatalog.class)))
+                .willReturn(Mono.just(List.of(new KeywordMatch(1L, "ai"))));
+        given(noteKeywordSaver.replaceKeywords(anyLong(), anyLong(), anyList(), any(LocalDateTime.class)))
+                .willThrow(new IllegalStateException("DB 연결 끊김"));
+
+        assertThatThrownBy(() -> noteAnalyzer.analyzeAsync(note(1L)).block())
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(bulkheadRegistry.bulkhead(NoteAnalyzer.REQUEST_BULKHEAD).getMetrics().getAvailableConcurrentCalls())
                 .isEqualTo(1);
     }
 
