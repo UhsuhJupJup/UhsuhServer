@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.transaction.annotation.Transactional;
 import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
 import uhsuhjupjup.backend.pipeline.notification.domain.OutboxStatus;
 
@@ -100,11 +99,22 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
                    @Param("to") OutboxStatus to,
                    @Param("now") LocalDateTime now);
 
-    @Transactional
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = "delete from notification_outbox"
+    @Query(value = "select id from notification_outbox"
             + " where status = 'SENT' and sent_at < :before"
-            + " order by sent_at asc"
+            + " order by sent_at asc, id asc"
             + " limit :limit", nativeQuery = true)
-    int deleteSentBefore(@Param("before") LocalDateTime before, @Param("limit") int limit);
+    List<Long> findSentIdsBefore(@Param("before") LocalDateTime before, @Param("limit") int limit);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "insert into notification_outbox_archive"
+            + " (id, recipient, recipient_type, subject, body, article_count, unsubscribe_url, status, attempts,"
+            + " next_attempt_at, republish_at, last_error, created_at, sent_at, archived_at)"
+            + " select id, recipient, recipient_type, subject, body, article_count, unsubscribe_url, status, attempts,"
+            + " next_attempt_at, republish_at, last_error, created_at, sent_at, :archivedAt"
+            + " from notification_outbox where id in :ids and status = 'SENT'", nativeQuery = true)
+    int copySentToArchive(@Param("ids") List<Long> ids, @Param("archivedAt") LocalDateTime archivedAt);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "delete from notification_outbox where id in :ids and status = 'SENT'", nativeQuery = true)
+    int deleteSentByIds(@Param("ids") List<Long> ids);
 }

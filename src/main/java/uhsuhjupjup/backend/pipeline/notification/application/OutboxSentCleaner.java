@@ -6,7 +6,6 @@ import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import uhsuhjupjup.backend.pipeline.notification.infra.NotificationOutboxRepository;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -16,7 +15,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class OutboxSentCleaner {
 
-    private final NotificationOutboxRepository notificationOutboxRepository;
+    private final OutboxSentArchiver outboxSentArchiver;
 
     @Value("${outbox.sent-retention:P7D}")
     private Duration sentRetention;
@@ -27,17 +26,18 @@ public class OutboxSentCleaner {
     @Scheduled(cron = "${outbox.cleanup-cron:0 0 4 * * *}", zone = "Asia/Seoul")
     @SchedulerLock(name = "notificationOutboxCleanup", lockAtMostFor = "PT30M")
     public void cleanup() {
-        int deleted = deleteSentBefore(LocalDateTime.now().minus(sentRetention));
-        log.info("발송 성공 이력 정리 삭제={} 보관={}", deleted, sentRetention);
+        LocalDateTime now = LocalDateTime.now();
+        int archived = archiveSentBefore(now.minus(sentRetention), now);
+        log.info("발송 성공 이력 보관 이동={} 아웃박스 보관 기간={}", archived, sentRetention);
     }
 
-    public int deleteSentBefore(LocalDateTime before) {
+    public int archiveSentBefore(LocalDateTime sentBefore, LocalDateTime archivedAt) {
         int total = 0;
-        int deleted;
+        int moved;
         do {
-            deleted = notificationOutboxRepository.deleteSentBefore(before, chunkSize);
-            total += deleted;
-        } while (deleted == chunkSize);
+            moved = outboxSentArchiver.archiveChunk(sentBefore, chunkSize, archivedAt);
+            total += moved;
+        } while (moved == chunkSize);
         return total;
     }
 }
