@@ -17,18 +17,32 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
 
     List<NotificationOutbox> findByStatusOrderByCreatedAtDesc(OutboxStatus status, Pageable pageable);
 
-    List<NotificationOutbox> findByStatusOrderBySentAtDesc(OutboxStatus status, Pageable pageable);
+    String SENT_LOG_COLUMNS = "id, recipient, recipient_type as recipientType, article_count as articleCount,"
+            + " subject, sent_at as sentAt";
 
-    List<NotificationOutbox> findByStatusAndSentAtGreaterThanEqualAndSentAtLessThanOrderBySentAtDesc(
-            OutboxStatus status, LocalDateTime from, LocalDateTime to);
+    @Query(value = "select " + SENT_LOG_COLUMNS + " from notification_outbox where status = 'SENT'"
+            + " union all"
+            + " select " + SENT_LOG_COLUMNS + " from notification_outbox_archive where status = 'SENT'"
+            + " order by sentAt desc, id desc"
+            + " limit :limit", nativeQuery = true)
+    List<NotificationSentLogRow> findRecentSentLogs(@Param("limit") int limit);
+
+    @Query(value = "select " + SENT_LOG_COLUMNS + " from notification_outbox"
+            + " where status = 'SENT' and sent_at >= :from and sent_at < :to"
+            + " union all"
+            + " select " + SENT_LOG_COLUMNS + " from notification_outbox_archive"
+            + " where status = 'SENT' and sent_at >= :from and sent_at < :to"
+            + " order by sentAt desc, id desc", nativeQuery = true)
+    List<NotificationSentLogRow> findSentLogsBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     @Query(value = "select date_format(sent_at, '%Y-%m-%d') as logDate,"
             + " min(sent_at) as firstSentAt,"
             + " count(*) as total,"
             + " cast(sum(recipient_type = 'MEMBER') as signed) as memberCount,"
             + " cast(sum(recipient_type = 'EMAIL_SUBSCRIBER') as signed) as subscriberCount"
-            + " from notification_outbox"
-            + " where status = 'SENT'"
+            + " from (select sent_at, recipient_type from notification_outbox where status = 'SENT'"
+            + " union all"
+            + " select sent_at, recipient_type from notification_outbox_archive where status = 'SENT') sent"
             + " group by date_format(sent_at, '%Y-%m-%d')"
             + " order by logDate desc", nativeQuery = true)
     List<NotificationOutboxDailyRow> findDailySentSummary();

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import uhsuhjupjup.backend.common.auth.AdminMember;
 import uhsuhjupjup.backend.member.domain.Member;
 import uhsuhjupjup.backend.pipeline.notification.application.OutboxAdminService;
-import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
+import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailSendLog;
 import uhsuhjupjup.backend.pipeline.notification.ui.dto.AdminEmailSendDailyResponse;
 import uhsuhjupjup.backend.pipeline.notification.ui.dto.AdminEmailSendLogResponse;
 
@@ -29,7 +29,7 @@ public class AdminEmailSendLogController implements AdminEmailSendLogControllerA
                                                 @RequestParam(defaultValue = "50") int limit,
                                                 @RequestParam(required = false)
                                                 @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<NotificationOutbox> rows =
+        List<EmailSendLog> rows =
                 date != null ? outboxAdminService.sentOn(date) : outboxAdminService.recentSent(limit);
         return rows.stream()
                 .map(AdminEmailSendLogResponse::from)
