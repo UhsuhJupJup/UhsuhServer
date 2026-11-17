@@ -1,6 +1,6 @@
 package uhsuhjupjup.backend.pipeline.notification.ui.dto;
 
-import uhsuhjupjup.backend.pipeline.notification.domain.NotificationOutbox;
+import uhsuhjupjup.backend.pipeline.notification.application.dto.EmailSendLog;
 
 import java.time.LocalDateTime;
 
@@ -13,13 +13,13 @@ public record AdminEmailSendLogResponse(
         LocalDateTime sentAt
 ) {
 
-    public static AdminEmailSendLogResponse from(NotificationOutbox row) {
+    public static AdminEmailSendLogResponse from(EmailSendLog log) {
         return new AdminEmailSendLogResponse(
-                row.getId(),
-                row.getRecipient(),
-                row.getRecipientType().name(),
-                row.getArticleCount(),
-                row.getSubject(),
-                row.getSentAt());
+                log.id(),
+                log.email(),
+                log.recipientType(),
+                log.articleCount(),
+                log.subject(),
+                log.sentAt());
     }
 }
